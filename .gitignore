@@ -1,0 +1,5 @@
+# 배포 환경 지식은 운영자마다 다르다 — deploy.sh 가 넣거나 운영자가 직접 넣는다
+/resources/knowledge/
+# egg 덤프는 각 패널의 스냅샷이다 (카탈로그 검증용, 로컬 전용)
+/resources/catalog/eggs.json
+/dist/

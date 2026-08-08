@@ -1,0 +1,21 @@
+{
+    "id": "wisdom-ai-assistant",
+    "name": "Wisdom AI Assistant",
+    "author": "WisdomIT",
+    "version": "1.0.0",
+    "description": "Chat to create, run and diagnose game servers — an AI assistant for Pelican Panel.",
+    "category": "plugin",
+    "url": "https://github.com/WisdomIT/pelican-wisdom-ai-assistant",
+    "update_url": "https://raw.githubusercontent.com/WisdomIT/pelican-wisdom-ai-assistant/main/update.json",
+    "namespace": "WisdomIT\\WisdomAiAssistant",
+    "class": "WisdomAiAssistantPlugin",
+    "panels": [
+        "admin",
+        "app",
+        "server"
+    ],
+    "panel_version": "^1.0.0-beta35",
+    "composer_packages": {
+        "anthropic-ai/sdk": "^0.7"
+    }
+}

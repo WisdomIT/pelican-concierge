@@ -1,0 +1,601 @@
+# 게임 카탈로그 — 사용자에게 보이는 게임 목록과 정책 (이슈 #16)
+#
+#  egg 는 "기술 정의"(SRCDS_APPID, 규칙, docker 이미지)이고
+#  카탈로그는 "사람이 읽는 정의"(이름, 인원, 물어볼 것)다. 둘을 섞지 않는다.
+#
+#  소비자: 개설 대행 함수(#7) → 에이전트(#13). 사람용 화면은 Pelican 기본 폼이 폴백.
+#
+# ── 설계 원칙 ──
+#  1. egg 를 **이름으로** 참조한다. id 는 서버 재구축 때 달라진다.
+#  2. egg 규칙은 기준선, 카탈로그가 경계. **넓히지 않고 좁히기만** 한다.
+#     (실측: MAX_PLAYERS 가 egg 규칙 min:1 뿐이라 10000 이 통과됐다)
+#  3. 화이트리스트 역할은 지지 않는다 — "임포트한 egg = 허용 게임" 으로 확정됐다.
+#     카탈로그에 없는 egg 도 Pelican 기본 폼으로는 개설된다. 카탈로그는 UX 계층이다.
+#  4. 자원 변환표는 **게임별로 따로** 둔다. 공통표는 성립하지 않는다
+#     (실측: 마인크래프트 실사용 968MiB / Satisfactory 배정 16384MiB)
+
+version: 1
+
+# 인원 표기는 사용자에게 보여줄 문구다. 실제 강제는 자원(memory/disk/cpu)이 한다.
+# 게임에 인원 변수가 있으면 sizes[].players 를 그 변수에도 반영한다(games[].player_var).
+games:
+
+  # ────────────────────────────────────────────────────────────────
+  - id: minecraft-paper
+    name: 마인크래프트 (플러그인)
+    summary: 플러그인을 넣을 수 있는 가장 대중적인 서버. 모드는 안 됨.
+    egg: Paper
+    # 실행할 Java 는 **마인크래프트 버전**이 정한다. 이 변수에서 버전을 읽어 자동으로 고른다.
+    #  ⚠ 지정하지 않으면 egg 의 첫 이미지가 쓰이는데 버전과 무관하다(Paper 는 java_25).
+    java_from: MINECRAFT_VERSION
+    # 유휴 판정에 쓸 접속자 쿼리(#18). 런처가 서버 목록만 열어둬도 rx 가 생기므로
+    # 마인크래프트는 rx 가 아니라 접속자 수로 판정해야 한다.
+    query: minecraft_java
+    # 이 게임에는 인원 변수가 없다 — 인원은 자원 배정으로만 표현된다.
+    player_var: null
+    sizes:
+      - { id: s, label: "4명 정도",  players: 4,  memory: 2048, disk: 8192,  cpu: 100 }
+      - { id: m, label: "8명 정도",  players: 8,  memory: 4096, disk: 15360, cpu: 200 }
+      - { id: l, label: "16명 정도", players: 16, memory: 8192, disk: 30720, cpu: 400 }
+    # 사용자에게 물을 것 — egg 의 user_editable 중 **의미 있는 것만**.
+    ask:
+      - env: MINECRAFT_VERSION
+        label: 버전
+        type: choice
+        # egg 이 설치할 때 papermc API 에서 실시간으로 받아온다 → **최신을 넣어도 된다.**
+        #  ⚠ 낡은 값만 두면 친구 런처(기본이 최신)로는 "Outdated server" 가 뜬다. 실제로 겪었다.
+        choices: ["26.2", "1.21.11", "1.20.6"]
+        default: "26.2"
+    # 묻지 않고 채울 것. egg 기본값을 그대로 쓸 거면 생략해도 된다.
+    defaults:
+      BUILD_NUMBER: latest
+      SERVER_JARFILE: server.jar
+    ports:
+      count: 1
+      protocol: [tcp, udp]            # 자바는 TCP, 쿼리/베드락 대응 위해 UDP 도 열어둔다
+    # ⚠ 설치 **완료 후** 실행. 개설 직후에는 파일이 아직 없다 (#7)
+    post_install:
+      - type: file_replace
+        path: eula.txt
+        from: "eula=false"
+        to: "eula=true"
+        reason: "EULA 미동의면 첫 기동이 조용히 실패한다(Exited 0). 사용자에게 물을 이유가 없는 전제."
+    verified: { install: "218MB", boot: "Paper 1.21 기동 확인 (java_21)" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 150
+    # 시크릿 없음 — 빈 선언은 "확인했고 없다"는 뜻이다(키 자체가 빠진 것과 구분된다).
+    secrets: []
+    mods:
+      supported: true
+      kind: plugin
+      path: plugins/
+      note: "Minecraft Modrinth 플러그인으로 패널에서 직접 설치 가능"
+
+  # ────────────────────────────────────────────────────────────────
+  - id: minecraft-fabric
+    name: 마인크래프트 (모드)
+    summary: 모드를 넣을 수 있는 서버. Fabric 로더 사용.
+    egg: Fabric
+    # 위 Paper 와 같은 이유. egg 첫 이미지는 Fabric=java_8, Forge=java_25 로 제각각이다.
+    java_from: MC_VERSION
+    query: minecraft_java
+    player_var: null
+    sizes:
+      - { id: s, label: "4명 정도",  players: 4,  memory: 4096, disk: 10240, cpu: 200 }
+      - { id: m, label: "8명 정도",  players: 8,  memory: 6144, disk: 20480, cpu: 300 }
+    ask:
+      - env: MC_VERSION
+        label: 버전
+        type: choice
+        # Fabric meta API 도 실시간이다(위 Paper 주석 참고).
+        choices: ["26.2", "1.21.11", "1.20.6"]
+        default: "26.2"
+    defaults:
+      FABRIC_VERSION: latest
+      LOADER_VERSION: latest
+      SERVER_JARFILE: server.jar
+    ports:
+      count: 1
+      protocol: [tcp, udp]
+    post_install:
+      - type: file_replace
+        path: eula.txt
+        from: "eula=false"
+        to: "eula=true"
+        reason: "Paper 와 동일"
+    verified: { install: "127MB", boot: "Fabric 1.21 설치 확인 (java_21)" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 80
+    # 시크릿 없음 — 빈 선언은 "확인했고 없다"는 뜻이다(키 자체가 빠진 것과 구분된다).
+    secrets: []
+    mods:
+      supported: true
+      kind: mod
+      path: mods/
+      note: "모드는 서버와 클라이언트 양쪽에 같은 버전이 필요하다 — 사용자 안내 필요"
+
+  # ────────────────────────────────────────────────────────────────
+  - id: project-zomboid
+    name: 좀보이드
+    summary: 좀비 아포칼립스 생존. 자체 서버로 많이 돌린다.
+    egg: Project Zomboid
+    # ⚠ 익명 로그인으로는 appid 380870 을 받을 수 없다(실측 — Missing configuration).
+    #   그래서 **개설자 본인의 스팀 계정**(게임 소유)을 ask 로 받아 설치한다(사용자 결정, a안).
+    #   - 대화 로그·관리자 화면은 secrets 선언이 마스킹한다
+    #   - 값은 그 서버의 변수에 남는다 — 서버 주인 = 계정 주인이라 본인 것만 노출된다
+    #   - Steam Guard 계정은 설치가 코드 대기로 실패할 수 있다 → 질문 note 로 미리 알리고,
+    #     실패하면 설치 검증(#7)이 알림 → STEAM_AUTH 에 코드 → 재설치 카드 흐름
+    player_var: null
+    sizes:
+      # ⚠ 4096 은 OOM 난다(실측 OOMKilled=true). 최소 8192.
+      - { id: m, label: "8명 정도", players: 8, memory: 8192, disk: 12288, cpu: 300 }
+    ask:
+      - { env: SERVER_NAME,    label: 서버 이름, type: text,     default: "MyServer" }
+      - { env: ADMIN_PASSWORD, label: 관리자 비밀번호, type: password }
+      - env: STEAM_USER
+        label: 스팀 아이디
+        type: text
+        note: "좀보이드를 소유한 본인 스팀 계정이어야 하고, 설치(다운로드)에만 쓰입니다."
+      - env: STEAM_PASS
+        label: 스팀 비밀번호
+        type: password
+        note: "Steam Guard(2단계 인증)가 켜져 있으면 설치가 실패할 수 있습니다 — 그때는 모바일 앱의 코드를 받아 다시 시도합니다."
+    defaults:
+      ADMIN_USER: admin
+      AUTO_UPDATE: "1"
+    # ✅ 실측 — 실행 명령이 두 포트를 모두 바인드한다:
+    #      ./ProjectZomboid64 -port {{SERVER_PORT}} -udpport {{STEAM_PORT}}
+    #    기본값 16262 는 할당 범위 밖이라 publish 되지 않는다 → 두 번째 할당 포트로 덮어써야 한다.
+    #    ⚠ 플러그인은 할당을 1개만 배정한다 → 개설 대행 함수(#7)가 두 번째를 붙여야 한다.
+    ports:
+      count: 2
+      protocol: [udp]
+      derive:
+        - { env: STEAM_PORT, from: allocation, index: 1 }
+    # ✅ 실측(#32): 게임 포트에서 A2S 응답 (0명, hostname 확인). 스팀 포트는 무응답.
+    query: source
+    # 🔴 필수 — 없으면 컨테이너 메모리를 아무리 올려도 항상 OOM 이다.
+    #    ProjectZomboid64.json 에 "-Xmx8g" 가 **하드코딩**돼 있어 JVM 이 힙만으로 8GB 를 잡는다.
+    #    힙 외 네이티브 메모리까지 더해져 컨테이너 제한을 반드시 초과한다.
+    #    → 배정 메모리보다 낮게(약 60~65%) 낮춰야 한다. 8192 배정 → -Xmx5g 로 안정 기동 확인.
+    post_install:
+      - type: json_vmarg
+        path: ProjectZomboid64.json
+        arg: "-Xmx"
+        value_ratio: 0.62          # 배정 메모리 × 0.62 (8192 → 약 5g)
+        reason: "egg 가 하드코딩한 -Xmx8g 를 컨테이너 제한에 맞춘다. 안 고치면 OOMKilled."
+    # ✅ 실측 — 모드는 파일 배치가 아니라 **서버 ini 편집**이다.
+    #    경로: <서버>/.cache/Server/<SERVER_NAME>.ini   (SERVER_NAME 변수값이 파일명이 된다)
+    #    관련 키 (실측 라인번호):
+    #      67  Mods=            모드 ID (문자열, 쉼표 구분)
+    #      210 WorkshopItems=   스팀 워크숍 ID (숫자, 쉼표 구분)
+    #      70  Map=             맵 모드는 여기도 함께 수정해야 한다
+    #    ⚠ Mods 와 WorkshopItems 는 **서로 다른 값**이고 둘 다 채워야 한다.
+    #      워크숍 아이템 하나가 여러 모드 ID 를 담을 수 있어 1:1 대응이 아니다.
+    secrets: [ADMIN_PASSWORD, STEAM_PASS, STEAM_AUTH]
+    mods:
+      supported: true
+      kind: config_ini
+      config_path: ".cache/Server/{SERVER_NAME}.ini"
+      keys:
+        workshop: WorkshopItems
+        mods: Mods
+        map: Map
+      note: "Mods 와 WorkshopItems 가 다른 값이고 둘 다 필요하다 — 에이전트가 대신 채워주기 좋은 작업"
+
+  # ────────────────────────────────────────────────────────────────
+  - id: valheim
+    name: 발헤임
+    summary: 바이킹 생존·건축. 소규모 친구들끼리 하기 좋다.
+    egg: Valheim
+    player_var: null
+    sizes:
+      - { id: s, label: "4명 정도",  players: 4,  memory: 3072, disk: 8192,  cpu: 200 }
+      - { id: m, label: "10명 정도", players: 10, memory: 6144, disk: 12288, cpu: 300 }
+    ask:
+      - { env: SERVER_NAME, label: 서버 이름,   type: text,     default: "MyServer" }
+      - { env: PASSWORD,    label: 접속 비밀번호, type: password, min: 5, max: 20 }
+      - { env: WORLD,       label: 월드 이름,   type: text,     default: "Dedicated" }
+    defaults:
+      PUBLIC_SERVER: "1"
+      ENABLE_CROSSPLAY: "1"
+      AUTO_UPDATE: "1"
+    ports:
+      count: 3
+      contiguous: true      # 연속 3개 필요
+      protocol: [udp]
+    secrets: [PASSWORD]
+    mods: { supported: false }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: palworld
+    name: 팰월드
+    summary: 팰 수집·건축. 인원이 늘면 메모리를 많이 먹는다.
+    egg: Palworld
+    player_var: MAX_PLAYERS       # 이 게임은 인원 변수가 있다
+    sizes:
+      - { id: s, label: "4명 정도",  players: 4,  memory: 8192,  disk: 20480, cpu: 300 }
+      - { id: m, label: "8명 정도",  players: 8,  memory: 16384, disk: 30720, cpu: 400 }
+    ask:
+      - { env: SERVER_NAME,     label: 서버 이름,      type: text,     default: "MyServer" }
+      - { env: SERVER_PASSWORD, label: 접속 비밀번호,   type: password, optional: true }
+      - { env: ADMIN_PASSWORD,  label: 관리자 비밀번호, type: password }
+    defaults:
+      AUTO_UPDATE: "1"
+      # ✅ egg 의 시작 스크립트(PalworldServerConfigParser)가 이 환경 변수를 읽어
+      #    PalWorldSettings.ini 의 RESTAPIEnabled 를 켠다 (#31). 변수 정의 자체는
+      #    wisdom-ai-assistant:egg-metadata 가 보장한다(원본 egg 에 없음 — 재임포트가 지운다).
+      REST_API_ENABLED: "True"
+    # egg 규칙이 이미 between:1,32 로 막고 있어 추가 상한이 필요 없다.
+    # (Satisfactory 의 MAX_PLAYERS 처럼 상한 없는 경우에만 caps 를 쓴다)
+    caps: {}
+    # 🔴 두 번째 포트는 **REST 쿼리 포트**다(#31). 유휴 판정(#18)이 접속자 수를
+    #    http://<게이트웨이>:<이 포트>/v1/api/players (Basic admin:ADMIN_PASSWORD)로 읽는다.
+    #    egg 기본값 8212 는 publish 되지 않아 패널이 닿을 수 없다 → 할당을 파생해 덮어쓴다.
+    #    (Rust QUERY_PORT 와 같은 패턴. wings 는 할당마다 tcp·udp 둘 다 publish 한다 — 실측)
+    ports:
+      count: 2
+      protocol: [udp]
+      derive:
+        - { env: REST_API_PORT, from: allocation, index: 1 }
+    # Player Counter 의 palworld 스키마가 REST 전체(인증·파싱)를 이미 구현하고 있다 —
+    #    우리는 선언만 하면 된다.
+    query: palworld
+    query_port_variable: REST_API_PORT
+    secrets: [SERVER_PASSWORD, ADMIN_PASSWORD]
+    mods: { supported: false }
+    install_min_mb: 8000
+
+  # ────────────────────────────────────────────────────────────────
+  - id: satisfactory
+    name: 새티스팩토리
+    summary: 공장 건설·자동화. 설치 용량이 크고 메모리를 많이 먹는다.
+    egg: Satisfactory
+    player_var: MAX_PLAYERS
+    sizes:
+      - { id: s, label: "4명 정도", players: 4, memory: 12288, disk: 30720, cpu: 300 }
+      - { id: m, label: "8명 정도", players: 8, memory: 16384, disk: 40960, cpu: 400 }
+    ask: []                      # 서버 이름·비밀번호는 게임 내 Server Manager 에서 설정한다
+    defaults:
+      AUTO_UPDATE: "1"
+    # ⚠ egg 규칙이 `required|integer|min:1` 뿐이라 **상한이 없다**.
+    #   실측에서 MAX_PLAYERS=10000 이 그대로 통과했다 → 카탈로그가 반드시 좁혀야 한다.
+    caps:
+      MAX_PLAYERS: 16
+    ports:
+      count: 2
+      protocol: [tcp, udp]       # Primary 는 UDP+TCP, Reliable Messaging 은 TCP
+      derive:
+        - { env: RELIABLE_PORT, from: allocation, index: 1 }
+    notes:
+      - "설치에 약 15GB 를 받는다. 진행 상황을 사용자에게 보여주지 않으면 실패로 오해한다."
+    # 시크릿 없음 — 빈 선언은 "확인했고 없다"는 뜻이다(키 자체가 빠진 것과 구분된다).
+    secrets: []
+    mods: { supported: false }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: core-keeper
+    name: 코어 키퍼
+    summary: 지하 탐험·건축 샌드박스. 가볍다.
+    egg: Core Keeper
+    player_var: MAX_PLAYERS
+    sizes:
+      - { id: s, label: "4명 정도",  players: 4,  memory: 2048, disk: 8192,  cpu: 100 }
+      - { id: m, label: "10명 정도", players: 10, memory: 4096, disk: 12288, cpu: 200 }
+    ask:
+      - { env: WORLD_NAME, label: 월드 이름, type: text, default: "MyWorld", min: 3, max: 100 }
+    defaults:
+      AUTO_UPDATE: "1"
+      WORLD_INDEX: "0"
+      WORLD_SEED: "0"
+    # MAX_PLAYERS 는 egg 규칙이 min:1|max:100 으로 이미 막고 있어 caps 불필요
+    ports:
+      count: 1
+      protocol: [udp]
+    # 시크릿 없음 — 빈 선언은 "확인했고 없다"는 뜻이다(키 자체가 빠진 것과 구분된다).
+    secrets: []
+    mods: { supported: false }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: seven-days-to-die
+    name: 세븐 데이즈 투 다이
+    summary: 좀비 생존·기지 방어.
+    egg: 7 Days To Die
+    player_var: null             # egg 에 인원 변수가 없다
+    sizes:
+      - { id: s, label: "4명 정도", players: 4, memory: 6144,  disk: 20480, cpu: 300 }
+      - { id: m, label: "8명 정도", players: 8, memory: 10240, disk: 30720, cpu: 400 }
+    ask:
+      - { env: PASSWORD,        label: 접속 비밀번호, type: password, optional: true }
+      - { env: GAME_DIFFICULTY, label: 난이도, type: choice, choices: ["0","1","2","3","4","5"], default: "2" }
+    # 유휴 판정용 접속자 쿼리(#18). 게임 포트에서 A2S 응답 — 실측 확인 (0/8 파싱).
+    query: source
+    defaults:
+      AUTO_UPDATE: "1"
+    # ⚠ 확인 필요 — 실행 명령은 -ServerPort=${SERVER_PORT} 하나만 쓰지만,
+    #    7DTD 는 통상 ServerPort +1/+2 를 UDP 로 함께 쓴다고 알려져 있다.
+    #    TELNET_PORT(기본 8081)는 관리용이라 외부 할당이 필요한지도 미확인.
+    #    실제 개설 후 컨테이너의 리스닝 포트를 확인해 확정할 것.
+    ports:
+      count: 3
+      contiguous: true
+      protocol: [tcp, udp]
+    secrets: [PASSWORD]
+    mods: { supported: true, kind: mod, path: "Mods/", note: "확인 필요" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: minecraft-forge
+    name: 마인크래프트 (모드 · Forge)
+    summary: Forge 모드팩을 돌릴 때. Fabric 과 모드 호환이 다르다.
+    egg: Forge Minecraft
+    # 위 Paper 와 같은 이유. egg 첫 이미지는 Fabric=java_8, Forge=java_25 로 제각각이다.
+    java_from: MC_VERSION
+    query: minecraft_java
+    player_var: null
+    sizes:
+      - { id: s, label: "4명 정도", players: 4, memory: 4096, disk: 12288, cpu: 200 }
+      - { id: m, label: "8명 정도", players: 8, memory: 8192, disk: 20480, cpu: 300 }
+    ask:
+      # 🔴 **다른 버전의 접두사가 되는 값을 넣으면 안 된다.** egg 이 promotions 를 찾을 때
+      #   exact 가 아니라 `contains()` 로 맞춘다 — "1.21.1" 은 "1.21.10"·"1.21.11" 에도 걸려
+      #   키가 3개가 되고, 여러 줄이 된 키로 조회해 `null` 이 된다. 그러면 설치가
+      #   `Downloading forge version null` 로 끝나고 **텅 빈 볼륨이 installed 로 표시된다**(실측).
+      #   validate.py 가 promotions_slim.json 으로 "유일하게 잡히는가"를 검사한다.
+      - { env: MC_VERSION, label: 버전, type: choice, choices: ["26.2","1.21.11","1.20.6"], default: "26.2" }
+    defaults:
+      BUILD_TYPE: recommended
+      SERVER_JARFILE: server.jar
+    ports: { count: 1, protocol: [tcp, udp] }
+    post_install:
+      - { type: file_replace, path: eula.txt, from: "eula=false", to: "eula=true", reason: "Paper 와 동일" }
+    secrets: []
+    verified: { install: "176MB", boot: "Done (6.239s)! — 1.21.11 recommended, EULA post_install 동작" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 120
+    mods: { supported: true, kind: mod, path: "mods/", note: "Fabric 과 모드가 호환되지 않는다 — 사용자에게 구분 안내 필요" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: terraria
+    name: 테라리아
+    summary: 2D 샌드박스. 매우 가볍다.
+    egg: Terraria Vanilla
+    player_var: null
+    sizes:
+      - { id: s, label: "8명 정도", players: 8, memory: 1024, disk: 4096, cpu: 100 }
+    ask: []
+    defaults: {}
+    ports: { count: 1, protocol: [tcp] }
+    secrets: []
+    mods: { supported: false, note: "모드는 tModLoader egg 가 따로 있다" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 60
+    verified: { install: "98MB", boot: "Server started" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: factorio
+    name: 팩토리오
+    summary: 공장 자동화. 가볍고 안정적이다.
+    egg: Factorio
+    player_var: null
+    sizes:
+      - { id: s, label: "8명 정도", players: 8, memory: 2048, disk: 8192, cpu: 100 }
+    ask: []
+    defaults: {}
+    ports: { count: 1, protocol: [udp] }
+    secrets: []
+    # ⚠ 공개 서버 목록 등록에는 Factorio 계정 토큰이 필요하다(실측: "auth error: Token doesn't match").
+    #   **직접 접속은 정상 동작**하므로 친구들끼리 쓰는 데는 문제없다.
+    notes:
+      - "공개 목록 등록만 계정 토큰 필요. 주소로 직접 접속은 정상"
+    mods: { supported: true, kind: mod, note: "패널의 Factorio Mod Installer 탭에서 검색·설치 가능" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 200
+    verified: { install: "296MB", boot: "TLS check success, 서버 기동" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: necesse
+    name: 네세스
+    summary: 2D 생존·탐험. 가볍다.
+    egg: Necesse
+    player_var: null
+    sizes:
+      - { id: s, label: "8명 정도", players: 8, memory: 2048, disk: 8192, cpu: 100 }
+    ask: []
+    defaults: {}
+    ports: { count: 1, protocol: [udp] }
+    secrets: []
+    # ⚠ 첫 설치가 288MB 에서 불완전하게 끝나고 Pelican 이 installed 로 표시한 사례가 있다.
+    #   재설치하면 574MB 로 정상 완료된다. 용량이 작으면 재설치할 것.
+    mods: { supported: false }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 400
+    verified: { install: "574MB", boot: "Started server using port ... with 10 slots" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: the-forest
+    name: 더 포레스트
+    summary: 숲 생존·건축.
+    egg: The Forest
+    player_var: null
+    sizes:
+      - { id: s, label: "4명 정도", players: 4, memory: 4096, disk: 12288, cpu: 200 }
+      - { id: m, label: "8명 정도", players: 8, memory: 6144, disk: 20480, cpu: 300 }
+    ask: []
+    defaults: {}
+    # 🔴 스팀·쿼리 포트를 파생한다(#32). config.cfg 의 serverSteamPort/serverQueryPort 를
+    #    wings 가 매 부팅 다시 쓰는데, egg 기본값(8766/27016)은 할당 범위 밖이라 publish
+    #    되지 않았다 — A2S 무응답의 원인이 프로토콜이 아니라 **포트 미개방**이었다(추정→실측).
+    #    (Rust QUERY_PORT 와 같은 패턴)
+    ports:
+      count: 3
+      protocol: [udp]
+      derive:
+        - { env: STEAM_PORT, from: allocation, index: 1 }
+        - { env: QUERY_PORT, from: allocation, index: 2 }
+    query: source
+    query_port_variable: QUERY_PORT
+    secrets: []
+    mods: { supported: false }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 1300
+    verified: { install: "1.9GB", boot: "End of Sequence, 오토세이브 시작" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: garrys-mod
+    name: 개리모드
+    summary: 소스 엔진 샌드박스. 애드온 자유도가 높다.
+    egg: Garrys Mod
+    player_var: null
+    sizes:
+      - { id: s, label: "8명 정도",  players: 8,  memory: 4096, disk: 20480, cpu: 200 }
+      - { id: m, label: "16명 정도", players: 16, memory: 6144, disk: 30720, cpu: 300 }
+    ask: []
+    defaults: {}
+    ports: { count: 1, protocol: [tcp, udp] }
+    # 유휴 판정용 접속자 쿼리(#18). 게임 포트에서 A2S 응답 — 실측 확인 (0/32 파싱).
+    query: source
+    secrets: []
+    mods: { supported: true, kind: addon, path: "garrysmod/addons/", note: "워크숍 애드온은 서버 설정으로도 지정 가능 — 조사 필요" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 4500
+    verified: { install: "6.7GB", boot: "VAC secure mode is activated" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: rust
+    name: 러스트
+    summary: 하드코어 생존·PvP. 맵 생성에 시간이 걸린다.
+    egg: Rust
+    player_var: null
+    sizes:
+      - { id: m, label: "20명 정도", players: 20, memory: 8192,  disk: 20480, cpu: 300 }
+      - { id: l, label: "50명 정도", players: 50, memory: 12288, disk: 30720, cpu: 400 }
+    ask:
+      - { env: RCON_PASS, label: 관리자(RCON) 비밀번호, type: password }   # 필수·기본값 없음
+      # uMod 플러그인 탭(Rust uMod)은 FRAMEWORK 가 oxide 일 때만 뜬다. 순정과 달리 서버에
+      # 모드 프레임워크가 깔리므로 사용자가 고르게 한다. 기본은 oxide — 플러그인을 쓰라고 여는 것이다.
+      - env: FRAMEWORK
+        label: 플러그인 지원 (uMod)
+        type: choice
+        choices: ["oxide", "vanilla"]
+        default: "oxide"
+    defaults: {}
+    # ⚠ RCON 이 별도 포트(28016)를 바인드한다 — 실측 확인.
+    #   외부에서 RCON 을 쓰려면 별도 할당이 필요하다. 게임 접속만이면 1개로 충분.
+    # 🔴 두 번째 포트는 **쿼리 포트**다(#18 실측). Rust 는 `+server.queryport {{QUERY_PORT}}` 를
+    #   쓰는데 egg 기본값(27017)은 publish 되지 않아 게임 포트 ±3 어디서도 A2S 무응답이었다.
+    #   할당을 파생해 넣으니 그 포트에서 응답·파싱 정상 (0/40). 서버 브라우저 노출에도 필요하다.
+    ports:
+      count: 2
+      protocol: [tcp, udp]
+      derive:
+        - { env: QUERY_PORT, from: allocation, index: 1 }
+    query: source
+    query_port_variable: QUERY_PORT
+    secrets: [RCON_PASS]
+    mods: { supported: true, kind: plugin, note: "FRAMEWORK=oxide 로 개설하면 패널의 uMod 탭에서 플러그인 검색·설치 가능 (Rust uMod 플러그인)" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 4000
+    verified: { install: "5.8GB", boot: "맵 생성 진행, RCON 28016 바인드" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: ark-survival-evolved
+    name: "아크: 서바이벌 이볼브드"
+    summary: 공룡 생존. 설치 22GB, 첫 기동에 10분 이상 걸린다.
+    egg: "Ark: Survival Evolved"
+    player_var: MAX_PLAYERS
+    sizes:
+      - { id: m, label: "10명 정도", players: 10, memory: 14336, disk: 40960, cpu: 400 }
+    ask:
+      - { env: SESSION_NAME, label: 서버 이름, type: text, default: "MyArk" }
+      - { env: ARK_PASSWORD, label: 접속 비밀번호, type: password, optional: true }
+      - { env: ARK_ADMIN_PASSWORD, label: 관리자 비밀번호, type: password }
+      - { env: SERVER_MAP, label: 맵, type: choice, choices: ["TheIsland","Ragnarok","TheCenter"], default: "TheIsland" }
+    defaults:
+      BATTLE_EYE: "0"        # 컨테이너에서 BattlEye 는 문제 소지 → 기본 끔
+      AUTO_UPDATE: "0"
+    # 🔴 포트 4개 필요 — 실측으로 확인한 리스닝 포트:
+    #      SERVER_PORT / SERVER_PORT+1 / QUERY_PORT(27015) / RCON_PORT(27020)
+    #    QUERY·RCON 기본값이 할당 범위 밖이라 그대로 두면 외부에서 안 붙는다.
+    #    플러그인은 할당을 1개만 주므로 개설 대행 함수(#7)가 나머지를 붙여야 한다.
+    ports:
+      count: 4
+      protocol: [tcp, udp]
+      derive:
+        - { env: QUERY_PORT, from: allocation, index: 2 }
+        - { env: RCON_PORT,  from: allocation, index: 3 }
+    # 유휴 판정용 접속자 쿼리(#18). 게임 포트가 아니라 **QUERY_PORT**(파생 할당)에서 응답 —
+    # 실측 확인 (0/10 파싱). 게임 포트 ±1 은 무응답이다.
+    query: source
+    query_port_variable: QUERY_PORT
+    secrets: [ARK_PASSWORD, ARK_ADMIN_PASSWORD]
+    # ⚠ egg 는 RCON 이 붙을 때까지 "waiting for rcon connection..." 을 반복 출력한다.
+    #   이건 **로딩 중 정상 출력**이다. 첫 기동 10분+ 소요.
+    #   기동 확인은 로그가 아니라 RCON 을 직접 찔러본다:
+    #     docker exec <uuid> rcon -t rcon -a 127.0.0.1:27020 -p <ARK_ADMIN_PASSWORD> ListPlayers
+    notes:
+      - "설치 22GB. 첫 시도가 294MB 에서 실패하면 재설치(간헐적 오류)"
+      - "'waiting for rcon connection' 은 로딩 중 정상 — RCON 응답으로 판단할 것"
+    mods: { supported: true, kind: workshop_id, note: "MOD_ID 변수에 워크숍 ID 를 넣는다" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 15000
+    verified: { install: "22GB", boot: "RCON ListPlayers → No Players Connected" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: fivem
+    name: FiveM (GTA V)
+    summary: GTA V 멀티플레이. Cfx.re 라이선스 키가 필요하다.
+    egg: FiveM
+    # ⚠ FIVEM_LICENSE 가 필수인데 기본값이 없다 → 사용자가 직접 개설하면 입력 단계에서 막힌다.
+    #   keymaster.fivem.net 에서 발급받는 값이고, 관리자가 채워 넘겨야 한다.
+    #   ✅ 실측: 라이선스는 **실행 시점 검증**이라 재설치 없이 Start 만으로 반영된다.
+    available: false
+    unavailable_reason: "Cfx.re 라이선스 키가 필요해 셀프서비스 개설 불가. 관리자가 대신 만들어야 한다"
+    player_var: MAX_PLAYERS
+    sizes:
+      - { id: m, label: "32명 정도", players: 32, memory: 4096, disk: 10240, cpu: 200 }
+    ask:
+      - { env: SERVER_HOSTNAME, label: 서버 이름, type: text, default: "My FiveM Server" }
+    defaults:
+      TXADMIN_ENABLE: "0"
+      STEAM_WEBAPIKEY: "none"
+      FIVEM_VERSION: recommended
+    # txAdmin 을 켜면 TXHOST_TXA_PORT(40120)도 필요하다. 기본 꺼짐이라 지금은 1개로 충분.
+    ports: { count: 1, protocol: [tcp, udp] }
+    # ✅ 실측(#32): 게임 포트에서 cfx 쿼리 응답 (0명, hostname·map 까지). 라이선스로 기동도 확인.
+    query: cfx
+    secrets: [FIVEM_LICENSE, STEAM_WEBAPIKEY]
+    mods: { supported: true, kind: resource, path: "resources/", note: "FiveM 리소스는 폴더 배치 + server.cfg 등록" }
+    # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
+    #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
+    install_min_mb: 200
+    verified: { install: "298MB", boot: "license key authentication succeeded, cfx.re Nucleus 인증" }
+
+  # ────────────────────────────────────────────────────────────────
+  - id: dont-starve-together
+    name: 돈스타브 투게더
+    summary: 협동 생존.
+    egg: "Don't Starve Together"
+    # ⚠ SERVER_TOKEN 이 필수인데 기본값이 없다. Klei 계정에서 발급하는 클러스터 토큰이라
+    #   사용자가 직접 개설하면 입력 단계에서 막힌다. 좀보이드·FiveM 과 같은 유형.
+    #   ✅ 실측(#32): 설치는 익명으로 되고, 토큰만 있으면 정상 기동한다.
+    #   ❌ 접속자 쿼리는 불가 확정 — 전 스키마 × 포트 스윕 전부 무응답(자체 프로토콜) → rx 판정.
+    available: false
+    unavailable_reason: "Klei 클러스터 토큰이 필요해 셀프서비스 개설 불가"
+    player_var: null
+    sizes:
+      - { id: s, label: "6명 정도", players: 6, memory: 2048, disk: 8192, cpu: 200 }
+    ask: []
+    defaults: {}
+    ports: { count: 1, protocol: [udp] }
+    secrets: [SERVER_TOKEN]
+    mods: { supported: true, kind: workshop_id, note: "워크숍 모드 id 방식 — 모드 탭 미검증" }
