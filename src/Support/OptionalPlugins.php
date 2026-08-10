@@ -7,7 +7,7 @@ use App\Models\Plugin;
 use Throwable;
 
 /**
- * 다른 플러그인 다섯과의 연동을 **한 곳에서** 판정한다 (#13).
+ * 다른 플러그인 여섯과의 연동을 **한 곳에서** 판정한다 (#13).
  *
  * 🔴 `class_exists` 는 판정 근거가 못 된다. PluginService 는 PSR-4 오토로드를 **먼저**
  *    등록하고 나서 비활성 플러그인을 걸러낸다("Always autoload src directory" — 코어 주석).
@@ -33,6 +33,7 @@ final class OptionalPlugins
         'rust-umod' => '1.0.0',
         'user-creatable-servers' => '1.1.1',
         'factorio-mod-installer' => '1.2.5',
+        'secret-variables' => '0.1.1',
     ];
 
     /** @var array<string, ?Plugin>|null */

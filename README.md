@@ -62,6 +62,14 @@ Install logs and config files routinely contain passwords and license keys. Valu
 the catalog marks as secret — plus anything that *looks* like a secret by name — are
 masked before the text ever reaches the model.
 
+Masking hides a value from the transcript; it does not change where the panel stores it.
+For that, install the **[Secret Variables](https://github.com/WisdomIT/pelican-secret-variables)**
+plugin — strongly recommended if your users open servers that need a vendor account
+(Steam login, license keys). With it, credentials the assistant collects are stored
+encrypted; without it they sit in `server_variables` in the clear, readable on the
+server's Startup page, and the assistant warns the user of exactly that before they type
+one. See the integrations table below.
+
 ### Idle servers
 
 An optional watcher notices when a running server has had nobody on it for a while and
@@ -141,6 +149,7 @@ still works, with exactly these differences:
 | [Rust uMod](https://hub.pelican.dev/plugins) | Plugin search & install for Rust | Same as above |
 | [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | **Creation requires admin authority** (the panel's `create server` permission) — ordinary users cannot create at all. Admin creations skip quota and the port pool (reserved ports included) and get 0 backup/database limits; the assistant's reply says so. No delete link |
 | Factorio Mod Installer | A hand-off link to the mod page | No link (mods need a factorio.com account either way) |
+| [Secret Variables](https://github.com/WisdomIT/pelican-secret-variables) | Credentials collected in chat (Steam passwords, license keys) land in encrypted storage instead of `server_variables`, for every variable an admin marks *managed* there | Credentials are stored as plain server variables, **readable by the panel operator on the Startup page** — and the assistant says so to the user before they type one |
 
 The settings screen shows each plugin's live status. A disabled plugin behaves like a
 missing one, with one exception: port and node-tag ranges come from User Creatable

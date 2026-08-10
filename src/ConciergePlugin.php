@@ -227,7 +227,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
     }
 
     /**
-     * 선택 연동 다섯의 상태 (#13). 없으면 해당 기능만 조용히 빠지는데, 그 사실이
+     * 선택 연동 여섯의 상태 (#13). 없으면 해당 기능만 조용히 빠지는데, 그 사실이
      * 어디에도 안 보이면 관리자는 설치 하나로 해결될 일을 영영 모른다.
      *
      * 다섯 상태는 서로 다른 안내가 필요하다 — "설치하세요"는 설치돼 있는데 꺼둔
@@ -241,6 +241,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'rust-umod' => 'Rust uMod',
             'user-creatable-servers' => 'User Creatable Servers',
             'factorio-mod-installer' => 'Factorio Mod Installer',
+            'secret-variables' => 'Secret Variables',
         ];
 
         $fields = [];

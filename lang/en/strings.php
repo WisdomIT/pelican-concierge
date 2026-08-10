@@ -245,6 +245,7 @@ return [
     'integration_adds_rust_umod' => 'Searching and installing Rust plugins from uMod.',
     'integration_adds_user_creatable_servers' => 'Per-user resource quotas are honoured when creating servers, and users can delete their own servers.',
     'integration_adds_factorio_mod_installer' => 'A link to the Factorio mod page (mods need a factorio.com account, so the assistant hands off).',
+    'integration_adds_secret_variables' => 'Credentials collected in chat (Steam passwords, license keys) are stored encrypted instead of as plain server variables. Without it the assistant warns the user that values stay readable on the Startup page.',
     'section_idle' => 'Idle servers',
     'section_idle_help' => 'Finds servers nobody is connected to, tells the owner, and optionally stops them.',
     'field_search_enabled' => 'Allow web search',

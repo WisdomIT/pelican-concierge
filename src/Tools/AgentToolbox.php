@@ -33,6 +33,7 @@ use WisdomIT\Concierge\Support\ServerLinks;
 use WisdomIT\Concierge\Services\ServerProvisioner;
 use WisdomIT\Concierge\Support\ConsoleLog;
 use WisdomIT\Concierge\Support\SecretMasker;
+use WisdomIT\Concierge\Support\SecretStore;
 
 /**
  * 도구 모음 — 정의와 실행이 한 곳에 있다.
@@ -1405,12 +1406,27 @@ final class AgentToolbox
         $variables = $server->variables
             // 사용자에게 안 보이는 변수는 모델에게도 주지 않는다.
             ->filter(fn ($v) => (bool) $v->user_viewable)
-            ->map(fn ($v) => [
-                'env_variable' => $v->env_variable,
-                'name' => $v->variable?->name ?? $v->env_variable,
-                'value' => $masker->mask((string) $v->server_value),
-                'editable' => (bool) $v->user_editable,
-            ])->values()->all();
+            ->map(function ($v) use ($masker, $server) {
+                $value = (string) $v->server_value;
+
+                // Secret Variables 가 관리하는 변수는 행이 **의도적으로** 비어 있다(#12) —
+                // 값은 암호화 저장소에 있고 읽어 올 getter 가 없다. 빈 값을 그대로 주면
+                // 모델이 "미설정"으로 읽고 다시 물어 값을 또 받아낸다.
+                if ($value === '' && SecretStore::routes((string) $v->env_variable)) {
+                    $value = SecretStore::has($server, (string) $v->env_variable)
+                        ? '(set — stored encrypted by the Secret Variables plugin, not readable)'
+                        : '(not set — this variable is managed by the Secret Variables plugin)';
+                } else {
+                    $value = $masker->mask($value);
+                }
+
+                return [
+                    'env_variable' => $v->env_variable,
+                    'name' => $v->variable?->name ?? $v->env_variable,
+                    'value' => $value,
+                    'editable' => (bool) $v->user_editable,
+                ];
+            })->values()->all();
 
         return new ToolCallResult('list_server_variables', $input, $this->json([
             'server' => $server->name,
@@ -1455,16 +1471,29 @@ final class AgentToolbox
             $input['value'] = SecretMasker::PLACEHOLDER;
         }
 
+        // 시크릿이면 값이 실제로 어디 남았는지 답이 말한다(#12) — 위 updateOrCreate 는
+        // Secret Variables 가 켜져 있고 이 변수를 관리하면 그쪽 모델 이벤트에 가로채여
+        // 암호화 저장되고 행은 비워진다. 아니면 평문 그대로다.
+        $storageNote = '';
+
+        if ($isSecret && $value !== '') {
+            $storageNote = SecretStore::routes($variable->env_variable)
+                ? ' The value was stored encrypted by the Secret Variables plugin — it is not readable in the panel.'
+                : ' Note: on this installation the value is stored in plain text, readable by the panel operator '
+                    . 'on the Startup page. Tell the user.';
+        }
+
         return new ToolCallResult(
             'update_server_variable',
             $input,
             sprintf(
-                "Set %s to '%s'.%s ⚠ **This is not applied yet** — only the value changed. A reinstall is what "
+                "Set %s to '%s'.%s%s ⚠ **This is not applied yet** — only the value changed. A reinstall is what "
                 . 'fetches the new files. Offer a backup first, and since you cannot reinstall yourself, '
                 . 'open the settings screen with suggest_page.',
 
                 $variable->env_variable,
                 $isSecret ? SecretMasker::PLACEHOLDER : $value,
+                $storageNote,
                 $imageNote,
             ),
             $server->id,
@@ -2444,7 +2473,8 @@ final class AgentToolbox
                 'min_length' => $a['min'] ?? null,
                 'max_length' => $a['max'] ?? null,
                 // 질문에 딸린 안내문(#59 후속) — 모델이 물을 때 그대로 전한다.
-                'note' => $a['note'] ?? null,
+                // 시크릿이면 저장 위치까지 붙는다(#12) — 값을 치기 **전에** 알아야 하는 정보다.
+                'note' => $this->withStorageNote($a, $g),
             ], fn ($v) => $v !== null), $g['ask'] ?? []),
             'notes' => $g['notes'] ?? null,
         ], $this->catalog->selfServiceGames());
@@ -2530,6 +2560,8 @@ final class AgentToolbox
                 'ports' => $ports,
                 // 관리자가 UCS 없이 만들었다면 그 사실과 부작용을 답이 직접 말한다(#17).
                 'without_ucs_note' => ServerProvisioner::noUcsCaveat(),
+                // 자격 증명이 실제로 어디 저장됐는지 — 암호화 우회(#12)인지 평문 폴백인지.
+                'credential_storage' => $this->secretStorageNote($server, $input, $game),
                 'state' => 'installing',
                 'notice' => 'The install has started. Downloading the game files takes several minutes, sometimes longer, '
                     . 'and the server starts by itself when done. Progress is visible via get_server_status.',
@@ -2584,6 +2616,73 @@ final class AgentToolbox
         }
 
         return $input;
+    }
+
+    /**
+     * 시크릿 질문에는 **값을 치기 전에** 저장 위치가 안내에 붙는다(#12).
+     * 계정 주인이 결정할 문제라서다 — 평문으로 남는 설치라면 그 사실을 알고 입력해야 한다.
+     *
+     * @param  array<string, mixed>  $ask
+     * @param  array<string, mixed>  $game
+     */
+    private function withStorageNote(array $ask, array $game): ?string
+    {
+        $note = $ask['note'] ?? null;
+
+        if (!in_array($ask['env'], $game['secrets'] ?? [], true)) {
+            return $note;
+        }
+
+        $storage = SecretStore::routes((string) $ask['env'])
+            ? 'This value is stored encrypted (Secret Variables plugin) and is not readable in the panel.'
+            : 'Warn the user before they type this: on this installation the value is stored in plain text '
+                . 'and is readable by the panel operator, e.g. on the server\'s Startup page.';
+
+        return $note === null ? $storage : $note . ' ' . $storage;
+    }
+
+    /**
+     * 개설 답변 중 시크릿이 실제로 어디 저장됐는지(#12). 판정 근거는 사후의 has() —
+     * "라우팅됐을 것"이라는 추정이 아니라 저장소에 실제로 있는지를 본다.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed>  $game
+     */
+    private function secretStorageNote(Server $server, array $input, array $game): ?string
+    {
+        $plain = [];
+        $encrypted = [];
+
+        foreach ($game['secrets'] ?? [] as $env) {
+            if ((string) ($input['answers'][$env] ?? '') === '') {
+                continue;
+            }
+
+            if (SecretStore::has($server, $env)) {
+                $encrypted[] = $env;
+            } else {
+                $plain[] = $env;
+            }
+        }
+
+        if ($plain === [] && $encrypted === []) {
+            return null;
+        }
+
+        $parts = [];
+
+        if ($encrypted !== []) {
+            $parts[] = 'Stored encrypted by the Secret Variables plugin (not readable in the panel): '
+                . implode(', ', $encrypted) . '.';
+        }
+
+        if ($plain !== []) {
+            $parts[] = 'Stored as plain server variables, readable by the panel operator on the Startup page: '
+                . implode(', ', $plain) . '. Tell the user this. An admin can protect these by installing the '
+                . 'Secret Variables plugin and marking them managed.';
+        }
+
+        return implode(' ', $parts);
     }
 
     private function provisioner(): ServerProvisioner
