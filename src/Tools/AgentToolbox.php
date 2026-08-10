@@ -1425,6 +1425,13 @@ final class AgentToolbox
         $server = $this->serverFor('update_server_variable', $input);
         [$variable, $value] = $this->variableChange($server, $input);
 
+        // 비밀 변수면(#11) 값을 스크럽 대상으로 수집하고, 기록에 남는 입력·출력도 가린다.
+        $isSecret = SecretMasker::isSecretEnv($server, $variable->env_variable);
+
+        if ($isSecret && $value !== '') {
+            $this->secretValues[] = $value;
+        }
+
         // 값은 **서버별 행**에 쓴다(위 주석). egg 정의는 건드리지 않는다.
         ServerVariable::query()->updateOrCreate(
             ['server_id' => $server->id, 'variable_id' => $variable->id],
@@ -1444,6 +1451,10 @@ final class AgentToolbox
             }
         }
 
+        if ($isSecret) {
+            $input['value'] = SecretMasker::PLACEHOLDER;
+        }
+
         return new ToolCallResult(
             'update_server_variable',
             $input,
@@ -1453,7 +1464,7 @@ final class AgentToolbox
                 . 'open the settings screen with suggest_page.',
 
                 $variable->env_variable,
-                $value,
+                $isSecret ? SecretMasker::PLACEHOLDER : $value,
                 $imageNote,
             ),
             $server->id,
@@ -2460,6 +2471,9 @@ final class AgentToolbox
         $game = $plan['game'];
         $size = $plan['size'];
 
+        // 값이 무엇인지 여기서 처음 확정된다 — 대화 스크럽(#11)의 수집 지점.
+        $this->collectSecretAnswers($input, $game);
+
         $lines = [
             ['label' => trans('concierge::strings.card_game'), 'value' => $game['name']],
             ['label' => trans('concierge::strings.card_players'), 'value' => $size['label']],
@@ -2499,6 +2513,8 @@ final class AgentToolbox
         $server = $provisioner->create($plan);
 
         $game = $plan['game'];
+        // 재개(카드 승인) 경로 — 카드를 만든 요청과 다른 요청이므로 여기서도 수집한다(#11).
+        $this->collectSecretAnswers($input, $game);
         $ports = $plan['allocations']->pluck('port')->implode(', ');
 
         return new ToolCallResult(
@@ -2530,6 +2546,35 @@ final class AgentToolbox
      * @param  array<string, mixed>  $game
      * @return array<string, mixed>
      */
+    /**
+     * 이 요청에서 값이 확인된 비밀들(#11). 서비스가 드레인해 ChatResult 로 올리고,
+     * 사이드바가 저장 직전 마스킹과 대화 소급 스크럽에 쓴다.
+     *
+     * @var array<int, string>
+     */
+    private array $secretValues = [];
+
+    /** @return array<int, string> */
+    public function pullSecretValues(): array
+    {
+        $values = $this->secretValues;
+        $this->secretValues = [];
+
+        return $values;
+    }
+
+    /** @param array<string, mixed> $input  @param array<string, mixed> $game */
+    private function collectSecretAnswers(array $input, array $game): void
+    {
+        foreach ($game['secrets'] ?? [] as $secret) {
+            $value = (string) ($input['answers'][$secret] ?? '');
+
+            if ($value !== '') {
+                $this->secretValues[] = $value;
+            }
+        }
+    }
+
     private function maskAnswers(array $input, array $game): array
     {
         foreach ($game['secrets'] ?? [] as $secret) {

@@ -38,6 +38,30 @@ final class SecretMasker
     /** @param array<int, string> $secrets */
     private function __construct(private readonly array $secrets) {}
 
+    /** 이 변수는 비밀인가 — 카탈로그 선언 1순위, 이름 패턴은 안전망(파일 머리말 참고). */
+    public static function isSecretEnv(Server $server, string $env): bool
+    {
+        return in_array($env, self::declaredFor($server), true)
+            || (bool) preg_match(self::SECRET_NAME_PATTERN, $env);
+    }
+
+    /**
+     * 값 목록으로 직접 가린다 — 대화 기록 스크럽(#11)용. 긴 값부터(짧은 값이 긴 값을
+     * 앞에서 잘라먹지 않게), MIN_LENGTH 미만은 건드리지 않는다(문장 파손 방지).
+     *
+     * @param array<int, string> $values
+     */
+    public static function maskValues(string $text, array $values): string
+    {
+        $values = array_values(array_filter(
+            array_unique(array_map(strval(...), $values)),
+            fn (string $v) => mb_strlen($v) >= self::MIN_LENGTH,
+        ));
+        usort($values, fn (string $a, string $b) => mb_strlen($b) <=> mb_strlen($a));
+
+        return str_replace($values, self::PLACEHOLDER, $text);
+    }
+
     public static function forServer(Server $server): self
     {
         $declared = self::declaredFor($server);
