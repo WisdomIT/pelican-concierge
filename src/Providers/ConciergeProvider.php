@@ -27,8 +27,9 @@ use WisdomIT\Concierge\Services\PostInstallRunner;
 
 class ConciergeProvider extends ServiceProvider
 {
-    /** 사이드바를 띄울 패널. 관리자 패널은 제외한다 — 거기서 남의 서버를 조작할 물건이 아니다. */
-    private const SIDEBAR_PANELS = ['app', 'server'];
+    /** 사이드바를 띄울 패널. 관리자 패널 포함(사용자 결정, #7 후속) — 에이전트는 어차피
+     *  로그인한 사용자의 권한으로만 움직이므로 관리자 화면이라고 더 할 수 있는 게 없다. */
+    private const SIDEBAR_PANELS = ['admin', 'app', 'server'];
 
     public function register(): void
     {
@@ -80,7 +81,7 @@ class ConciergeProvider extends ServiceProvider
         // 갈랐다가는 사용자가 내비게이션 설정을 바꾸는 순간 버튼이 사라진다.
         // 자리 선정 근거(오답 훅 포함)는 트리거 뷰 머리말에 있다.
         FilamentView::registerRenderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER, fn (): string => $this->trigger('topbar'));
-        FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_END, fn (): string => $this->trigger('sidebar'));
+        FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_FOOTER, fn (): string => $this->trigger('sidebar'));
 
         // 서버 목록에는 UCS 의 Create server 옆에도 선다(#7). UCS 가 Before 를 쓰므로
         // 우리는 After — 같은 공식 API(CanCustomizeHeaderActions)다.
