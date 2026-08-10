@@ -6,7 +6,7 @@
 #   1. The **zip filename decides the folder name**. PluginService checks for
 #      "<zip basename>/plugin.json" inside the archive; if found it extracts to
 #      plugins/, otherwise it extracts the contents into plugins/<zip basename>/.
-#      Either way the name must be `wisdom-ai-assistant` — it has to match `id`.
+#      Either way the name must be `concierge` — it has to match `id`.
 #
 #   2. `meta` must not ship. It is the panel's own install state (status,
 #      status_message); shipping it hands your local state to every installer.

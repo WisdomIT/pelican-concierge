@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Jobs;
+namespace WisdomIT\Concierge\Jobs;
 
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -9,9 +9,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantInstallCheck;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
-use WisdomIT\WisdomAiAssistant\Services\InstallLogAuditor;
+use WisdomIT\Concierge\Models\ConciergeInstallCheck;
+use WisdomIT\Concierge\Models\ConciergeSettings;
+use WisdomIT\Concierge\Services\InstallLogAuditor;
 
 /**
  * 설치가 끝나면 **에이전트가 알아서** 로그를 읽고 판정한다 (#7).
@@ -48,7 +48,7 @@ class VerifyInstall implements ShouldQueue
             return;
         }
 
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
 
         // 에이전트가 꺼져 있거나 키가 없으면 판정할 수단이 없다. 조용히 넘어간다.
         if (!$settings->isUsable()) {
@@ -56,14 +56,14 @@ class VerifyInstall implements ShouldQueue
         }
 
         $verdict = (new InstallLogAuditor($settings))->audit($server);
-        $record = WisdomAiAssistantInstallCheck::firstOrNew(['server_id' => $server->id]);
+        $record = ConciergeInstallCheck::firstOrNew(['server_id' => $server->id]);
 
         // 재설치 뒤 다시 판정하는 경우다 — 이전 알림은 이미 지나갔으므로 초기화한다.
         $record->notified_at = null;
 
         if ($verdict === null) {
             // 로그를 못 읽었거나 모델이 답을 못 줬다. **실패로 단정하지 않는다.**
-            $record->status = WisdomAiAssistantInstallCheck::STATUS_UNKNOWN;
+            $record->status = ConciergeInstallCheck::STATUS_UNKNOWN;
             $record->reason = null;
             $record->save();
 
@@ -71,13 +71,13 @@ class VerifyInstall implements ShouldQueue
         }
 
         $record->status = $verdict['ok']
-            ? WisdomAiAssistantInstallCheck::STATUS_OK
-            : WisdomAiAssistantInstallCheck::STATUS_FAILED;
+            ? ConciergeInstallCheck::STATUS_OK
+            : ConciergeInstallCheck::STATUS_FAILED;
         $record->reason = $verdict['reason'];
         $record->save();
 
         if (!$verdict['ok']) {
-            Log::warning('wisdom-ai-assistant: 설치가 실패한 것으로 판정', [
+            Log::warning('concierge: 설치가 실패한 것으로 판정', [
                 'server' => $server->uuid_short,
                 'reason' => $verdict['reason'],
             ]);

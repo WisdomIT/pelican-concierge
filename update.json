@@ -1,6 +1,6 @@
 {
     "*": {
-        "version": "1.0.0",
-        "download_url": "https://github.com/WisdomIT/pelican-wisdom-ai-assistant/releases/latest/download/wisdom-ai-assistant.zip"
+        "version": "1.1.0",
+        "download_url": "https://github.com/WisdomIT/pelican-concierge/releases/latest/download/concierge.zip"
     }
 }

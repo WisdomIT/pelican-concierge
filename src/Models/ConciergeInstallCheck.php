@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Models\Server;
 use Carbon\Carbon;
@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property ?int $floor_mb
  * @property Carbon $updated_at
  */
-class WisdomAiAssistantInstallCheck extends Model
+class ConciergeInstallCheck extends Model
 {
     /** 설치가 끝까지 정상으로 끝났다. */
     public const STATUS_OK = 'ok';
@@ -29,7 +29,7 @@ class WisdomAiAssistantInstallCheck extends Model
     /** 판정하지 못했다(로그를 못 읽음·모델 호출 실패). **실패로 단정하지 않는다.** */
     public const STATUS_UNKNOWN = 'unknown';
 
-    protected $table = 'wisdom_ai_assistant_install_checks';
+    protected $table = 'concierge_install_checks';
 
     protected $fillable = [
         'server_id',

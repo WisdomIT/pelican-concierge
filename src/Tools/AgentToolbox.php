@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Tools;
+namespace WisdomIT\Concierge\Tools;
 
 use App\Enums\SubuserPermission;
 use App\Models\Server;
@@ -8,8 +8,8 @@ use App\Models\User;
 use App\Repositories\Daemon\DaemonFileRepository;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Throwable;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantInstallCheck;
+use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Models\ConciergeInstallCheck;
 use App\Enums\ServerState;
 use App\Models\Allocation;
 use App\Models\Backup;
@@ -21,18 +21,18 @@ use App\Repositories\Daemon\DaemonBackupRepository;
 use App\Services\Backups\InitiateBackupService;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use App\Services\Servers\BuildModificationService;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantBackupWatch;
-use WisdomIT\WisdomAiAssistant\Services\ModInstaller;
-use WisdomIT\WisdomAiAssistant\Services\PlayerCount;
-use WisdomIT\WisdomAiAssistant\Catalog\JavaRuntime;
-use WisdomIT\WisdomAiAssistant\Support\CronSchedule;
-use WisdomIT\WisdomAiAssistant\Support\FilePaths;
-use WisdomIT\WisdomAiAssistant\Support\PortPool;
-use WisdomIT\WisdomAiAssistant\Support\Tenancy;
-use WisdomIT\WisdomAiAssistant\Support\ServerLinks;
-use WisdomIT\WisdomAiAssistant\Services\ServerProvisioner;
-use WisdomIT\WisdomAiAssistant\Support\ConsoleLog;
-use WisdomIT\WisdomAiAssistant\Support\SecretMasker;
+use WisdomIT\Concierge\Models\ConciergeBackupWatch;
+use WisdomIT\Concierge\Services\ModInstaller;
+use WisdomIT\Concierge\Services\PlayerCount;
+use WisdomIT\Concierge\Catalog\JavaRuntime;
+use WisdomIT\Concierge\Support\CronSchedule;
+use WisdomIT\Concierge\Support\FilePaths;
+use WisdomIT\Concierge\Support\PortPool;
+use WisdomIT\Concierge\Support\Tenancy;
+use WisdomIT\Concierge\Support\ServerLinks;
+use WisdomIT\Concierge\Services\ServerProvisioner;
+use WisdomIT\Concierge\Support\ConsoleLog;
+use WisdomIT\Concierge\Support\SecretMasker;
 
 /**
  * 도구 모음 — 정의와 실행이 한 곳에 있다.
@@ -729,18 +729,18 @@ final class AgentToolbox
         $common = [
             'tool' => $name,
             'server_id' => $server->id,
-            'title' => trans('wisdom-ai-assistant::strings.card_title_' . $name),
-            'confirm' => trans('wisdom-ai-assistant::strings.card_confirm_' . $name),
+            'title' => trans('concierge::strings.card_title_' . $name),
+            'confirm' => trans('concierge::strings.card_confirm_' . $name),
         ];
 
         if (isset(self::POWER_ACTIONS[$name])) {
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_current_state'), 'value' => trans('wisdom-ai-assistant::strings.state_' . $this->powerState($server))],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
+                    ['label' => trans('concierge::strings.card_current_state'), 'value' => trans('concierge::strings.state_' . $this->powerState($server))],
                 ],
-                'note' => $name === 'start_server' ? null : trans('wisdom-ai-assistant::strings.card_note_disconnect'),
+                'note' => $name === 'start_server' ? null : trans('concierge::strings.card_note_disconnect'),
                 'danger' => $name !== 'start_server',
             ];
         }
@@ -750,18 +750,18 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_schedule_name'), 'value' => trim((string) ($input['name'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_schedule_name'), 'value' => trim((string) ($input['name'] ?? ''))],
                     // 🔴 크론 문자열이 아니라 **사람이 읽는 문장**을 보여준다. 사용자가 확인하는
                     //    것은 표현식이 아니라 "언제 도는가"다.
-                    ['label' => trans('wisdom-ai-assistant::strings.card_schedule_when'), 'value' => CronSchedule::describe(CronSchedule::validate([
+                    ['label' => trans('concierge::strings.card_schedule_when'), 'value' => CronSchedule::describe(CronSchedule::validate([
                         'cron_minute' => $parts['cron_minute'], 'cron_hour' => (string) ($input['hour'] ?? '*'),
                         'cron_day_of_month' => $parts['cron_day_of_month'], 'cron_month' => '*',
                         'cron_day_of_week' => $parts['cron_day_of_week'],
                     ]))],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_schedule_action'), 'value' => trans("wisdom-ai-assistant::strings.schedule_action_{$action}") . ($payload !== '' ? " ({$payload})" : '')],
+                    ['label' => trans('concierge::strings.card_schedule_action'), 'value' => trans("concierge::strings.schedule_action_{$action}") . ($payload !== '' ? " ({$payload})" : '')],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_schedule'),
+                'note' => trans('concierge::strings.card_note_schedule'),
                 'danger' => false,
             ];
         }
@@ -771,9 +771,9 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_schedule_name'), 'value' => $schedule->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_schedule_when'), 'value' => CronSchedule::describeSchedule($schedule)],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_schedule_name'), 'value' => $schedule->name],
+                    ['label' => trans('concierge::strings.card_schedule_when'), 'value' => CronSchedule::describeSchedule($schedule)],
                 ],
                 'danger' => $name === 'delete_schedule',
             ];
@@ -785,15 +785,15 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_variable'), 'value' => $variable->variable?->name ?? $variable->env_variable],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_variable_from'), 'value' => (string) $variable->server_value],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_variable_to'), 'value' => $value],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_variable'), 'value' => $variable->variable?->name ?? $variable->env_variable],
+                    ['label' => trans('concierge::strings.card_variable_from'), 'value' => (string) $variable->server_value],
+                    ['label' => trans('concierge::strings.card_variable_to'), 'value' => $value],
                 ],
                 // 🔴 버전 변경은 재설치가 뒤따라야 의미가 있다 — 카드에서 그 사실을 미리 말한다.
                 'note' => trans($isVersion
-                    ? 'wisdom-ai-assistant::strings.card_note_variable_version'
-                    : 'wisdom-ai-assistant::strings.card_note_variable'),
+                    ? 'concierge::strings.card_note_variable_version'
+                    : 'concierge::strings.card_note_variable'),
                 'danger' => $isVersion,
             ];
         }
@@ -803,11 +803,11 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
                     // 🔴 **명령 원문이 이 카드의 전부다.** 무엇이 실행되는지가 확인의 대상이다.
-                    ['label' => trans('wisdom-ai-assistant::strings.card_command'), 'value' => $command],
+                    ['label' => trans('concierge::strings.card_command'), 'value' => $command],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_command'),
+                'note' => trans('concierge::strings.card_note_command'),
                 'danger' => false,
             ];
         }
@@ -819,12 +819,12 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_mod'), 'value' => $plan['title']],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_mod_version'), 'value' => $plan['version']],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_file'), 'value' => $plan['filename']],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_mod'), 'value' => $plan['title']],
+                    ['label' => trans('concierge::strings.card_mod_version'), 'value' => $plan['version']],
+                    ['label' => trans('concierge::strings.card_file'), 'value' => $plan['filename']],
                 ],
-                'note' => $plan['provider'] === 'modrinth' ? trans('wisdom-ai-assistant::strings.card_note_mod_restart') : null,
+                'note' => $plan['provider'] === 'modrinth' ? trans('concierge::strings.card_note_mod_restart') : null,
                 'danger' => $name === 'uninstall_mod',
             ];
         }
@@ -836,14 +836,14 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_file'), 'value' => $path],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_file_action'), 'value' => trans($exists
-                        ? 'wisdom-ai-assistant::strings.card_file_overwrite'
-                        : 'wisdom-ai-assistant::strings.card_file_new')],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_file_size'), 'value' => strlen((string) ($input['content'] ?? '')) . ' B'],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_file'), 'value' => $path],
+                    ['label' => trans('concierge::strings.card_file_action'), 'value' => trans($exists
+                        ? 'concierge::strings.card_file_overwrite'
+                        : 'concierge::strings.card_file_new')],
+                    ['label' => trans('concierge::strings.card_file_size'), 'value' => strlen((string) ($input['content'] ?? '')) . ' B'],
                 ],
-                'note' => $exists ? trans('wisdom-ai-assistant::strings.card_note_overwrite') : null,
+                'note' => $exists ? trans('concierge::strings.card_note_overwrite') : null,
                 'danger' => $exists,
             ];
         }
@@ -851,8 +851,8 @@ final class AgentToolbox
         if ($name === 'create_server_directory') {
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_folder'), 'value' => FilePaths::assertWritable((string) ($input['path'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_folder'), 'value' => FilePaths::assertWritable((string) ($input['path'] ?? ''))],
                 ],
                 'danger' => false,
             ];
@@ -863,12 +863,12 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
                     // 전체 URL 을 보여준다 — 무엇을 받는지가 이 카드의 전부다.
-                    ['label' => trans('wisdom-ai-assistant::strings.card_download_url'), 'value' => $url],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_folder'), 'value' => FilePaths::label((string) ($input['directory'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_download_url'), 'value' => $url],
+                    ['label' => trans('concierge::strings.card_folder'), 'value' => FilePaths::label((string) ($input['directory'] ?? ''))],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_download'),
+                'note' => trans('concierge::strings.card_note_download'),
                 'danger' => false,
             ];
         }
@@ -878,12 +878,12 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
                     // 🔴 **대상과 개수를 확정해 보여준다.** 되돌릴 수 없는 작업의 카드다.
-                    ['label' => trans('wisdom-ai-assistant::strings.card_delete_targets'), 'value' => implode(', ', $paths)],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_delete_count'), 'value' => (string) count($paths)],
+                    ['label' => trans('concierge::strings.card_delete_targets'), 'value' => implode(', ', $paths)],
+                    ['label' => trans('concierge::strings.card_delete_count'), 'value' => (string) count($paths)],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_delete_files'),
+                'note' => trans('concierge::strings.card_note_delete_files'),
                 'danger' => true,
             ];
         }
@@ -891,9 +891,9 @@ final class AgentToolbox
         if ($name === 'rename_server_file') {
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_rename_from'), 'value' => FilePaths::assertWritable((string) ($input['from'] ?? ''))],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_rename_to'), 'value' => FilePaths::assertWritable((string) ($input['to'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_rename_from'), 'value' => FilePaths::assertWritable((string) ($input['from'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_rename_to'), 'value' => FilePaths::assertWritable((string) ($input['to'] ?? ''))],
                 ],
                 'danger' => false,
             ];
@@ -904,11 +904,11 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_backup_name'), 'value' => trim((string) ($input['name'] ?? '')) ?: trans('wisdom-ai-assistant::strings.card_backup_auto')],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_backup_slots'), 'value' => $server->backups()->where('is_successful', true)->count() . ' / ' . $server->backup_limit],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_backup_name'), 'value' => trim((string) ($input['name'] ?? '')) ?: trans('concierge::strings.card_backup_auto')],
+                    ['label' => trans('concierge::strings.card_backup_slots'), 'value' => $server->backups()->where('is_successful', true)->count() . ' / ' . $server->backup_limit],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_backup'),
+                'note' => trans('concierge::strings.card_note_backup'),
                 'danger' => false,
             ];
         }
@@ -918,15 +918,15 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_backup_name'), 'value' => $backup->name],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_backup_name'), 'value' => $backup->name],
                     // 🔴 **어느 시점으로 돌아가는지가 이 카드의 전부다.** 되돌린 뒤의 진행은 사라진다.
-                    ['label' => trans('wisdom-ai-assistant::strings.card_backup_made_at'), 'value' => (string) $backup->created_at],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_power_state'), 'value' => trans($this->powerState($server) === 'running'
-                        ? 'wisdom-ai-assistant::strings.state_running'
-                        : 'wisdom-ai-assistant::strings.state_offline')],
+                    ['label' => trans('concierge::strings.card_backup_made_at'), 'value' => (string) $backup->created_at],
+                    ['label' => trans('concierge::strings.card_power_state'), 'value' => trans($this->powerState($server) === 'running'
+                        ? 'concierge::strings.state_running'
+                        : 'concierge::strings.state_offline')],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_restore'),
+                'note' => trans('concierge::strings.card_note_restore'),
                 'danger' => true,
             ];
         }
@@ -934,23 +934,23 @@ final class AgentToolbox
         if ($name === 'update_server_resources') {
             $change = $this->resourcePlan($server, $input);
 
-            $lines = [['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name]];
+            $lines = [['label' => trans('concierge::strings.card_server'), 'value' => $server->name]];
 
             foreach ($change['diff'] as $field => [$from, $to]) {
                 $lines[] = [
-                    'label' => trans("wisdom-ai-assistant::strings.card_resource_{$field}"),
+                    'label' => trans("concierge::strings.card_resource_{$field}"),
                     'value' => sprintf('%s → %s', $from, $to),
                 ];
             }
 
             $lines[] = [
-                'label' => trans('wisdom-ai-assistant::strings.card_allowance_after'),
+                'label' => trans('concierge::strings.card_allowance_after'),
                 'value' => $change['allowance_after'],
             ];
 
             return $common + [
                 'lines' => $lines,
-                'note' => trans('wisdom-ai-assistant::strings.card_note_resources'),
+                'note' => trans('concierge::strings.card_note_resources'),
                 'danger' => $change['shrinks'],
             ];
         }
@@ -960,11 +960,11 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_new_port'), 'value' => (string) $allocation->port],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_current_ports'), 'value' => $server->allocations->pluck('port')->implode(', ')],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_new_port'), 'value' => (string) $allocation->port],
+                    ['label' => trans('concierge::strings.card_current_ports'), 'value' => $server->allocations->pluck('port')->implode(', ')],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_port_restart'),
+                'note' => trans('concierge::strings.card_note_port_restart'),
                 'danger' => false,
             ];
         }
@@ -974,10 +974,10 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_remove_port'), 'value' => (string) $allocation->port],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_remove_port'), 'value' => (string) $allocation->port],
                 ],
-                'note' => trans('wisdom-ai-assistant::strings.card_note_port_remove'),
+                'note' => trans('concierge::strings.card_note_port_remove'),
                 'danger' => true,
             ];
         }
@@ -988,12 +988,12 @@ final class AgentToolbox
 
             return $common + [
                 'lines' => [
-                    ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_mod'), 'value' => $plan['title']],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_mod_version'), 'value' => $plan['version']],
-                    ['label' => trans('wisdom-ai-assistant::strings.card_file'), 'value' => $plan['filename']],
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_mod'), 'value' => $plan['title']],
+                    ['label' => trans('concierge::strings.card_mod_version'), 'value' => $plan['version']],
+                    ['label' => trans('concierge::strings.card_file'), 'value' => $plan['filename']],
                 ],
-                'note' => $plan['provider'] === 'modrinth' ? trans('wisdom-ai-assistant::strings.card_note_mod_restart') : null,
+                'note' => $plan['provider'] === 'modrinth' ? trans('concierge::strings.card_note_mod_restart') : null,
                 'danger' => false,
             ];
         }
@@ -1005,8 +1005,8 @@ final class AgentToolbox
 
         return $common + [
             'lines' => [
-                ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                ['label' => trans('wisdom-ai-assistant::strings.card_file'), 'value' => $path],
+                ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                ['label' => trans('concierge::strings.card_file'), 'value' => $path],
             ],
             'diff' => ['before' => $edit['before'], 'after' => $edit['after']],
             'note' => null,
@@ -1750,12 +1750,12 @@ final class AgentToolbox
 
         // ⚠ 약속("끝나면 알려드립니다")을 지킬 수단을 여기서 남긴다. 감시가 없으면
         //   그런 말을 하게 두면 안 된다.
-        WisdomAiAssistantBackupWatch::create([
+        ConciergeBackupWatch::create([
             'server_id' => $server->id,
             // 알림은 **시킨 사람에게** 간다(#48).
             'user_id' => $this->user->id,
             'backup_uuid' => $backup->uuid,
-            'kind' => WisdomAiAssistantBackupWatch::KIND_BACKUP,
+            'kind' => ConciergeBackupWatch::KIND_BACKUP,
         ]);
 
         return new ToolCallResult(
@@ -1794,12 +1794,12 @@ final class AgentToolbox
             throw new ToolInputException('Could not start the restore. Try again shortly.');
         }
 
-        WisdomAiAssistantBackupWatch::create([
+        ConciergeBackupWatch::create([
             'server_id' => $server->id,
             // 알림은 **시킨 사람에게** 간다(#48).
             'user_id' => $this->user->id,
             'backup_uuid' => $backup->uuid,
-            'kind' => WisdomAiAssistantBackupWatch::KIND_RESTORE,
+            'kind' => ConciergeBackupWatch::KIND_RESTORE,
         ]);
 
         return new ToolCallResult(
@@ -2229,7 +2229,7 @@ final class AgentToolbox
             'uptime_ms' => $utilization['uptime'] ?? null,
             // 설치가 실제로 끝났는지 용량으로 판정한 결과(#7). Pelican 의 install_state 는
             // 중간에 끊긴 설치도 installed 로 표시하므로 그것만 보면 안 된다.
-            'install_check' => WisdomAiAssistantInstallCheck::where('server_id', $server->id)->first()?->summary(),
+            'install_check' => ConciergeInstallCheck::where('server_id', $server->id)->first()?->summary(),
         ]), $server->id);
     }
 
@@ -2446,25 +2446,25 @@ final class AgentToolbox
         $size = $plan['size'];
 
         $lines = [
-            ['label' => trans('wisdom-ai-assistant::strings.card_game'), 'value' => $game['name']],
-            ['label' => trans('wisdom-ai-assistant::strings.card_players'), 'value' => $size['label']],
-            ['label' => trans('wisdom-ai-assistant::strings.card_resources'), 'value' => sprintf(
+            ['label' => trans('concierge::strings.card_game'), 'value' => $game['name']],
+            ['label' => trans('concierge::strings.card_players'), 'value' => $size['label']],
+            ['label' => trans('concierge::strings.card_resources'), 'value' => sprintf(
                 '%s · %s',
-                trans('wisdom-ai-assistant::strings.card_memory_value', ['gb' => round($size['memory'] / 1024, 1)]),
-                trans('wisdom-ai-assistant::strings.card_disk_value', ['gb' => round($size['disk'] / 1024, 1)]),
+                trans('concierge::strings.card_memory_value', ['gb' => round($size['memory'] / 1024, 1)]),
+                trans('concierge::strings.card_disk_value', ['gb' => round($size['disk'] / 1024, 1)]),
             )],
         ];
 
         return [
             'tool' => 'create_server',
             'server_id' => null,
-            'title' => trans('wisdom-ai-assistant::strings.card_title_create_server'),
+            'title' => trans('concierge::strings.card_title_create_server'),
             'lines' => $lines,
             // 이름은 줄이 아니라 **편집 필드**로 보여준다(#59) — 카드에서 바로 고칠 수 있다.
-            'name_input' => ['label' => trans('wisdom-ai-assistant::strings.card_server_name'), 'value' => $plan['name']],
+            'name_input' => ['label' => trans('concierge::strings.card_server_name'), 'value' => $plan['name']],
             // 설치가 오래 걸리는 게임은 진행이 안 보이면 실패로 오해한다(#7).
-            'note' => $game['notes'][0] ?? trans('wisdom-ai-assistant::strings.card_note_install_time'),
-            'confirm' => trans('wisdom-ai-assistant::strings.card_confirm_create_server'),
+            'note' => $game['notes'][0] ?? trans('concierge::strings.card_note_install_time'),
+            'confirm' => trans('concierge::strings.card_confirm_create_server'),
             'danger' => false,
         ];
     }

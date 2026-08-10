@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Console;
+namespace WisdomIT\Concierge\Console;
 
 use App\Models\Egg;
 use Illuminate\Console\Command;
@@ -20,7 +20,7 @@ use Illuminate\Console\Command;
  */
 class EnsureEggMetadata extends Command
 {
-    protected $signature = 'wisdom-ai-assistant:egg-metadata';
+    protected $signature = 'concierge:egg-metadata';
 
     protected $description = '모드 플러그인이 요구하는 egg 태그·feature 를 보정한다';
 

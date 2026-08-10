@@ -1,8 +1,8 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Support;
+namespace WisdomIT\Concierge\Support;
 
-use WisdomIT\WisdomAiAssistant\Tools\ToolInputException;
+use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
  * 파일 도구가 만지는 경로·주소의 안전 규칙 (#37).

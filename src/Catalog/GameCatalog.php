@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Catalog;
+namespace WisdomIT\Concierge\Catalog;
 
 use App\Models\Egg;
 use RuntimeException;
@@ -28,7 +28,7 @@ final class GameCatalog
             return self::$games;
         }
 
-        $path = plugin_path('wisdom-ai-assistant', 'resources', 'catalog', 'games.yaml');
+        $path = plugin_path('concierge', 'resources', 'catalog', 'games.yaml');
 
         if (!is_file($path)) {
             return self::$games = [];

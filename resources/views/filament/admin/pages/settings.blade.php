@@ -4,7 +4,7 @@
 
         <div class="flex items-center gap-3">
             <x-filament::button type="submit" icon="tabler-device-floppy">
-                {{ trans('wisdom-ai-assistant::strings.save') }}
+                {{ trans('concierge::strings.save') }}
             </x-filament::button>
 
             @if ($this->hasApiKey)
@@ -13,9 +13,9 @@
                     color="danger"
                     icon="tabler-key-off"
                     wire:click="clearApiKey"
-                    wire:confirm="{{ trans('wisdom-ai-assistant::strings.confirm_clear_key') }}"
+                    wire:confirm="{{ trans('concierge::strings.confirm_clear_key') }}"
                 >
-                    {{ trans('wisdom-ai-assistant::strings.clear_api_key') }}
+                    {{ trans('concierge::strings.clear_api_key') }}
                 </x-filament::button>
             @endif
         </div>

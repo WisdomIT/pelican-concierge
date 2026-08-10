@@ -1,15 +1,15 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant;
+namespace WisdomIT\Concierge;
 
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
-class WisdomAiAssistantPlugin implements Plugin
+class ConciergePlugin implements Plugin
 {
     public function getId(): string
     {
-        return 'wisdom-ai-assistant';
+        return 'concierge';
     }
 
     public function register(Panel $panel): void
@@ -27,7 +27,7 @@ class WisdomAiAssistantPlugin implements Plugin
             $path = plugin_path($this->getId(), "src/Filament/$id/$dir");
 
             if (is_dir($path)) {
-                $panel->{$method}($path, "WisdomIT\\WisdomAiAssistant\\Filament\\$id\\$dir");
+                $panel->{$method}($path, "WisdomIT\\Concierge\\Filament\\$id\\$dir");
             }
         }
     }

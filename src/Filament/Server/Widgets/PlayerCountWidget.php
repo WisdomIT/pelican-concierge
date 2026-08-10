@@ -1,12 +1,12 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Filament\Server\Widgets;
+namespace WisdomIT\Concierge\Filament\Server\Widgets;
 
 use App\Filament\Server\Components\SmallStatBlock;
 use App\Models\Server;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget;
-use WisdomIT\WisdomAiAssistant\Services\PlayerCount;
+use WisdomIT\Concierge\Services\PlayerCount;
 
 /**
  * 콘솔 위 접속자 수 위젯 (#53).
@@ -52,14 +52,14 @@ class PlayerCountWidget extends StatsOverviewWidget
         if (!is_array($details)) {
             // 부팅 직후 등 일시 실패 — 다음 폴링(30초)에 다시 온다.
             return [
-                SmallStatBlock::make(trans('wisdom-ai-assistant::strings.widget_players'), trans('wisdom-ai-assistant::strings.widget_waiting')),
+                SmallStatBlock::make(trans('concierge::strings.widget_players'), trans('concierge::strings.widget_waiting')),
             ];
         }
 
         $count = sprintf('%s / %s', $details['current_players'] ?? '?', $details['max_players'] ?? '?');
 
         $stats = [
-            SmallStatBlock::make(trans('wisdom-ai-assistant::strings.widget_players'), $count),
+            SmallStatBlock::make(trans('concierge::strings.widget_players'), $count),
         ];
 
         // 닉네임이 오는 게임(마인크래프트 등)만 한 줄 덧붙인다.
@@ -67,7 +67,7 @@ class PlayerCountWidget extends StatsOverviewWidget
 
         if ($names !== []) {
             $stats[] = SmallStatBlock::make(
-                trans('wisdom-ai-assistant::strings.widget_who'),
+                trans('concierge::strings.widget_who'),
                 implode(', ', array_slice($names, 0, 8)) . (count($names) > 8 ? ' …' : ''),
             );
         }

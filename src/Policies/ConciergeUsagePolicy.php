@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Policies;
+namespace WisdomIT\Concierge\Policies;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  *
  * 클래스 위치가 곧 등록이다 — Laravel 이 Models\X → Policies\XPolicy 로 자동 탐색한다.
  */
-class WisdomAiAssistantUsagePolicy
+class ConciergeUsagePolicy
 {
     public function viewAny(User $user): bool
     {

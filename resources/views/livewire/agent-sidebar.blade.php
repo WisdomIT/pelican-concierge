@@ -15,7 +15,7 @@
 
     ⚠ 3) 이 파일은 **모든 페이지**에 렌더된다(BODY_END 렌더 훅).
       선택자를 넓게 잡으면 패널 전체가 망가진다. 전부 `.wa-` 로 시작하는 자체 클래스를 쓰고,
-      바깥으로 나가는 규칙은 본문을 밀어내는 `html.wa-open body` 하나뿐이다.
+      바깥으로 나가는 규칙은 본문을 밀어내는 `html.cg-open body` 하나뿐이다.
 --}}
 {{--
     ⚠ **열림 여부는 서버가 아니라 브라우저에 둔다.**
@@ -24,7 +24,7 @@
       바로 그 경우다(SPA 예외) — 콘솔을 떠나는 순간 사이드바가 닫혔다. localStorage 에 두면
       두 경우 모두 유지되고, 토글할 때마다 서버를 왕복하지도 않는다.
 
-    ⚠ `wa-open` 클래스는 **이동할 때마다 다시 붙여야 한다.**
+    ⚠ `cg-open` 클래스는 **이동할 때마다 다시 붙여야 한다.**
       본문을 미는 규칙은 `<html>` 의 클래스로 걸리는데, `wire:navigate` 는 이동한 페이지의
       `<html>` 속성으로 갈아치우므로 그 클래스가 날아간다. 그런데 사이드바는 `@persist` 로
       살아남아 **다시 초기화되지 않으므로** `x-effect` 는 다시 돌지 않는다(`open` 이 바뀐 게
@@ -32,13 +32,13 @@
       (첫 그림에서의 깜빡임은 `sidebar-mount.blade.php` 의 인라인 스크립트가 막는다)
 --}}
 <div
-    class="wa-root"
+    class="cg-root"
     x-data="{
         history: false,
-        open: localStorage.getItem('wa-open') === '1',
-        apply() { document.documentElement.classList.toggle('wa-open', this.open) },
+        open: localStorage.getItem('cg-open') === '1',
+        apply() { document.documentElement.classList.toggle('cg-open', this.open) },
     }"
-    x-effect="localStorage.setItem('wa-open', open ? '1' : '0'); apply(); if (open && $wire.unread) $wire.markRead()"
+    x-effect="localStorage.setItem('cg-open', open ? '1' : '0'); apply(); if (open && $wire.unread) $wire.markRead()"
     x-on:livewire:navigated.document="apply()"
     {{-- 에이전트가 먼저 말을 거는 통로. 설치는 몇 분 걸리므로 사용자가 물을 때까지 기다리면
          늦는다. 평소 30초면 충분하고, **진행 중인 서버가 있을 때만** 5초로 당긴다 —
@@ -53,21 +53,21 @@
     /* ── 사이드바 껍데기 ──
 
        ⚠ 폭 변수는 **`:root`(= html)에 둬야 한다.** CSS 커스텀 속성은 아래로만 상속된다.
-         `.wa-root` 에 두면 그 자손만 보게 되는데, 본문을 미는 규칙의 대상인 `body` 는
-         `.wa-root` 의 **조상**이라 값을 못 본다 → `var(--wa-w)` 가 무효가 되어 padding 이
+         `.cg-root` 에 두면 그 자손만 보게 되는데, 본문을 미는 규칙의 대상인 `body` 는
+         `.cg-root` 의 **조상**이라 값을 못 본다 → `var(--cg-w)` 가 무효가 되어 padding 이
          0 으로 떨어지고, 사이드바가 항상 본문을 덮는 것처럼 보인다. 실제로 그렇게 틀렸다. */
-    :root { --wa-w: 24rem; }
+    :root { --cg-w: 24rem; }
 
     /* 펼치면 본문을 밀어낸다. 덮어버리면 콘솔 로그를 보면서 물어볼 수가 없는데,
        그게 이 사이드바를 만든 이유다. Filament 의 topbar 는 sticky(고정 아님)라 함께 밀린다. */
-    html.wa-open body {
-        padding-right: var(--wa-w);
+    html.cg-open body {
+        padding-right: var(--cg-w);
         transition: padding-right .2s ease;
     }
     /* 좁은 화면에서는 밀 자리가 없다 → 덮는다. */
-    @media (max-width: 1023px) { html.wa-open body { padding-right: 0; } }
+    @media (max-width: 1023px) { html.cg-open body { padding-right: 0; } }
 
-    .wa-launcher {
+    .cg-launcher {
         position: fixed; right: 0; bottom: 4.5rem; z-index: 29;
         display: flex; align-items: center; gap: .4rem;
         padding: .6rem .8rem;
@@ -77,36 +77,36 @@
         font-size: .8125rem; font-weight: 600;
         box-shadow: 0 1px 6px rgb(0 0 0 / .25);
     }
-    .wa-launcher:hover { filter: brightness(1.08); }
+    .cg-launcher:hover { filter: brightness(1.08); }
     /* blade-icons 는 width/height=24 를 그대로 박아 넣는다 → 글자 크기에 맞춰 줄인다. */
-    .wa-launcher-icon { width: 1.1rem; height: 1.1rem; }
-    .wa-dot {
+    .cg-launcher-icon { width: 1.1rem; height: 1.1rem; }
+    .cg-dot {
         width: .5rem; height: .5rem; border-radius: 50%;
         background: var(--danger-500, #ef4444);
         box-shadow: 0 0 0 2px var(--primary-600, #4f46e5);
     }
 
-    .wa-panel {
+    .cg-panel {
         position: fixed; inset: 0 0 0 auto; z-index: 30;
         display: flex; flex-direction: column;
-        width: var(--wa-w); max-width: 100vw;
+        width: var(--cg-w); max-width: 100vw;
         padding: 1rem;
         background: var(--gray-50, #fff);
         border-left: 1px solid var(--gray-200, #e5e7eb);
         box-shadow: -2px 0 12px rgb(0 0 0 / .08);
     }
-    :where(.dark) .wa-panel {
+    :where(.dark) .cg-panel {
         background: var(--gray-950, #030712);
         border-color: var(--gray-800, #1f2937);
     }
 
     /* 대화 로그만 늘어나고 머리말·입력은 제자리에 있어야 한다. */
-    .wa-chat { display: flex; flex-direction: column; gap: 1rem; min-height: 0; flex: 1 1 auto; }
-    .wa-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    .cg-chat { display: flex; flex-direction: column; gap: 1rem; min-height: 0; flex: 1 1 auto; }
+    .cg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
-    .wa-log { display: flex; flex-direction: column; gap: .75rem; }
+    .cg-log { display: flex; flex-direction: column; gap: .75rem; }
 
-    .wa-bubble {
+    .cg-bubble {
         max-width: 100%;
         border-radius: .75rem;
         padding: .7rem 1rem;
@@ -116,29 +116,29 @@
     }
     /* 스트리밍 목적지는 항상 DOM 에 있어야 해서, 비어 있을 때만 감춘다.
        :empty 는 공백 문자도 내용으로 치므로 아래 div 안에 줄바꿈을 넣지 말 것. */
-    .wa-bubble:empty { display: none; }
+    .cg-bubble:empty { display: none; }
 
-    .wa-user {
+    .cg-user {
         align-self: flex-end;
         background: var(--primary-600, #4f46e5);
         color: #fff;
         white-space: pre-wrap;
     }
-    .wa-agent {
+    .cg-agent {
         align-self: flex-start;
         background: var(--gray-100, #f3f4f6);
         color: var(--gray-900, #111827);
     }
-    :where(.dark) .wa-agent {
+    :where(.dark) .cg-agent {
         background: var(--gray-800, #1f2937);
         color: var(--gray-100, #f3f4f6);
     }
 
-    .wa-hint { font-size: .875rem; color: var(--gray-500, #6b7280); }
+    .cg-hint { font-size: .875rem; color: var(--gray-500, #6b7280); }
 
     /* ── 화면 이동 버튼 ── */
-    .wa-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
-    .wa-link {
+    .cg-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
+    .cg-link {
         display: inline-block;
         max-width: 100%;
         padding: .35rem .7rem;
@@ -148,27 +148,27 @@
         font-size: .8125rem; font-weight: 600;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .wa-link:hover { background: color-mix(in oklab, var(--primary-600, #4f46e5) 12%, transparent); }
+    .cg-link:hover { background: color-mix(in oklab, var(--primary-600, #4f46e5) 12%, transparent); }
 
     /* ── 마크다운 ── */
-    .wa-md > :first-child { margin-top: 0; }
-    .wa-md > :last-child { margin-bottom: 0; }
-    .wa-md p { margin: .6em 0; }
-    .wa-md ul, .wa-md ol { margin: .6em 0; padding-left: 1.4em; }
-    .wa-md ul { list-style: disc; }
-    .wa-md ol { list-style: decimal; }
-    .wa-md li { margin: .25em 0; }
-    .wa-md li > ul, .wa-md li > ol { margin: .25em 0; }
-    .wa-md strong { font-weight: 600; }
-    .wa-md em { font-style: italic; }
-    .wa-md h1, .wa-md h2, .wa-md h3, .wa-md h4 {
+    .cg-md > :first-child { margin-top: 0; }
+    .cg-md > :last-child { margin-bottom: 0; }
+    .cg-md p { margin: .6em 0; }
+    .cg-md ul, .cg-md ol { margin: .6em 0; padding-left: 1.4em; }
+    .cg-md ul { list-style: disc; }
+    .cg-md ol { list-style: decimal; }
+    .cg-md li { margin: .25em 0; }
+    .cg-md li > ul, .cg-md li > ol { margin: .25em 0; }
+    .cg-md strong { font-weight: 600; }
+    .cg-md em { font-style: italic; }
+    .cg-md h1, .cg-md h2, .cg-md h3, .cg-md h4 {
         margin: 1em 0 .5em; font-weight: 600; line-height: 1.3;
     }
-    .wa-md h1 { font-size: 1.25em; }
-    .wa-md h2 { font-size: 1.15em; }
-    .wa-md h3, .wa-md h4 { font-size: 1.05em; }
-    .wa-md a { text-decoration: underline; }
-    .wa-md code {
+    .cg-md h1 { font-size: 1.25em; }
+    .cg-md h2 { font-size: 1.15em; }
+    .cg-md h3, .cg-md h4 { font-size: 1.05em; }
+    .cg-md a { text-decoration: underline; }
+    .cg-md code {
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-size: .875em;
         padding: .1em .35em;
@@ -176,31 +176,31 @@
         background: color-mix(in oklab, currentColor 12%, transparent);
     }
     /* 넓은 코드는 말풍선을 밀지 않고 스스로 스크롤한다. */
-    .wa-md pre {
+    .cg-md pre {
         margin: .6em 0;
         padding: .7rem .85rem;
         border-radius: .5rem;
         overflow-x: auto;
         background: color-mix(in oklab, currentColor 8%, transparent);
     }
-    .wa-md pre code { padding: 0; background: none; }
-    .wa-md blockquote {
+    .cg-md pre code { padding: 0; background: none; }
+    .cg-md blockquote {
         margin: .6em 0;
         padding-left: .8em;
         border-left: 3px solid color-mix(in oklab, currentColor 25%, transparent);
     }
-    .wa-md table { display: block; overflow-x: auto; border-collapse: collapse; margin: .6em 0; }
-    .wa-md th, .wa-md td {
+    .cg-md table { display: block; overflow-x: auto; border-collapse: collapse; margin: .6em 0; }
+    .cg-md th, .cg-md td {
         border: 1px solid color-mix(in oklab, currentColor 20%, transparent);
         padding: .3em .6em;
     }
-    .wa-md hr {
+    .cg-md hr {
         margin: 1em 0; border: 0;
         border-top: 1px solid color-mix(in oklab, currentColor 20%, transparent);
     }
 
     /* ── 확인 카드 ── */
-    .wa-card {
+    .cg-card {
         align-self: flex-start;
         max-width: 100%;
         border: 1px solid var(--gray-300, #d1d5db);
@@ -209,20 +209,20 @@
         background: var(--gray-50, #fff);
         font-size: .875rem;
     }
-    :where(.dark) .wa-card { border-color: var(--gray-700, #374151); background: var(--gray-900, #111827); }
-    .wa-card.is-danger { border-color: var(--danger-500, #ef4444); }
+    :where(.dark) .cg-card { border-color: var(--gray-700, #374151); background: var(--gray-900, #111827); }
+    .cg-card.is-danger { border-color: var(--danger-500, #ef4444); }
 
-    .wa-card-title { font-weight: 600; margin-bottom: .6rem; }
-    .wa-card dl { display: grid; grid-template-columns: auto 1fr; gap: .25rem .8rem; margin: 0 0 .7rem; }
-    .wa-card dt { color: var(--gray-500, #6b7280); }
-    .wa-card dd { margin: 0; }
-    .wa-card-input-label {
+    .cg-card-title { font-weight: 600; margin-bottom: .6rem; }
+    .cg-card dl { display: grid; grid-template-columns: auto 1fr; gap: .25rem .8rem; margin: 0 0 .7rem; }
+    .cg-card dt { color: var(--gray-500, #6b7280); }
+    .cg-card dd { margin: 0; }
+    .cg-card-input-label {
         display: block;
         margin: .5rem 0 .25rem;
         font-size: .75rem;
         color: var(--gray-500, #6b7280);
     }
-    .wa-card-input {
+    .cg-card-input {
         display: block; width: 100%;
         margin-top: .25rem;
         padding: .4rem .55rem;
@@ -232,16 +232,16 @@
         background: transparent;
         color: inherit;
     }
-    :where(.dark) .wa-card-input { border-color: var(--gray-700, #374151); }
+    :where(.dark) .cg-card-input { border-color: var(--gray-700, #374151); }
 
-    .wa-card-note {
+    .cg-card-note {
         margin: 0 0 .7rem;
         font-size: .8125rem;
         color: var(--danger-600, #dc2626);
     }
-    .wa-card-actions { display: flex; gap: .5rem; }
+    .cg-card-actions { display: flex; gap: .5rem; }
 
-    .wa-diff {
+    .cg-diff {
         margin: 0 0 .7rem;
         border-radius: .5rem;
         overflow-x: auto;
@@ -250,12 +250,12 @@
         line-height: 1.6;
         background: color-mix(in oklab, currentColor 6%, transparent);
     }
-    .wa-diff > div { padding: .15rem .6rem; white-space: pre; }
-    .wa-diff-del { color: var(--danger-600, #dc2626); }
-    .wa-diff-add { color: var(--success-600, #16a34a); }
+    .cg-diff > div { padding: .15rem .6rem; white-space: pre; }
+    .cg-diff-del { color: var(--danger-600, #dc2626); }
+    .cg-diff-add { color: var(--success-600, #16a34a); }
 
     /* 카드 실행/취소 안내 — 대화가 아니라 화면 표시다. 가운데 작게. */
-    .wa-event {
+    .cg-event {
         align-self: center;
         font-size: .75rem;
         color: var(--gray-500, #6b7280);
@@ -266,20 +266,20 @@
        flex 축소가 max-height 보다 먼저 걸려 찌그러지고, 축소된 높이에서는 overflow 도
        의도대로 안 돼 스크롤바가 안 보였다(#28, 실측). 오버레이로 띄우면 채팅 영역과
        아예 경쟁하지 않는다. */
-    .wa-head-wrap { position: relative; }
-    .wa-head {
+    .cg-head-wrap { position: relative; }
+    .cg-head {
         display: flex; align-items: center; gap: .5rem;
         padding-bottom: .75rem;
         border-bottom: 1px solid var(--gray-200, #e5e7eb);
     }
-    :where(.dark) .wa-head { border-color: var(--gray-800, #1f2937); }
-    .wa-head-title {
+    :where(.dark) .cg-head { border-color: var(--gray-800, #1f2937); }
+    .cg-head-title {
         flex: 1 1 auto; min-width: 0;
         font-size: .875rem; font-weight: 600;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    .wa-history {
+    .cg-history {
         position: absolute;
         top: calc(100% + .5rem); left: 0; right: 0;
         z-index: 10;
@@ -299,11 +299,11 @@
         background: var(--gray-50, #fff);
         box-shadow: 0 8px 24px rgb(0 0 0 / .18);
     }
-    :where(.dark) .wa-history {
+    :where(.dark) .cg-history {
         border-color: var(--gray-800, #1f2937);
         background: var(--gray-950, #030712);
     }
-    .wa-history-item {
+    .cg-history-item {
         /* 항목 내부의 가로 정렬만 flex — 목록 컨테이너는 block 이어야 한다(위 주석). */
         display: flex; align-items: baseline; gap: .5rem;
         width: 100%;
@@ -313,18 +313,18 @@
         text-align: left;
         color: var(--gray-700, #374151);
     }
-    .wa-history-name {
+    .cg-history-name {
         flex: 1 1 auto; min-width: 0;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .wa-history-when {
+    .cg-history-when {
         flex: 0 0 auto;
         font-size: .6875rem;
         color: var(--gray-400, #9ca3af);
     }
     /* 기록 아이콘 위 배지 — 목록을 열기 전에도 미읽음이 있음을 알린다(#29). */
-    .wa-iconwrap { position: relative; display: inline-flex; }
-    .wa-history-badge {
+    .cg-iconwrap { position: relative; display: inline-flex; }
+    .cg-history-badge {
         position: absolute; top: 1px; right: 1px;
         width: .45rem; height: .45rem; border-radius: 50%;
         background: var(--danger-500, #ef4444);
@@ -332,47 +332,47 @@
     }
 
     /* 다른 대화에 새 알림이 도착했다는 표시(#29). 열면 꺼진다. */
-    .wa-history-dot {
+    .cg-history-dot {
         flex: 0 0 auto;
         width: .45rem; height: .45rem; border-radius: 50%;
         background: var(--danger-500, #ef4444);
         align-self: center;
     }
-    :where(.dark) .wa-history-item { color: var(--gray-300, #d1d5db); }
-    .wa-history-item:hover { background: color-mix(in oklab, currentColor 10%, transparent); }
-    .wa-history-item.is-active {
+    :where(.dark) .cg-history-item { color: var(--gray-300, #d1d5db); }
+    .cg-history-item:hover { background: color-mix(in oklab, currentColor 10%, transparent); }
+    .cg-history-item.is-active {
         background: color-mix(in oklab, var(--primary-600, #4f46e5) 15%, transparent);
         font-weight: 600;
     }
-    .wa-history-empty { padding: .45rem .6rem; font-size: .8125rem; color: var(--gray-500, #6b7280); }
+    .cg-history-empty { padding: .45rem .6rem; font-size: .8125rem; color: var(--gray-500, #6b7280); }
 
     /* ── 진행 중 카드 ── */
-    .wa-watch {
+    .cg-watch {
         border: 1px solid var(--gray-200, #e5e7eb);
         border-radius: .625rem;
         padding: .5rem .7rem;
         font-size: .8125rem;
     }
-    :where(.dark) .wa-watch { border-color: var(--gray-800, #1f2937); }
-    .wa-watch-title { color: var(--gray-500, #6b7280); font-size: .75rem; margin-bottom: .3rem; }
-    .wa-watch-row { display: flex; align-items: center; gap: .5rem; }
-    .wa-watch-name {
+    :where(.dark) .cg-watch { border-color: var(--gray-800, #1f2937); }
+    .cg-watch-title { color: var(--gray-500, #6b7280); font-size: .75rem; margin-bottom: .3rem; }
+    .cg-watch-row { display: flex; align-items: center; gap: .5rem; }
+    .cg-watch-name {
         flex: 1 1 auto; min-width: 0;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         font-weight: 600;
     }
-    .wa-watch-state { display: inline-flex; align-items: center; gap: .35rem; color: var(--gray-500, #6b7280); }
-    .wa-spinner {
+    .cg-watch-state { display: inline-flex; align-items: center; gap: .35rem; color: var(--gray-500, #6b7280); }
+    .cg-spinner {
         width: .7rem; height: .7rem; border-radius: 50%;
         border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
         border-top-color: var(--primary-600, #4f46e5);
-        animation: wa-spin .8s linear infinite;
+        animation: cg-spin .8s linear infinite;
     }
-    @keyframes wa-spin { to { transform: rotate(360deg); } }
+    @keyframes cg-spin { to { transform: rotate(360deg); } }
 
     /* ── 입력 ── */
-    .wa-form { display: flex; align-items: flex-end; gap: .5rem; }
-    .wa-input {
+    .cg-form { display: flex; align-items: flex-end; gap: .5rem; }
+    .cg-input {
         flex: 1 1 auto;
         min-height: 3.25rem;
         padding: .6rem .8rem;
@@ -384,96 +384,96 @@
         color: var(--gray-900, #111827);
         resize: vertical;
     }
-    :where(.dark) .wa-input {
+    :where(.dark) .cg-input {
         border-color: var(--gray-700, #374151);
         background: var(--gray-900, #111827);
         color: var(--gray-100, #f3f4f6);
     }
-    .wa-input:disabled { opacity: .5; }
+    .cg-input:disabled { opacity: .5; }
     </style>
 
     {{-- 런처. topbar 에 넣지 않은 이유는 topbar 가 사용자 설정에 따라 꺼질 수 있기 때문이다. --}}
-    <button type="button" class="wa-launcher" x-show="! open"
+    <button type="button" class="cg-launcher" x-show="! open"
             x-on:click="open = true" x-cloak>
-        <x-filament::icon icon="tabler-message-chatbot" class="wa-launcher-icon" />
-        {{ trans('wisdom-ai-assistant::strings.title') }}
+        <x-filament::icon icon="tabler-message-chatbot" class="cg-launcher-icon" />
+        {{ trans('concierge::strings.title') }}
         {{-- 닫혀 있는 동안 에이전트가 말을 걸었다는 표시. --}}
         @if ($this->unread)
-            <span class="wa-dot"></span>
+            <span class="cg-dot"></span>
         @endif
     </button>
 
-    <aside class="wa-panel" x-show="open" x-cloak>
-        <div class="wa-chat">
+    <aside class="cg-panel" x-show="open" x-cloak>
+        <div class="cg-chat">
             {{-- 기록 오버레이의 기준점. 바깥을 누르면 닫힌다. --}}
-            <div class="wa-head-wrap" x-on:click.outside="history = false">
-            <div class="wa-head">
-                <div class="wa-head-title">{{ $this->currentTitle() }}</div>
+            <div class="cg-head-wrap" x-on:click.outside="history = false">
+            <div class="cg-head">
+                <div class="cg-head-title">{{ $this->currentTitle() }}</div>
 
                 {{-- 폭이 24rem 뿐이라 아이콘만 쓴다. 이름은 title 로 남긴다.
                      다른 대화에 미읽음 알림이 있으면 아이콘에도 점을 띄운다(#29) —
                      목록을 열어보기 전에는 점이 어디 있는지 알 수 없기 때문이다. --}}
-                <span class="wa-iconwrap">
+                <span class="cg-iconwrap">
                     <x-filament::icon-button
                         size="sm" color="gray" icon="tabler-history"
-                        :label="trans('wisdom-ai-assistant::strings.conversation_history')"
+                        :label="trans('concierge::strings.conversation_history')"
                         x-on:click="history = ! history"
                         x-bind:aria-expanded="history"
                     />
                     @if (collect($this->conversations)->contains(fn ($c) => $c['unread'] ?? false))
-                        <span class="wa-history-badge"></span>
+                        <span class="cg-history-badge"></span>
                     @endif
                 </span>
 
                 <x-filament::icon-button
                     size="sm" color="gray" icon="tabler-plus"
-                    :label="trans('wisdom-ai-assistant::strings.new_conversation')"
+                    :label="trans('concierge::strings.new_conversation')"
                     wire:click="startConversation"
                     x-on:click="history = false"
                 />
 
                 <x-filament::icon-button
                     size="sm" color="gray" icon="tabler-x"
-                    :label="trans('wisdom-ai-assistant::strings.close')"
+                    :label="trans('concierge::strings.close')"
                     x-on:click="open = false"
                 />
             </div>
 
-            <div class="wa-history" x-show="history" x-cloak>
+            <div class="cg-history" x-show="history" x-cloak>
                 @forelse ($this->conversations as $conversation)
                     <button
                         type="button"
                         wire:key="conv-{{ $conversation['id'] }}"
                         wire:click="openConversation('{{ $conversation['id'] }}')"
                         x-on:click="history = false"
-                        @class(['wa-history-item', 'is-active' => $conversation['id'] === $this->conversationId])
-                    ><span class="wa-history-name">{{ $conversation['title'] }}</span>@if ($conversation['unread'] ?? false)<span class="wa-history-dot"></span>@endif<span class="wa-history-when">{{ $conversation['when'] ?? '' }}</span></button>
+                        @class(['cg-history-item', 'is-active' => $conversation['id'] === $this->conversationId])
+                    ><span class="cg-history-name">{{ $conversation['title'] }}</span>@if ($conversation['unread'] ?? false)<span class="cg-history-dot"></span>@endif<span class="cg-history-when">{{ $conversation['when'] ?? '' }}</span></button>
                 @empty
-                    <div class="wa-history-empty">{{ trans('wisdom-ai-assistant::strings.empty') }}</div>
+                    <div class="cg-history-empty">{{ trans('concierge::strings.empty') }}</div>
                 @endforelse
             </div>
             </div>
 
             {{-- 로그만 늘어나고 스크롤한다. 스트리밍은 Livewire 재렌더 없이 DOM 을 직접
                  고치므로, 바닥 고정은 MutationObserver 로 해야 따라온다. --}}
-            <div class="wa-scroll"
+            <div class="cg-scroll"
                  x-init="new MutationObserver(() => $el.scrollTop = $el.scrollHeight)
                             .observe($el, { subtree: true, childList: true, characterData: true })">
-                <div class="wa-log">
+                <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
-                    <div class="wa-bubble wa-user">{{ $message['text'] }}</div>
+                    <div class="cg-bubble cg-user">{{ $message['text'] }}</div>
                 @elseif ($message['role'] === 'event')
-                    <div class="wa-event">{{ $message['text'] }}</div>
+                    <div class="cg-event">{{ $message['text'] }}</div>
                 @else
-                    <div class="wa-bubble wa-agent wa-md">{!! $this->markdown($message['text']) !!}</div>
+                    <div class="cg-bubble cg-agent cg-md">{!! $this->markdown($message['text']) !!}</div>
 
                     {{-- 이 턴에서 실제로 무언가를 한 서버로 가는 버튼.
                          `wire:navigate` 로 이동해야 사이드바가 살아남는다(전체 리로드면 재마운트된다). --}}
                     @if ($message['links'] ?? [])
-                        <div class="wa-links">
+                        <div class="cg-links">
                             @foreach ($message['links'] as $link)
-                                <a href="{{ $link['url'] }}" wire:navigate class="wa-link">
+                                <a href="{{ $link['url'] }}" wire:navigate class="cg-link">
                                     {{ $link['label'] }}
                                 </a>
                             @endforeach
@@ -481,7 +481,7 @@
                     @endif
                 @endif
             @empty
-                <p class="wa-hint">{{ trans('wisdom-ai-assistant::strings.empty') }}</p>
+                <p class="cg-hint">{{ trans('concierge::strings.empty') }}</p>
             @endforelse
 
             {{--
@@ -489,16 +489,16 @@
                 응답이 끝나면 위 @forelse 가 같은 내용을 정식으로 그리고 Livewire 가 여기를 비운다.
                 ⚠ 태그 안에 공백·줄바꿈을 넣지 말 것 — :empty 가 안 먹어서 빈 말풍선이 남는다.
             --}}
-            <div wire:stream="live-user" class="wa-bubble wa-user"></div>
-            <div wire:stream="live-assistant" class="wa-bubble wa-agent wa-md"></div>
+            <div wire:stream="live-user" class="cg-bubble cg-user"></div>
+            <div wire:stream="live-assistant" class="cg-bubble cg-agent cg-md"></div>
 
             {{--
                 확인 카드. 내용은 **모델이 쓴 문장이 아니라 우리가 조회한 사실**이다 —
                 모델이 "안전한 작업입니다" 같은 말로 사용자를 유도할 수 없어야 한다.
             --}}
             @if ($this->pendingCard)
-                <div @class(['wa-card', 'is-danger' => $this->pendingCard['danger'] ?? false])>
-                    <div class="wa-card-title">{{ $this->pendingCard['title'] }}</div>
+                <div @class(['cg-card', 'is-danger' => $this->pendingCard['danger'] ?? false])>
+                    <div class="cg-card-title">{{ $this->pendingCard['title'] }}</div>
 
                     <dl>
                         @foreach ($this->pendingCard['lines'] as $line)
@@ -509,25 +509,25 @@
 
                     {{-- 편집 필드(#59) — 개설 카드의 서버 이름. 고친 값이 그대로 실행에 들어간다. --}}
                     @if ($this->pendingCard['name_input'] ?? null)
-                        <label class="wa-card-input-label">
+                        <label class="cg-card-input-label">
                             {{ $this->pendingCard['name_input']['label'] }}
-                            <input type="text" maxlength="40" class="wa-card-input" wire:model="cardName" />
+                            <input type="text" maxlength="40" class="cg-card-input" wire:model="cardName" />
                         </label>
                     @endif
 
                     {{-- 파일 수정은 **무엇이 바뀌는지 눈으로 보여야** 확인의 의미가 있다. --}}
                     @if ($this->pendingCard['diff'] ?? null)
-                        <div class="wa-diff">
-                            <div class="wa-diff-del">- {{ $this->pendingCard['diff']['before'] }}</div>
-                            <div class="wa-diff-add">+ {{ $this->pendingCard['diff']['after'] }}</div>
+                        <div class="cg-diff">
+                            <div class="cg-diff-del">- {{ $this->pendingCard['diff']['before'] }}</div>
+                            <div class="cg-diff-add">+ {{ $this->pendingCard['diff']['after'] }}</div>
                         </div>
                     @endif
 
                     @if ($this->pendingCard['note'] ?? null)
-                        <p class="wa-card-note">{{ $this->pendingCard['note'] }}</p>
+                        <p class="cg-card-note">{{ $this->pendingCard['note'] }}</p>
                     @endif
 
-                    <div class="wa-card-actions">
+                    <div class="cg-card-actions">
                         <x-filament::button
                             wire:click="confirmTool"
                             wire:loading.attr="disabled"
@@ -543,7 +543,7 @@
                             wire:target="confirmTool,cancelTool"
                             color="gray"
                         >
-                            {{ $this->pendingCard['cancel'] ?? trans('wisdom-ai-assistant::strings.card_cancel') }}
+                            {{ $this->pendingCard['cancel'] ?? trans('concierge::strings.card_cancel') }}
                         </x-filament::button>
                     </div>
                 </div>
@@ -553,22 +553,22 @@
 
             {{-- 진행 중인 서버. 입력창 바로 위에 둬서 대화를 밀어내지 않는다. --}}
             @if ($this->watching)
-                <div class="wa-watch">
-                    <div class="wa-watch-title">{{ trans('wisdom-ai-assistant::strings.watch_title') }}</div>
+                <div class="cg-watch">
+                    <div class="cg-watch-title">{{ trans('concierge::strings.watch_title') }}</div>
                     @foreach ($this->watching as $w)
-                        <div class="wa-watch-row" wire:key="watch-{{ $w['id'] }}">
-                            <span class="wa-watch-name">{{ $w['name'] }}</span>
-                            <span class="wa-watch-state">
-                                <span class="wa-spinner"></span>
-                                {{ trans('wisdom-ai-assistant::strings.watch_state_' . $w['state'], [], null)
-                                   ?: trans('wisdom-ai-assistant::strings.watch_state_unknown') }}
+                        <div class="cg-watch-row" wire:key="watch-{{ $w['id'] }}">
+                            <span class="cg-watch-name">{{ $w['name'] }}</span>
+                            <span class="cg-watch-state">
+                                <span class="cg-spinner"></span>
+                                {{ trans('concierge::strings.watch_state_' . $w['state'], [], null)
+                                   ?: trans('concierge::strings.watch_state_unknown') }}
                             </span>
                         </div>
                     @endforeach
                 </div>
             @endif
 
-            <form wire:submit="send" x-data="{}" class="wa-form">
+            <form wire:submit="send" x-data="{}" class="cg-form">
             {{-- ⚠ 입력창은 **disable 하지 않는다.** wire:loading 에 target 없이 disabled 를
                  걸었더니 30초(진행 중 5초) 폴링마다 입력창이 잠기며 **포커스가 풀려 타이핑이
                  끊겼다**(실측, #26). 전송 중 중복 제출은 보내기 버튼과 send() 의 빈 입력
@@ -576,8 +576,8 @@
             <textarea
                 wire:model="draft"
                 rows="2"
-                class="wa-input"
-                placeholder="{{ trans('wisdom-ai-assistant::strings.placeholder') }}"
+                class="cg-input"
+                placeholder="{{ trans('concierge::strings.placeholder') }}"
                 {{-- Enter 로 보내고 Shift+Enter 로 줄바꿈. 값 비우기는 $nextTick 으로 미뤄
                      Livewire 가 먼저 읽게 한다 — 먼저 지우면 빈 메시지가 전송된다. --}}
                 @keydown.enter="if (! $event.shiftKey) { $event.preventDefault(); $el.closest('form').requestSubmit(); $nextTick(() => $el.value = ''); }"
@@ -585,8 +585,8 @@
 
             {{-- 폴링에는 반응하지 않도록 반드시 target 을 건다(#26). --}}
             <x-filament::button type="submit" icon="tabler-send" wire:loading.attr="disabled" wire:target="send">
-                <span wire:loading.remove wire:target="send">{{ trans('wisdom-ai-assistant::strings.send') }}</span>
-                <span wire:loading wire:target="send">{{ trans('wisdom-ai-assistant::strings.sending') }}</span>
+                <span wire:loading.remove wire:target="send">{{ trans('concierge::strings.send') }}</span>
+                <span wire:loading wire:target="send">{{ trans('concierge::strings.sending') }}</span>
             </x-filament::button>
             </form>
         </div>

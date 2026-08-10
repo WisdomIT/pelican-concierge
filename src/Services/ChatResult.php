@@ -1,8 +1,8 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
-use WisdomIT\WisdomAiAssistant\Tools\ToolCallResult;
+use WisdomIT\Concierge\Tools\ToolCallResult;
 
 /**
  * 한 번의 사용자 발화에 대한 결과. 도구 왕복이 여러 번 있었어도 여기로 합쳐 나온다.

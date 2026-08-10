@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Models\User;
 use Carbon\Carbon;
@@ -25,7 +25,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $assistant_message
  * @property Carbon $created_at
  */
-class WisdomAiAssistantUsage extends Model
+class ConciergeUsage extends Model
 {
     public const STATUS_OK = 'ok';
 
@@ -40,11 +40,11 @@ class WisdomAiAssistantUsage extends Model
     /** 확인 카드를 띄우고 사용자의 결정을 기다리는 중. 결정이 오면 같은 행이 갱신된다. */
     public const STATUS_AWAITING = 'awaiting_confirmation';
 
-    protected $table = 'wisdom_ai_assistant_usages';
+    protected $table = 'concierge_usages';
 
     protected $fillable = [
         'user_id',
-        // 대화를 묶는 ULID = `wisdom_ai_assistant_conversations.id`.
+        // 대화를 묶는 ULID = `concierge_conversations.id`.
         'conversation_id',
         'model',
         'effort',
@@ -74,13 +74,13 @@ class WisdomAiAssistantUsage extends Model
 
     public function conversation(): BelongsTo
     {
-        return $this->belongsTo(WisdomAiAssistantConversation::class, 'conversation_id');
+        return $this->belongsTo(ConciergeConversation::class, 'conversation_id');
     }
 
-    /** @return HasMany<WisdomAiAssistantToolCall, $this> */
+    /** @return HasMany<ConciergeToolCall, $this> */
     public function toolCalls(): HasMany
     {
-        return $this->hasMany(WisdomAiAssistantToolCall::class, 'usage_id');
+        return $this->hasMany(ConciergeToolCall::class, 'usage_id');
     }
 
     /**
@@ -107,7 +107,7 @@ class WisdomAiAssistantUsage extends Model
      *
      * @param array<string, mixed> $attributes
      */
-    public static function record(int $userId, WisdomAiAssistantSettings $settings, array $attributes): self
+    public static function record(int $userId, ConciergeSettings $settings, array $attributes): self
     {
         return static::query()->create([
             'user_id' => $userId,

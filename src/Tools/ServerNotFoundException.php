@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Tools;
+namespace WisdomIT\Concierge\Tools;
 
 /**
  * 모델이 지정한 서버를 요청자의 접근 가능 목록에서 찾지 못했다.

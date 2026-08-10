@@ -1,9 +1,9 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Support;
+namespace WisdomIT\Concierge\Support;
 
 use App\Models\Server;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
+use WisdomIT\Concierge\Catalog\GameCatalog;
 
 /**
  * 서버의 egg 변수 중 시크릿에 해당하는 것을 찾아, **값이 나타나는 모든 곳**을 가린다.

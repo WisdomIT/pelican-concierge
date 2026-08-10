@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Support;
+namespace WisdomIT\Concierge\Support;
 
 use App\Filament\Server\Pages\Console;
 use App\Filament\Server\Pages\Settings;
@@ -47,7 +47,7 @@ final class ServerLinks
         'delete' => 'Boy132\\UserCreatableServers\\Filament\\Server\\Pages\\ServerResourcePage',
         // 모드 플러그인 화면들. 전부 남의 플러그인 소유 → 같은 이유로 문자열.
         //  ⚠ egg 태그·feature 조건이 안 맞으면 페이지 자체가 접근 거부한다(각 플러그인의 canAccess).
-        //    조건은 wisdom-ai-assistant:egg-metadata 가 보정한다.
+        //    조건은 concierge:egg-metadata 가 보정한다.
         'modrinth_plugins' => 'Boy132\\MinecraftModrinth\\Filament\\Server\\Pages\\MinecraftModrinthPluginPage',
         'modrinth_mods' => 'Boy132\\MinecraftModrinth\\Filament\\Server\\Pages\\MinecraftModrinthModPage',
         'umod' => 'Boy132\\RustUMod\\Filament\\Server\\Pages\\RustUModPluginsPage',
@@ -84,7 +84,7 @@ final class ServerLinks
         $links = [];
 
         foreach ($calls as $call) {
-            // 실행 결과 객체(ToolCallResult)와 저장된 행(WisdomAiAssistantToolCall)을 모두 받는다.
+            // 실행 결과 객체(ToolCallResult)와 저장된 행(ConciergeToolCall)을 모두 받는다.
             $name = $call->name ?? $call->tool_name ?? '';
             $serverId = $call->serverId ?? $call->server_id ?? null;
             $failed = $call->isError ?? $call->is_error ?? false;
@@ -149,7 +149,7 @@ final class ServerLinks
 
         try {
             return [
-                'label' => trans("wisdom-ai-assistant::strings.link_{$page}", ['server' => $server->name]),
+                'label' => trans("concierge::strings.link_{$page}", ['server' => $server->name]),
                 'url' => $class::getUrl(panel: 'server', tenant: $server),
             ];
         } catch (Throwable) {

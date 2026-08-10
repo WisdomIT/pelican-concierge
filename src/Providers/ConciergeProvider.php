@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Providers;
+namespace WisdomIT\Concierge\Providers;
 
 use App\Events\Server\Installed;
 use App\Enums\ConsoleWidgetPosition;
@@ -14,15 +14,15 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Throwable;
 use Illuminate\Support\Facades\Schedule;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
-use WisdomIT\WisdomAiAssistant\Console\CheckIdleServers;
-use WisdomIT\WisdomAiAssistant\Filament\Server\Widgets\PlayerCountWidget;
-use WisdomIT\WisdomAiAssistant\Console\EnsureEggMetadata;
-use WisdomIT\WisdomAiAssistant\Jobs\VerifyInstall;
-use WisdomIT\WisdomAiAssistant\Livewire\AgentSidebar;
-use WisdomIT\WisdomAiAssistant\Services\PostInstallRunner;
+use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Console\CheckIdleServers;
+use WisdomIT\Concierge\Filament\Server\Widgets\PlayerCountWidget;
+use WisdomIT\Concierge\Console\EnsureEggMetadata;
+use WisdomIT\Concierge\Jobs\VerifyInstall;
+use WisdomIT\Concierge\Livewire\AgentSidebar;
+use WisdomIT\Concierge\Services\PostInstallRunner;
 
-class WisdomAiAssistantPluginProvider extends ServiceProvider
+class ConciergePluginProvider extends ServiceProvider
 {
     /** 사이드바를 띄울 패널. 관리자 패널은 제외한다 — 거기서 남의 서버를 조작할 물건이 아니다. */
     private const SIDEBAR_PANELS = ['app', 'server'];
@@ -49,7 +49,7 @@ class WisdomAiAssistantPluginProvider extends ServiceProvider
         config([
             'cache.stores.' . AgentSidebar::PENDING_STORE => [
                 'driver' => 'file',
-                'path' => storage_path('framework/cache/wisdom-ai-assistant'),
+                'path' => storage_path('framework/cache/concierge'),
             ],
         ]);
 
@@ -57,10 +57,10 @@ class WisdomAiAssistantPluginProvider extends ServiceProvider
         // 1분이면 30분 판정에 충분하고 데몬 부하도 작다.
         if ($this->app->runningInConsole()) {
             $this->commands([CheckIdleServers::class, EnsureEggMetadata::class]);
-            Schedule::command('wisdom-ai-assistant:check-idle')->everyMinute()->withoutOverlapping();
+            Schedule::command('concierge:check-idle')->everyMinute()->withoutOverlapping();
         }
 
-        Livewire::component('wisdom-ai-assistant-sidebar', AgentSidebar::class);
+        Livewire::component('concierge-sidebar', AgentSidebar::class);
 
         // 사이드바를 모든 페이지에 붙인다.
         //
@@ -109,7 +109,7 @@ class WisdomAiAssistantPluginProvider extends ServiceProvider
                 return '';
             }
 
-            return view('wisdom-ai-assistant::sidebar-mount')->render();
+            return view('concierge::sidebar-mount')->render();
         } catch (Throwable $exception) {
             report($exception);
 

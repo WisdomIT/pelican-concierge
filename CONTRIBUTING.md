@@ -20,7 +20,7 @@ src/
   Catalog/GameCatalog.php        reads resources/catalog/games.yaml
   Support/SecretMasker.php       redaction before text reaches the model
 resources/catalog/games.yaml     what the assistant knows about each game
-config/wisdom-ai-assistant.php   seed defaults + admin dropdown choices
+config/concierge.php   seed defaults + admin dropdown choices
 ```
 
 The config filename and its config key are both derived from the plugin `id`
@@ -77,7 +77,7 @@ Rendering a page server-side catches most integration breakage without a browser
 $u = App\Models\User::first();
 Illuminate\Support\Facades\Auth::onceUsingId($u->id);
 $resp = app(Illuminate\Contracts\Http\Kernel::class)
-    ->handle(Illuminate\Http\Request::create('https://your-panel/admin/wisdom-ai-assistant', 'GET'));
+    ->handle(Illuminate\Http\Request::create('https://your-panel/admin/concierge', 'GET'));
 echo $resp->getStatusCode();
 ```
 

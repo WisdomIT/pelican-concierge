@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Tools;
+namespace WisdomIT\Concierge\Tools;
 
 /**
  * 모델이 준 인자로는 작업을 특정할 수 없다.

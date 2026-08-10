@@ -1,11 +1,11 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use Illuminate\Support\Str;
-use WisdomIT\WisdomAiAssistant\Tools\ToolInputException;
+use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
  * 모드 플러그인(Modrinth·uMod)의 서비스 계층을 에이전트 도구에서 재사용한다 (#16).

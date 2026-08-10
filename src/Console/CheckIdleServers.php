@@ -1,16 +1,16 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Console;
+namespace WisdomIT\Concierge\Console;
 
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantIdleWatch;
-use WisdomIT\WisdomAiAssistant\Services\PlayerCount;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
+use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Models\ConciergeIdleWatch;
+use WisdomIT\Concierge\Services\PlayerCount;
+use WisdomIT\Concierge\Models\ConciergeSettings;
 
 /**
  * 켜져 있는 서버가 실제로 쓰이고 있는지 주기적으로 본다 (#18).
@@ -30,13 +30,13 @@ use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
  */
 class CheckIdleServers extends Command
 {
-    protected $signature = 'wisdom-ai-assistant:check-idle';
+    protected $signature = 'concierge:check-idle';
 
     protected $description = '유휴 서버를 찾아 알리고, 설정에 따라 정지한다 (#18)';
 
     public function handle(): int
     {
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
 
         if (!$settings->idle_enabled) {
             return self::SUCCESS;
@@ -56,18 +56,18 @@ class CheckIdleServers extends Command
         return self::SUCCESS;
     }
 
-    private function inspect(Server $server, WisdomAiAssistantSettings $settings, GameCatalog $catalog): void
+    private function inspect(Server $server, ConciergeSettings $settings, GameCatalog $catalog): void
     {
         $details = app(DaemonServerRepository::class)->setServer($server)->getDetails();
 
         // 꺼져 있으면 추적할 것이 없다. 다음에 켜졌을 때 처음부터 센다.
         if (($details['state'] ?? '') !== 'running') {
-            WisdomAiAssistantIdleWatch::where('server_id', $server->id)->delete();
+            ConciergeIdleWatch::where('server_id', $server->id)->delete();
 
             return;
         }
 
-        $watch = WisdomAiAssistantIdleWatch::firstOrCreate(['server_id' => $server->id]);
+        $watch = ConciergeIdleWatch::firstOrCreate(['server_id' => $server->id]);
         $rx = (int) ($details['utilization']['network']['rx_bytes'] ?? 0);
         $players = $this->playerCount($server, $catalog);
 
@@ -75,7 +75,7 @@ class CheckIdleServers extends Command
         //    그 서버의 rx 를 올린다 — 우리가 만든 트래픽 때문에 영영 유휴가 되지 않는다.
         //    판정을 건너뛰고 다음 주기를 기다린다(상태는 그대로 둔다).
         if ($players === false) {
-            Log::warning('wisdom-ai-assistant: 접속자 쿼리 실패 — 이번 주기는 판정하지 않는다', [
+            Log::warning('concierge: 접속자 쿼리 실패 — 이번 주기는 판정하지 않는다', [
                 'server' => $server->uuid_short,
                 'egg' => $server->egg?->name,
             ]);
@@ -107,7 +107,7 @@ class CheckIdleServers extends Command
             return;
         }
 
-        Log::info('wisdom-ai-assistant: 유휴 서버 자동 정지', [
+        Log::info('concierge: 유휴 서버 자동 정지', [
             'server' => $server->uuid_short,
             'idle_minutes' => $idle,
         ]);
@@ -122,7 +122,7 @@ class CheckIdleServers extends Command
      * ⚠ rx 가 **줄었으면** 활동이 아니라 재시작이다(카운터가 0 부터 다시 센다).
      *   활동으로 처리하면 재시작할 때마다 타이머가 리셋된다.
      */
-    private function isActive(WisdomAiAssistantIdleWatch $watch, int $rx, int|false|null $players): bool
+    private function isActive(ConciergeIdleWatch $watch, int $rx, int|false|null $players): bool
     {
         if ($players !== null) {
             return $players > 0;

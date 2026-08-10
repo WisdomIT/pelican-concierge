@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Tools;
+namespace WisdomIT\Concierge\Tools;
 
 /**
  * 서버에는 접근할 수 있지만 그 작업을 할 권한은 없다(Pelican 의 서브유저 권한).

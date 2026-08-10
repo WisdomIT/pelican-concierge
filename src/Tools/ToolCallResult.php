@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Tools;
+namespace WisdomIT\Concierge\Tools;
 
 /**
  * 도구 1회 실행 결과. 모델에 돌려줄 텍스트와, 로그에 남길 메타데이터를 함께 담는다.

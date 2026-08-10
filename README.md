@@ -1,4 +1,4 @@
-# Wisdom AI Assistant
+# Concierge
 
 An AI assistant for **Pelican Panel**. Your users describe what they want in plain
 language — *"make me a Minecraft server for six friends"*, *"why can nobody join?"* —
@@ -79,10 +79,10 @@ The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 
 ## Install
 
-**From the Hub** — find *Wisdom AI Assistant* in the plugin list and install it.
+**From the Hub** — find *Concierge* in the plugin list and install it.
 
-**Manually** — download `wisdom-ai-assistant.zip` from
-[Releases](https://github.com/WisdomIT/pelican-wisdom-ai-assistant/releases), then either:
+**Manually** — download `concierge.zip` from
+[Releases](https://github.com/WisdomIT/pelican-concierge/releases), then either:
 
 - use the **Import** button on the panel's plugin list to upload it, then press
   **Install**; or
@@ -112,7 +112,7 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 | Idle watch | off | Interval, and whether to stop the server or only ask |
 | Web search | off | Adds a per-search fee on top of tokens |
 
-Model and effort choices are listed in `config/wisdom-ai-assistant.php`. When Anthropic
+Model and effort choices are listed in `config/concierge.php`. When Anthropic
 ships a new model you can add it there without touching code.
 
 ## Cost

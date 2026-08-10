@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Enums\SubuserPermission;
 use App\Models\Server;
@@ -8,7 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use WisdomIT\WisdomAiAssistant\Support\NoticeAudience;
+use WisdomIT\Concierge\Support\NoticeAudience;
 
 /**
  * 서버 하나의 유휴 추적 상태 (#18).
@@ -19,9 +19,9 @@ use WisdomIT\WisdomAiAssistant\Support\NoticeAudience;
  * @property ?Carbon $notified_at
  * @property ?Carbon $snoozed_at
  */
-class WisdomAiAssistantIdleWatch extends Model
+class ConciergeIdleWatch extends Model
 {
-    protected $table = 'wisdom_ai_assistant_idle_watches';
+    protected $table = 'concierge_idle_watches';
 
     protected $fillable = ['server_id', 'last_rx', 'idle_since', 'notified_at', 'snoozed_at'];
 

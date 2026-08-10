@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Filament\Admin\Pages;
+namespace WisdomIT\Concierge\Filament\Admin\Pages;
 
 use BackedEnum;
 use Filament\Forms\Components\Select;
@@ -12,20 +12,20 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
+use WisdomIT\Concierge\Models\ConciergeSettings;
 
 /**
  * @property Schema $form
  */
-class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
+class ConciergeSettingsPage extends Page implements HasSchemas
 {
     use InteractsWithForms;
 
     protected static string|BackedEnum|null $navigationIcon = 'tabler-message-chatbot';
 
-    protected static ?string $slug = 'wisdom-ai-assistant';
+    protected static ?string $slug = 'concierge';
 
-    protected string $view = 'wisdom-ai-assistant::filament.admin.pages.settings';
+    protected string $view = 'concierge::filament.admin.pages.settings';
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
@@ -44,17 +44,17 @@ class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
 
     public static function getNavigationLabel(): string
     {
-        return trans('wisdom-ai-assistant::strings.settings_title');
+        return trans('concierge::strings.settings_title');
     }
 
     public function getTitle(): string
     {
-        return trans('wisdom-ai-assistant::strings.settings_title');
+        return trans('concierge::strings.settings_title');
     }
 
     public function mount(): void
     {
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
         $this->hasApiKey = $settings->isConfigured();
 
         // api_key 는 절대 되돌려 채우지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
@@ -80,74 +80,74 @@ class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
         return $schema
             ->statePath('data')
             ->components([
-                Section::make(trans('wisdom-ai-assistant::strings.section_general'))
+                Section::make(trans('concierge::strings.section_general'))
                     ->schema([
                         Toggle::make('enabled')
-                            ->label(trans('wisdom-ai-assistant::strings.field_enabled'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_enabled'))
+                            ->label(trans('concierge::strings.field_enabled'))
+                            ->helperText(trans('concierge::strings.help_enabled'))
                             ->inline(false),
                     ]),
 
-                Section::make(trans('wisdom-ai-assistant::strings.section_connection'))
+                Section::make(trans('concierge::strings.section_connection'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('api_key')
-                            ->label(trans('wisdom-ai-assistant::strings.field_api_key'))
+                            ->label(trans('concierge::strings.field_api_key'))
                             ->password()
                             ->revealable()
                             ->autocomplete(false)
                             ->placeholder(fn () => $this->hasApiKey
-                                ? trans('wisdom-ai-assistant::strings.api_key_set')
-                                : trans('wisdom-ai-assistant::strings.api_key_unset'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_api_key'))
+                                ? trans('concierge::strings.api_key_set')
+                                : trans('concierge::strings.api_key_unset'))
+                            ->helperText(trans('concierge::strings.help_api_key'))
                             ->columnSpanFull(),
 
                         Select::make('model')
-                            ->label(trans('wisdom-ai-assistant::strings.field_model'))
-                            ->options(config('wisdom-ai-assistant.available_models'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_model'))
+                            ->label(trans('concierge::strings.field_model'))
+                            ->options(config('concierge.available_models'))
+                            ->helperText(trans('concierge::strings.help_model'))
                             ->native(false)
                             ->required(),
 
                         Select::make('effort')
-                            ->label(trans('wisdom-ai-assistant::strings.field_effort'))
-                            ->options(config('wisdom-ai-assistant.available_efforts'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_effort'))
+                            ->label(trans('concierge::strings.field_effort'))
+                            ->options(config('concierge.available_efforts'))
+                            ->helperText(trans('concierge::strings.help_effort'))
                             ->native(false)
                             ->required(),
 
                         TextInput::make('max_tokens')
-                            ->label(trans('wisdom-ai-assistant::strings.field_max_tokens'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_max_tokens'))
+                            ->label(trans('concierge::strings.field_max_tokens'))
+                            ->helperText(trans('concierge::strings.help_max_tokens'))
                             ->numeric()
                             ->minValue(256)
                             ->maxValue(64000)
                             ->required(),
                     ]),
 
-                Section::make(trans('wisdom-ai-assistant::strings.section_limits'))
+                Section::make(trans('concierge::strings.section_limits'))
                     ->columns(2)
                     ->schema([
                         TextInput::make('daily_message_limit')
-                            ->label(trans('wisdom-ai-assistant::strings.field_daily_limit'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_daily_limit'))
+                            ->label(trans('concierge::strings.field_daily_limit'))
+                            ->helperText(trans('concierge::strings.help_daily_limit'))
                             ->numeric()
                             ->minValue(0)
                             ->required(),
                     ]),
 
-                Section::make(trans('wisdom-ai-assistant::strings.section_idle'))
-                    ->description(trans('wisdom-ai-assistant::strings.section_idle_help'))
+                Section::make(trans('concierge::strings.section_idle'))
+                    ->description(trans('concierge::strings.section_idle_help'))
                     ->schema([
                         Toggle::make('search_enabled')
-                            ->label(trans('wisdom-ai-assistant::strings.field_search_enabled'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_search_enabled'))
+                            ->label(trans('concierge::strings.field_search_enabled'))
+                            ->helperText(trans('concierge::strings.help_search_enabled'))
                             ->live()
                             ->inline(false),
 
                         TextInput::make('search_max_uses')
-                            ->label(trans('wisdom-ai-assistant::strings.field_search_max_uses'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_search_max_uses'))
+                            ->label(trans('concierge::strings.field_search_max_uses'))
+                            ->helperText(trans('concierge::strings.help_search_max_uses'))
                             ->numeric()
                             ->minValue(1)
                             ->maxValue(10)
@@ -155,29 +155,29 @@ class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
                             ->visible(fn ($get) => (bool) $get('search_enabled')),
 
                         Toggle::make('idle_enabled')
-                            ->label(trans('wisdom-ai-assistant::strings.field_idle_enabled'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_idle_enabled'))
+                            ->label(trans('concierge::strings.field_idle_enabled'))
+                            ->helperText(trans('concierge::strings.help_idle_enabled'))
                             ->live()
                             ->inline(false),
 
                         TextInput::make('idle_minutes')
-                            ->label(trans('wisdom-ai-assistant::strings.field_idle_minutes'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_idle_minutes'))
+                            ->label(trans('concierge::strings.field_idle_minutes'))
+                            ->helperText(trans('concierge::strings.help_idle_minutes'))
                             ->numeric()
                             ->minValue(5)
                             ->required()
                             ->visible(fn ($get) => (bool) $get('idle_enabled')),
 
                         Toggle::make('idle_stop_enabled')
-                            ->label(trans('wisdom-ai-assistant::strings.field_idle_stop'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_idle_stop'))
+                            ->label(trans('concierge::strings.field_idle_stop'))
+                            ->helperText(trans('concierge::strings.help_idle_stop'))
                             ->live()
                             ->inline(false)
                             ->visible(fn ($get) => (bool) $get('idle_enabled')),
 
                         TextInput::make('idle_grace_minutes')
-                            ->label(trans('wisdom-ai-assistant::strings.field_idle_grace'))
-                            ->helperText(trans('wisdom-ai-assistant::strings.help_idle_grace'))
+                            ->label(trans('concierge::strings.field_idle_grace'))
+                            ->helperText(trans('concierge::strings.help_idle_grace'))
                             ->numeric()
                             ->minValue(5)
                             ->required()
@@ -193,7 +193,7 @@ class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
         $apiKey = trim((string) ($data['api_key'] ?? ''));
         unset($data['api_key']);
 
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
         $settings->fill($data);
 
         // 빈 입력은 "그대로 두기"를 뜻한다. 그래야 다른 설정만 고칠 때 키를 다시 칠 필요가 없다.
@@ -202,29 +202,29 @@ class WisdomAiAssistantSettingsPage extends Page implements HasSchemas
         }
 
         $settings->save();
-        WisdomAiAssistantSettings::forgetCached();
+        ConciergeSettings::forgetCached();
 
         $this->hasApiKey = $settings->isConfigured();
         $this->data['api_key'] = '';
 
         Notification::make()
-            ->title(trans('wisdom-ai-assistant::strings.saved'))
+            ->title(trans('concierge::strings.saved'))
             ->success()
             ->send();
     }
 
     public function clearApiKey(): void
     {
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
         $settings->api_key = null;
         $settings->save();
-        WisdomAiAssistantSettings::forgetCached();
+        ConciergeSettings::forgetCached();
 
         $this->hasApiKey = false;
         $this->data['api_key'] = '';
 
         Notification::make()
-            ->title(trans('wisdom-ai-assistant::strings.api_key_cleared'))
+            ->title(trans('concierge::strings.api_key_cleared'))
             ->warning()
             ->send();
     }

@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use App\Models\Allocation;
 use App\Models\Egg;
@@ -11,9 +11,9 @@ use App\Services\Servers\ServerCreationService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
-use WisdomIT\WisdomAiAssistant\Catalog\JavaRuntime;
-use WisdomIT\WisdomAiAssistant\Tools\ToolInputException;
+use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Catalog\JavaRuntime;
+use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
  * 개설 대행 (#7). 대화로 받은 의도를 실제 개설로 옮긴다.
@@ -107,7 +107,7 @@ final class ServerProvisioner
 
         $base = $version !== null
             ? "{$game['name']} {$version}"
-            : trans('wisdom-ai-assistant::strings.default_server_name', ['game' => $game['name'], 'players' => $size['players'] ?? '?']);
+            : trans('concierge::strings.default_server_name', ['game' => $game['name'], 'players' => $size['players'] ?? '?']);
 
         $name = $base;
 
@@ -316,7 +316,7 @@ final class ServerProvisioner
         // ⚠ 이 수치들이 **서로 모순되는 일이 실제로 있었다** — 웹 요청에서는 빈 할당이 0으로,
         //   같은 순간 CLI 조회에서는 100으로 보였다. 원인을 좁히려면 필터 없는 총계와
         //   어느 DB 를 보고 있는지까지 함께 남겨야 한다.
-        Log::warning('wisdom-ai-assistant: 할당을 고르지 못했다', [
+        Log::warning('concierge: 할당을 고르지 못했다', [
             'need' => $count,
             'contiguous' => $contiguous,
             'free_in_range' => $free->count(),
@@ -383,7 +383,7 @@ final class ServerProvisioner
     /** @return array<int, int> */
     private function allowedPorts(): array
     {
-        return \WisdomIT\WisdomAiAssistant\Support\PortPool::allowedPorts();
+        return \WisdomIT\Concierge\Support\PortPool::allowedPorts();
     }
 
     /**

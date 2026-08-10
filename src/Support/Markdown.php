@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Support;
+namespace WisdomIT\Concierge\Support;
 
 use Illuminate\Support\Str;
 

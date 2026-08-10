@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Models\Backup;
 use App\Models\Server;
@@ -22,7 +22,7 @@ use Illuminate\Support\Collection;
  * @property string $kind
  * @property ?Carbon $notified_at
  */
-class WisdomAiAssistantBackupWatch extends Model
+class ConciergeBackupWatch extends Model
 {
     public const KIND_BACKUP = 'backup';
 
@@ -35,7 +35,7 @@ class WisdomAiAssistantBackupWatch extends Model
      */
     private const TTL_HOURS = 6;
 
-    protected $table = 'wisdom_ai_assistant_backup_watches';
+    protected $table = 'concierge_backup_watches';
 
     protected $fillable = ['server_id', 'user_id', 'backup_uuid', 'kind', 'notified_at'];
 

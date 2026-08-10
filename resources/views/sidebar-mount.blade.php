@@ -5,7 +5,7 @@
       그때 body 가 통째로 갈린다. `@persist` 로 감싼 요소만 새 문서로 **옮겨져** 살아남는다 —
       없으면 화면을 옮길 때마다 대화가 처음부터 다시 시작된다.
 
-    ⚠ 이름(`wisdom-ai-assistant`)은 **모든 페이지에서 같아야** 한다. 페이지마다 다르면 Alpine 이
+    ⚠ 이름(`concierge`)은 **모든 페이지에서 같아야** 한다. 페이지마다 다르면 Alpine 이
       다른 요소로 보고 새로 만든다.
 
     ⚠ **서버 콘솔 페이지는 SPA 예외**다(`PanelProvider` 의 `->spa()`). 그 화면을 드나들 때는
@@ -19,9 +19,9 @@
     새로고침할 때마다 화면이 튄다. `@persist` 밖에 두어야 이동할 때마다 다시 실행된다.
 --}}
 <script>
-    document.documentElement.classList.toggle('wa-open', localStorage.getItem('wa-open') === '1');
+    document.documentElement.classList.toggle('cg-open', localStorage.getItem('cg-open') === '1');
 </script>
 
-@persist('wisdom-ai-assistant')
-    <livewire:wisdom-ai-assistant-sidebar />
+@persist('concierge')
+    <livewire:concierge-sidebar />
 @endpersist

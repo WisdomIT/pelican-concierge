@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Models\Server;
 use Carbon\Carbon;
@@ -24,9 +24,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $is_error
  * @property Carbon $created_at
  */
-class WisdomAiAssistantToolCall extends Model
+class ConciergeToolCall extends Model
 {
-    protected $table = 'wisdom_ai_assistant_tool_calls';
+    protected $table = 'concierge_tool_calls';
 
     protected $fillable = [
         'usage_id',
@@ -46,7 +46,7 @@ class WisdomAiAssistantToolCall extends Model
 
     public function usage(): BelongsTo
     {
-        return $this->belongsTo(WisdomAiAssistantUsage::class, 'usage_id');
+        return $this->belongsTo(ConciergeUsage::class, 'usage_id');
     }
 
     public function server(): BelongsTo

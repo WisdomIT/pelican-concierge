@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use Anthropic\Client;
 use Anthropic\Messages\InputJSONDelta;
@@ -13,10 +13,10 @@ use App\Models\Egg;
 use App\Models\User;
 use Closure;
 use Throwable;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
-use WisdomIT\WisdomAiAssistant\Tools\AgentToolbox;
-use WisdomIT\WisdomAiAssistant\Tools\ToolCallResult;
-use WisdomIT\WisdomAiAssistant\Tools\ToolException;
+use WisdomIT\Concierge\Models\ConciergeSettings;
+use WisdomIT\Concierge\Tools\AgentToolbox;
+use WisdomIT\Concierge\Tools\ToolCallResult;
+use WisdomIT\Concierge\Tools\ToolException;
 
 /**
  * 모델 호출 + 도구 루프.
@@ -36,7 +36,7 @@ final class AnthropicChatService
     private const MAX_TOOL_ROUNDS = 6;
 
     public function __construct(
-        private readonly WisdomAiAssistantSettings $settings,
+        private readonly ConciergeSettings $settings,
         private readonly User $user,
     ) {}
 
@@ -500,7 +500,7 @@ final class AnthropicChatService
      */
     private function deploymentKnowledge(): string
     {
-        $path = plugin_path('wisdom-ai-assistant', 'resources', 'knowledge', 'agent.md');
+        $path = plugin_path('concierge', 'resources', 'knowledge', 'agent.md');
 
         if (!is_file($path)) {
             return '';

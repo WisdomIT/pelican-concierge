@@ -226,7 +226,7 @@ games:
       AUTO_UPDATE: "1"
       # ✅ egg 의 시작 스크립트(PalworldServerConfigParser)가 이 환경 변수를 읽어
       #    PalWorldSettings.ini 의 RESTAPIEnabled 를 켠다 (#31). 변수 정의 자체는
-      #    wisdom-ai-assistant:egg-metadata 가 보장한다(원본 egg 에 없음 — 재임포트가 지운다).
+      #    concierge:egg-metadata 가 보장한다(원본 egg 에 없음 — 재임포트가 지운다).
       REST_API_ENABLED: "True"
     # egg 규칙이 이미 between:1,32 로 막고 있어 추가 상한이 필요 없다.
     # (Satisfactory 의 MAX_PLAYERS 처럼 상한 없는 경우에만 caps 를 쓴다)

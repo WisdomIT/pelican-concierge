@@ -178,7 +178,7 @@ $sc = $e->startup_commands; echo is_array($sc) ? reset($sc) : $sc;'
 | Project Zomboid | `SERVER_PORT`, `STEAM_PORT` | `-port` / `-udpport` 로 **둘 다 바인드**. 기본값 16262 는 할당 범위 밖이라 반드시 덮어써야 한다 |
 | Satisfactory | `SERVER_PORT`, `RELIABLE_PORT` | Reliable Messaging 은 v1.1+ 필수 |
 | Core Keeper · Valheim | `SERVER_PORT` | |
-| Palworld | `SERVER_PORT`, `REST_API_PORT` | REST 쿼리 포트(#31). 변수 자체는 원본 egg 에 없어 `wisdom-ai-assistant:egg-metadata` 가 보장하고, 시작 스크립트(PalworldServerConfigParser)가 env → PalWorldSettings.ini 로 옮긴다 |
+| Palworld | `SERVER_PORT`, `REST_API_PORT` | REST 쿼리 포트(#31). 변수 자체는 원본 egg 에 없어 `concierge:egg-metadata` 가 보장하고, 시작 스크립트(PalworldServerConfigParser)가 env → PalWorldSettings.ini 로 옮긴다 |
 | Paper · Fabric | (없음) | Pelican 이 `server.properties` 에 주입 |
 | 7 Days to Die | `${SERVER_PORT}` | `{{ }}` 가 아니라 **셸 확장**을 쓴다 — 정규식으로 찾을 때 주의 |
 

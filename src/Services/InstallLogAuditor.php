@@ -1,13 +1,13 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use Anthropic\Client;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Throwable;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
-use WisdomIT\WisdomAiAssistant\Support\SecretMasker;
+use WisdomIT\Concierge\Models\ConciergeSettings;
+use WisdomIT\Concierge\Support\SecretMasker;
 
 /**
  * 설치 로그를 읽고 **설치가 실제로 끝났는지** 판정한다 (#7).
@@ -36,7 +36,7 @@ final class InstallLogAuditor
     /** 판정은 짧은 JSON 하나면 된다. */
     private const MAX_TOKENS = 512;
 
-    public function __construct(private readonly WisdomAiAssistantSettings $settings) {}
+    public function __construct(private readonly ConciergeSettings $settings) {}
 
     /**
      * @return ?array{ok: bool, reason: string}  판정할 수 없으면 null

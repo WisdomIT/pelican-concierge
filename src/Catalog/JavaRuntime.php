@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Catalog;
+namespace WisdomIT\Concierge\Catalog;
 
 /**
  * 마인크래프트 버전 → 실행할 Java 이미지.

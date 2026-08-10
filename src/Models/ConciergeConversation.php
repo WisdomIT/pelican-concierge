@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use App\Models\User;
 use Carbon\Carbon;
@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 /**
- * 대화 하나. 메시지는 `wisdom_ai_assistant_usages` 가 갖고 있고 이 모델은 목록에 필요한 것만 든다.
+ * 대화 하나. 메시지는 `concierge_usages` 가 갖고 있고 이 모델은 목록에 필요한 것만 든다.
  *
  * ⚠ **빈 대화는 만들지 않는다.** 채팅 화면을 열기만 해도 행이 생기면 사이드바가 빈 항목으로
  *   가득 찬다. id 는 화면에서 미리 정하고, 행은 **첫 발화 때** `ensure()` 가 만든다.
@@ -25,12 +25,12 @@ use Illuminate\Support\Str;
  * @property ?Carbon $notice_unread_at
  * @property Carbon $created_at
  */
-class WisdomAiAssistantConversation extends Model
+class ConciergeConversation extends Model
 {
     /** 목록에 보여줄 제목 길이. 넘으면 자른다. */
     private const TITLE_LENGTH = 60;
 
-    protected $table = 'wisdom_ai_assistant_conversations';
+    protected $table = 'concierge_conversations';
 
     // PK 가 ULID 문자열이다 — 자동 증가로 두면 저장할 때 id 가 날아간다.
     public $incrementing = false;
@@ -65,11 +65,11 @@ class WisdomAiAssistantConversation extends Model
     /**
      * 이 대화의 메시지들. 오래된 것부터 — 화면에 그대로 쌓아 올리는 순서다.
      *
-     * @return HasMany<WisdomAiAssistantUsage, $this>
+     * @return HasMany<ConciergeUsage, $this>
      */
     public function messages(): HasMany
     {
-        return $this->hasMany(WisdomAiAssistantUsage::class, 'conversation_id')->oldest('id');
+        return $this->hasMany(ConciergeUsage::class, 'conversation_id')->oldest('id');
     }
 
     /**
@@ -159,20 +159,20 @@ class WisdomAiAssistantConversation extends Model
         $minutes = (int) $at->diffInMinutes(now());
 
         if ($minutes < 1) {
-            return trans('wisdom-ai-assistant::strings.time_just_now');
+            return trans('concierge::strings.time_just_now');
         }
 
         if ($minutes < 60) {
-            return trans('wisdom-ai-assistant::strings.time_minutes_ago', ['n' => $minutes]);
+            return trans('concierge::strings.time_minutes_ago', ['n' => $minutes]);
         }
 
         if ($minutes < 60 * 24) {
-            return trans('wisdom-ai-assistant::strings.time_hours_ago', ['n' => intdiv($minutes, 60)]);
+            return trans('concierge::strings.time_hours_ago', ['n' => intdiv($minutes, 60)]);
         }
 
         return $at->year === now()->year
-            ? $at->format(trans('wisdom-ai-assistant::strings.time_date_this_year'))
-            : $at->format(trans('wisdom-ai-assistant::strings.time_date_other_year'));
+            ? $at->format(trans('concierge::strings.time_date_this_year'))
+            : $at->format(trans('concierge::strings.time_date_other_year'));
     }
 
     /** 화면에 띄울 제목. 내용 저장 이전 기록은 제목이 없다. */
@@ -180,6 +180,6 @@ class WisdomAiAssistantConversation extends Model
     {
         return filled($this->title)
             ? $this->title
-            : trans('wisdom-ai-assistant::strings.untitled_conversation');
+            : trans('concierge::strings.untitled_conversation');
     }
 }

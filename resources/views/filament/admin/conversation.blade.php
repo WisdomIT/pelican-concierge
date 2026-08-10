@@ -1,6 +1,6 @@
 @php
-    use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantUsage;
-    use WisdomIT\WisdomAiAssistant\Support\Markdown;
+    use WisdomIT\Concierge\Models\ConciergeUsage;
+    use WisdomIT\Concierge\Support\Markdown;
 
     $totalIn = $messages->sum('input_tokens');
     $totalOut = $messages->sum('output_tokens');
@@ -120,11 +120,11 @@
     </style>
 
     <div class="wac-total">
-        <div><span>{{ trans('wisdom-ai-assistant::strings.field_messages') }}</span> <b>{{ $messages->count() }}</b></div>
-        <div><span>{{ trans('wisdom-ai-assistant::strings.field_input_tokens') }}</span> <b>{{ number_format($totalIn) }}</b></div>
-        <div><span>{{ trans('wisdom-ai-assistant::strings.field_output_tokens') }}</span> <b>{{ number_format($totalOut) }}</b></div>
-        <div><span>{{ trans('wisdom-ai-assistant::strings.total_tokens') }}</span> <b>{{ number_format($totalIn + $totalOut) }}</b></div>
-        <div><span>{{ trans('wisdom-ai-assistant::strings.field_model') }}</span> <b>{{ $messages->first()?->model }}</b></div>
+        <div><span>{{ trans('concierge::strings.field_messages') }}</span> <b>{{ $messages->count() }}</b></div>
+        <div><span>{{ trans('concierge::strings.field_input_tokens') }}</span> <b>{{ number_format($totalIn) }}</b></div>
+        <div><span>{{ trans('concierge::strings.field_output_tokens') }}</span> <b>{{ number_format($totalOut) }}</b></div>
+        <div><span>{{ trans('concierge::strings.total_tokens') }}</span> <b>{{ number_format($totalIn + $totalOut) }}</b></div>
+        <div><span>{{ trans('concierge::strings.field_model') }}</span> <b>{{ $messages->first()?->model }}</b></div>
     </div>
 
     <div class="wac-log">
@@ -147,7 +147,7 @@
                             <details class="wac-tool">
                                 <summary>
                                     <span class="wac-tool-name">
-                                        {{ trans('wisdom-ai-assistant::strings.tool_' . $call->tool_name) }}
+                                        {{ trans('concierge::strings.tool_' . $call->tool_name) }}
                                     </span>
 
                                     @if ($call->server)
@@ -155,20 +155,20 @@
                                     @endif
 
                                     @if ($call->is_error)
-                                        <span class="wac-tool-bad">· {{ trans('wisdom-ai-assistant::strings.tool_failed') }}</span>
+                                        <span class="wac-tool-bad">· {{ trans('concierge::strings.tool_failed') }}</span>
                                     @endif
                                 </summary>
 
                                 @if (filled($call->input))
-                                    <dt>{{ trans('wisdom-ai-assistant::strings.field_tool_input') }}</dt>
+                                    <dt>{{ trans('concierge::strings.field_tool_input') }}</dt>
                                     <pre>{{ $call->input }}</pre>
                                 @endif
 
                                 @if (filled($call->result))
-                                    <dt>{{ trans('wisdom-ai-assistant::strings.field_tool_result') }}</dt>
+                                    <dt>{{ trans('concierge::strings.field_tool_result') }}</dt>
                                     <pre>{{ $call->result }}</pre>
                                 @else
-                                    <dt>{{ trans('wisdom-ai-assistant::strings.content_not_logged') }}</dt>
+                                    <dt>{{ trans('concierge::strings.content_not_logged') }}</dt>
                                 @endif
                             </details>
                         @endforeach
@@ -180,7 +180,7 @@
                 @if (filled($message->assistant_message))
                     <div class="wac-bubble wac-agent wac-md">{!! Markdown::render($message->assistant_message) !!}</div>
                 @else
-                    <div class="wac-bubble wac-agent">{{ trans('wisdom-ai-assistant::strings.content_not_logged') }}</div>
+                    <div class="wac-bubble wac-agent">{{ trans('concierge::strings.content_not_logged') }}</div>
                 @endif
 
                 <div class="wac-meta">
@@ -188,9 +188,9 @@
                     <span class="wac-chip">in {{ number_format($message->input_tokens) }}</span>
                     <span class="wac-chip">out {{ number_format($message->output_tokens) }}</span>
 
-                    @if ($message->status !== WisdomAiAssistantUsage::STATUS_OK)
+                    @if ($message->status !== ConciergeUsage::STATUS_OK)
                         <span class="wac-chip is-bad">
-                            {{ trans('wisdom-ai-assistant::strings.status_' . $message->status) }}
+                            {{ trans('concierge::strings.status_' . $message->status) }}
                         </span>
                     @endif
                 </div>

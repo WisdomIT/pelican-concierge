@@ -1,9 +1,9 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Support;
+namespace WisdomIT\Concierge\Support;
 
 use App\Models\Schedule;
-use WisdomIT\WisdomAiAssistant\Tools\ToolInputException;
+use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
  * 크론 표현식을 사람 말로, 사람 말을 크론으로 (#41).

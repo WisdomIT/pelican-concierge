@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Livewire;
+namespace WisdomIT\Concierge\Livewire;
 
 use App\Enums\SubuserPermission;
 use App\Models\Server;
@@ -12,18 +12,18 @@ use Livewire\Component;
 use Illuminate\Support\Str;
 use Throwable;
 use App\Services\Servers\ReinstallServerService;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantBackupWatch;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantConversation;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantIdleWatch;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantInstallCheck;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantSettings;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantToolCall;
-use WisdomIT\WisdomAiAssistant\Models\WisdomAiAssistantUsage;
-use WisdomIT\WisdomAiAssistant\Services\AnthropicChatService;
-use WisdomIT\WisdomAiAssistant\Services\ChatResult;
-use WisdomIT\WisdomAiAssistant\Support\Markdown;
-use WisdomIT\WisdomAiAssistant\Support\ServerLinks;
-use WisdomIT\WisdomAiAssistant\Support\Tenancy;
+use WisdomIT\Concierge\Models\ConciergeBackupWatch;
+use WisdomIT\Concierge\Models\ConciergeConversation;
+use WisdomIT\Concierge\Models\ConciergeIdleWatch;
+use WisdomIT\Concierge\Models\ConciergeInstallCheck;
+use WisdomIT\Concierge\Models\ConciergeSettings;
+use WisdomIT\Concierge\Models\ConciergeToolCall;
+use WisdomIT\Concierge\Models\ConciergeUsage;
+use WisdomIT\Concierge\Services\AnthropicChatService;
+use WisdomIT\Concierge\Services\ChatResult;
+use WisdomIT\Concierge\Support\Markdown;
+use WisdomIT\Concierge\Support\ServerLinks;
+use WisdomIT\Concierge\Support\Tenancy;
 
 /**
  * 어느 화면에서든 떠 있는 에이전트 사이드바.
@@ -44,9 +44,9 @@ class AgentSidebar extends Component
     /**
      * 재개 상태를 두는 캐시 스토어. **기본 스토어와 분리한다.**
      * `cache:clear` 는 기본 스토어만 비우므로, 여기 두면 배포에 휩쓸리지 않는다.
-     * (스토어 정의는 `WisdomAiAssistantPluginProvider::boot()`)
+     * (스토어 정의는 `ConciergePluginProvider::boot()`)
      */
-    public const PENDING_STORE = 'wisdom-ai-assistant';
+    public const PENDING_STORE = 'concierge';
 
     /** 실행하면 시간이 걸리는 도구 — 끝날 때까지 상태를 지켜본다. */
     private const WATCHED_TOOLS = ['start_server', 'restart_server', 'create_server'];
@@ -82,7 +82,7 @@ class AgentSidebar extends Component
 
     public string $draft = '';
 
-    /** 지금 열려 있는 대화의 id = `wisdom_ai_assistant_conversations.id`. */
+    /** 지금 열려 있는 대화의 id = `concierge_conversations.id`. */
     public string $conversationId = '';
 
     /**
@@ -130,7 +130,7 @@ class AgentSidebar extends Component
      */
     public function mount(): void
     {
-        $latest = WisdomAiAssistantConversation::listFor((int) auth()->id())->first();
+        $latest = ConciergeConversation::listFor((int) auth()->id())->first();
 
         $latest === null ? $this->startConversation() : $this->openConversation($latest->id);
     }
@@ -163,7 +163,7 @@ class AgentSidebar extends Component
             return;
         }
 
-        $notice = WisdomAiAssistantInstallCheck::undeliveredFor((int) auth()->id())->first();
+        $notice = ConciergeInstallCheck::undeliveredFor((int) auth()->id())->first();
 
         if ($notice === null) {
             // 한 번에 하나만 전한다 — 백업이 없으면 유휴로 넘어간다.
@@ -177,13 +177,13 @@ class AgentSidebar extends Component
         $server = $notice->server;
 
         // 성공은 알리기만 한다 — 결정할 것이 없으므로 카드도 없다.
-        if ($notice->status === WisdomAiAssistantInstallCheck::STATUS_OK) {
-            $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.install_ok_notice', [
+        if ($notice->status === ConciergeInstallCheck::STATUS_OK) {
+            $this->deliverNotice($server, trans('concierge::strings.install_ok_notice', [
                 'server' => $server->name,
                 'address' => $server->allocation?->address ?? '-',
                 'state' => trans($this->isRunning($server)
-                    ? 'wisdom-ai-assistant::strings.install_ok_running'
-                    : 'wisdom-ai-assistant::strings.install_ok_offline'),
+                    ? 'concierge::strings.install_ok_running'
+                    : 'concierge::strings.install_ok_offline'),
             ]), ServerLinks::forToolCalls([
                 (object) ['name' => 'start_server', 'serverId' => $server->id, 'isError' => false],
             ]));
@@ -195,17 +195,17 @@ class AgentSidebar extends Component
             return;
         }
 
-        $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.install_failed_notice', [
+        $this->deliverNotice($server, trans('concierge::strings.install_failed_notice', [
             'server' => $server->name,
             'reason' => (string) $notice->reason,
         ]), [], [
-            'title' => trans('wisdom-ai-assistant::strings.card_title_reinstall'),
+            'title' => trans('concierge::strings.card_title_reinstall'),
             'lines' => [
-                ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                ['label' => trans('wisdom-ai-assistant::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
+                ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                ['label' => trans('concierge::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
             ],
-            'note' => trans('wisdom-ai-assistant::strings.card_note_reinstall'),
-            'confirm' => trans('wisdom-ai-assistant::strings.card_confirm_reinstall'),
+            'note' => trans('concierge::strings.card_note_reinstall'),
+            'confirm' => trans('concierge::strings.card_confirm_reinstall'),
             'danger' => true,
             // 이 카드는 모델의 도구 루프에서 나온 것이 아니다 → 재개할 상태가 없다.
             'standalone' => 'reinstall:' . $server->id,
@@ -270,7 +270,7 @@ class AgentSidebar extends Component
             }
 
             if ($state === 'running') {
-                $this->announce(trans('wisdom-ai-assistant::strings.watch_started', [
+                $this->announce(trans('concierge::strings.watch_started', [
                     'server' => $server->name,
                     'address' => $server->allocation?->address ?? '-',
                 ]), $server);
@@ -281,7 +281,7 @@ class AgentSidebar extends Component
             if ($state === 'offline') {
                 // 켜는 중이었는데 꺼졌다 → 기동 실패. 알리고 내린다.
                 if ($entry['state'] === 'starting') {
-                    $this->announce(trans('wisdom-ai-assistant::strings.watch_stopped', ['server' => $server->name]), $server);
+                    $this->announce(trans('concierge::strings.watch_stopped', ['server' => $server->name]), $server);
                 }
 
                 // 설치가 끝나 offline 이 된 경우는 설치 알림(#7)이 맡는다. 어느 쪽이든 감시는 끝.
@@ -373,7 +373,7 @@ class AgentSidebar extends Component
 
         $this->pendingCard = [];
         $this->pendingToken = '';
-        WisdomAiAssistantConversation::find($this->conversationId)?->clearPending();
+        ConciergeConversation::find($this->conversationId)?->clearPending();
 
         // 서버가 지워졌으면 알릴 대상도 없다 — 카드만 걷는다.
         if ($server !== null) {
@@ -388,7 +388,7 @@ class AgentSidebar extends Component
      */
     private function staleIdleNotice(int $serverId, ?Server $server): ?array
     {
-        if (WisdomAiAssistantIdleWatch::where('server_id', $serverId)->exists()) {
+        if (ConciergeIdleWatch::where('server_id', $serverId)->exists()) {
             return null;
         }
 
@@ -401,8 +401,8 @@ class AgentSidebar extends Component
 
         return [
             'text' => trans($stopped
-                ? 'wisdom-ai-assistant::strings.idle_auto_stopped'
-                : 'wisdom-ai-assistant::strings.idle_card_moot', ['server' => $server->name]),
+                ? 'concierge::strings.idle_auto_stopped'
+                : 'concierge::strings.idle_card_moot', ['server' => $server->name]),
             'links' => $stopped ? ServerLinks::forToolCalls([
                 (object) ['name' => 'start_server', 'serverId' => $server->id, 'isError' => false],
             ]) : [],
@@ -419,10 +419,10 @@ class AgentSidebar extends Component
      */
     private function staleReinstallNotice(int $serverId, ?Server $server): ?array
     {
-        $check = WisdomAiAssistantInstallCheck::where('server_id', $serverId)->first();
+        $check = ConciergeInstallCheck::where('server_id', $serverId)->first();
 
         if ($check !== null
-            && $check->status === WisdomAiAssistantInstallCheck::STATUS_FAILED
+            && $check->status === ConciergeInstallCheck::STATUS_FAILED
             && $check->notified_at !== null) {
             return null;
         }
@@ -432,9 +432,9 @@ class AgentSidebar extends Component
         }
 
         return [
-            'text' => trans($check?->status === WisdomAiAssistantInstallCheck::STATUS_OK
-                ? 'wisdom-ai-assistant::strings.reinstall_card_resolved'
-                : 'wisdom-ai-assistant::strings.reinstall_card_moot', ['server' => $server->name]),
+            'text' => trans($check?->status === ConciergeInstallCheck::STATUS_OK
+                ? 'concierge::strings.reinstall_card_resolved'
+                : 'concierge::strings.reinstall_card_moot', ['server' => $server->name]),
             'links' => [],
         ];
     }
@@ -446,16 +446,16 @@ class AgentSidebar extends Component
      */
     private function deliverBackupNotice(): bool
     {
-        WisdomAiAssistantBackupWatch::pruneStale();
+        ConciergeBackupWatch::pruneStale();
 
-        $watch = WisdomAiAssistantBackupWatch::readyFor((int) auth()->id())->first();
+        $watch = ConciergeBackupWatch::readyFor((int) auth()->id())->first();
 
         if ($watch === null || $watch->server === null) {
             return false;
         }
 
         $server = $watch->server;
-        $isRestore = $watch->kind === WisdomAiAssistantBackupWatch::KIND_RESTORE;
+        $isRestore = $watch->kind === ConciergeBackupWatch::KIND_RESTORE;
         $ok = $watch->succeeded();
 
         $key = match (true) {
@@ -465,7 +465,7 @@ class AgentSidebar extends Component
             default => 'backup_failed_notice',
         };
 
-        $this->deliverNotice($server, trans("wisdom-ai-assistant::strings.{$key}", [
+        $this->deliverNotice($server, trans("concierge::strings.{$key}", [
             'server' => $server->name,
             'backup' => $watch->backup()?->name ?? '-',
         ]));
@@ -484,31 +484,31 @@ class AgentSidebar extends Component
      */
     private function deliverIdleNotice(): void
     {
-        $settings = WisdomAiAssistantSettings::current();
-        $watch = WisdomAiAssistantIdleWatch::undeliveredFor((int) auth()->id(), $settings->idle_minutes)->first();
+        $settings = ConciergeSettings::current();
+        $watch = ConciergeIdleWatch::undeliveredFor((int) auth()->id(), $settings->idle_minutes)->first();
 
         if ($watch === null || $watch->server === null) {
             return;
         }
         $server = $watch->server;
 
-        $text = trans('wisdom-ai-assistant::strings.idle_notice', [
+        $text = trans('concierge::strings.idle_notice', [
             'server' => $server->name,
             'minutes' => $watch->idleMinutes(),
             'action' => $settings->idle_stop_enabled
-                ? trans('wisdom-ai-assistant::strings.idle_notice_will_stop', ['grace' => $settings->idle_grace_minutes])
-                : trans('wisdom-ai-assistant::strings.idle_notice_no_stop'),
+                ? trans('concierge::strings.idle_notice_will_stop', ['grace' => $settings->idle_grace_minutes])
+                : trans('concierge::strings.idle_notice_no_stop'),
         ]);
 
         $this->deliverNotice($server, $text, [], [
-            'title' => trans('wisdom-ai-assistant::strings.card_title_idle'),
+            'title' => trans('concierge::strings.card_title_idle'),
             'lines' => [
-                ['label' => trans('wisdom-ai-assistant::strings.card_server'), 'value' => $server->name],
-                ['label' => trans('wisdom-ai-assistant::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
+                ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                ['label' => trans('concierge::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
             ],
-            'note' => trans('wisdom-ai-assistant::strings.card_note_idle'),
-            'confirm' => trans('wisdom-ai-assistant::strings.card_confirm_idle'),
-            'cancel' => trans('wisdom-ai-assistant::strings.card_cancel_idle'),
+            'note' => trans('concierge::strings.card_note_idle'),
+            'confirm' => trans('concierge::strings.card_confirm_idle'),
+            'cancel' => trans('concierge::strings.card_cancel_idle'),
             'danger' => true,
             'standalone' => 'idle:' . $server->id,
         ]);
@@ -525,7 +525,7 @@ class AgentSidebar extends Component
      * 선제 알림을 **그 서버를 다루던 대화**로 보낸다 (#29).
      *
      * ⚠ 현재 열린 대화에 꽂으면 안 된다 — 서버 여러 대를 대화 세션으로 나눠 관리하는
-     *   사용자의 맥락을 침범한다. 원 대화는 `wisdom_ai_assistant_tool_calls`(server_id ↔
+     *   사용자의 맥락을 침범한다. 원 대화는 `concierge_tool_calls`(server_id ↔
      *   conversation_id)에서 찾는다: 그 서버를 마지막으로 다룬 대화다.
      *
      * - 원 대화 == 현재 대화 → 지금까지처럼 화면에 바로 띄운다 (카드 포함)
@@ -542,22 +542,22 @@ class AgentSidebar extends Component
     private function deliverNotice(Server $server, string $text, array $links = [], ?array $card = null): void
     {
         $userId = (int) auth()->id();
-        $title = trans('wisdom-ai-assistant::strings.notice_conversation_title', ['server' => $server->name]);
+        $title = trans('concierge::strings.notice_conversation_title', ['server' => $server->name]);
 
         // ⚠ 원 대화가 없을 때 **매번 새 대화를 만들면 안 된다.** 그 서버를 대화로 다룬 적이
         //   없는 사용자(친구가 화면에서만 쓰던 경우)는 알림이 올 때마다 목록에 같은 이름의
         //   대화가 쌓인다. 이미 있는 전용 알림 대화를 다시 쓴다.
         $target = $this->originConversationId($server)
-            ?? WisdomAiAssistantConversation::query()
+            ?? ConciergeConversation::query()
                 ->where('user_id', $userId)
                 ->where('title', $title)
                 ->latest('last_message_at')
                 ->value('id')
-            ?? WisdomAiAssistantConversation::newId();
+            ?? ConciergeConversation::newId();
 
-        WisdomAiAssistantUsage::record($userId, WisdomAiAssistantSettings::current(), [
+        ConciergeUsage::record($userId, ConciergeSettings::current(), [
             'conversation_id' => $target,
-            'status' => WisdomAiAssistantUsage::STATUS_OK,
+            'status' => ConciergeUsage::STATUS_OK,
             'input_tokens' => 0,
             'output_tokens' => 0,
             'user_message' => null,
@@ -565,7 +565,7 @@ class AgentSidebar extends Component
         ]);
 
         // 새 대화라면 제목은 알림 본문이 아니라 **서버 이름 기반**으로 깔끔하게.
-        $conversation = WisdomAiAssistantConversation::ensure($target, $userId, $title);
+        $conversation = ConciergeConversation::ensure($target, $userId, $title);
 
         if ($card !== null) {
             // standalone 카드는 재개 상태(캐시)가 없다 — 행에 실어 두면 열 때 복원된다.
@@ -596,7 +596,7 @@ class AgentSidebar extends Component
     {
         $userId = (int) auth()->id();
 
-        $conversationId = WisdomAiAssistantToolCall::query()
+        $conversationId = ConciergeToolCall::query()
             ->where('server_id', $server->id)
             ->whereNotNull('conversation_id')
             ->whereHas('usage', fn ($query) => $query->where('user_id', $userId))
@@ -607,17 +607,17 @@ class AgentSidebar extends Component
             return null;
         }
 
-        return WisdomAiAssistantConversation::query()
+        return ConciergeConversation::query()
             ->where('user_id', $userId)
             ->whereKey($conversationId)
             ->exists() ? $conversationId : null;
     }
 
-    /** 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(WisdomAiAssistantConversation 주석 참고). */
+    /** 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(ConciergeConversation 주석 참고). */
     public function startConversation(): void
     {
         // ULID 라서 사전순 정렬이 곧 시간순이다 → 관리 화면에서 최신 대화부터 보인다.
-        $this->conversationId = WisdomAiAssistantConversation::newId();
+        $this->conversationId = ConciergeConversation::newId();
         $this->messages = [];
         $this->pendingCard = [];
         $this->pendingToken = '';
@@ -634,7 +634,7 @@ class AgentSidebar extends Component
      */
     public function openConversation(string $id): void
     {
-        $conversation = WisdomAiAssistantConversation::query()
+        $conversation = ConciergeConversation::query()
             ->where('user_id', (int) auth()->id())
             ->find($id);
 
@@ -660,19 +660,19 @@ class AgentSidebar extends Component
     /**
      * 저장된 턴을 말풍선으로 되돌린다.
      *
-     * ⚠ 한 행이 **한 턴**(사용자 발화 + 최종 응답)이다. 도구 이력은 `wisdom_ai_assistant_tool_calls`
+     * ⚠ 한 행이 **한 턴**(사용자 발화 + 최종 응답)이다. 도구 이력은 `concierge_tool_calls`
      *   에 따로 있고 여기 섞지 않는다 — 이 배열은 그대로 모델에게 다시 보내는 대화 맥락이라
      *   화면 장식이 들어가면 맥락이 오염된다.
      *
      * @return array<int, array{role: string, text: string}>
      */
-    private function restoreMessages(WisdomAiAssistantConversation $conversation): array
+    private function restoreMessages(ConciergeConversation $conversation): array
     {
         $turns = $conversation->messages;
         $dropped = $turns->count() - self::RESTORED_TURN_LIMIT;
 
         $messages = $dropped > 0
-            ? [['role' => 'event', 'text' => trans('wisdom-ai-assistant::strings.older_turns_hidden', ['count' => $dropped])]]
+            ? [['role' => 'event', 'text' => trans('concierge::strings.older_turns_hidden', ['count' => $dropped])]]
             : [];
 
         foreach ($turns->slice(max(0, $dropped)) as $usage) {
@@ -737,7 +737,7 @@ class AgentSidebar extends Component
      * 재개 상태는 캐시에만 있고 수명이 짧다. **만료됐으면 되살리지 않는 것이 맞다** — 그 상태
      * 안의 도구 결과는 읽은 시점의 스냅샷이라, 한참 지난 뒤 승인하면 그 사이의 변경을 덮어쓴다.
      */
-    private function restorePendingCard(WisdomAiAssistantConversation $conversation): void
+    private function restorePendingCard(ConciergeConversation $conversation): void
     {
         $this->pendingCard = [];
         $this->pendingToken = '';
@@ -755,9 +755,9 @@ class AgentSidebar extends Component
             return;
         }
 
-        if (!Cache::store(self::PENDING_STORE)->has('wisdom-ai-assistant:pending:' . $conversation->pending_token)) {
+        if (!Cache::store(self::PENDING_STORE)->has('concierge:pending:' . $conversation->pending_token)) {
             $conversation->clearPending();
-            $this->messages[] = ['role' => 'event', 'text' => trans('wisdom-ai-assistant::strings.card_expired')];
+            $this->messages[] = ['role' => 'event', 'text' => trans('concierge::strings.card_expired')];
 
             return;
         }
@@ -775,15 +775,15 @@ class AgentSidebar extends Component
             }
         }
 
-        return trans('wisdom-ai-assistant::strings.new_conversation');
+        return trans('concierge::strings.new_conversation');
     }
 
     private function refreshConversations(): void
     {
-        $this->conversations = WisdomAiAssistantConversation::listFor((int) auth()->id())
+        $this->conversations = ConciergeConversation::listFor((int) auth()->id())
             ->limit(self::CONVERSATION_LIST_LIMIT)
             ->get()
-            ->map(fn (WisdomAiAssistantConversation $c) => [
+            ->map(fn (ConciergeConversation $c) => [
                 'id' => $c->id,
                 'title' => $c->displayTitle(),
                 'when' => $c->lastMessageLabel(),
@@ -794,7 +794,7 @@ class AgentSidebar extends Component
 
     public function render(): View
     {
-        return view('wisdom-ai-assistant::livewire.agent-sidebar');
+        return view('concierge::livewire.agent-sidebar');
     }
 
     /**
@@ -809,7 +809,7 @@ class AgentSidebar extends Component
         }
 
         try {
-            return WisdomAiAssistantSettings::current()->enabled;
+            return ConciergeSettings::current()->enabled;
         } catch (Throwable) {
             // 소스는 배포됐는데 마이그레이션이 아직 안 돈 짧은 구간에서 테이블이 없다.
             // 그 사이 화면 전체가 500 나는 것보다 사이드바가 잠깐 안 보이는 편이 낫다.
@@ -833,30 +833,30 @@ class AgentSidebar extends Component
         // 보냈는지조차 화면에 안 나온다 — Livewire 는 요청이 끝나야 다시 렌더하기 때문이다.
         $this->streamTo('live-user', $text);
 
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
         $userId = (int) auth()->id();
 
         if (!$settings->enabled) {
-            $this->reply($settings, $userId, $text, WisdomAiAssistantUsage::STATUS_DISABLED, trans('wisdom-ai-assistant::strings.disabled'));
+            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_DISABLED, trans('concierge::strings.disabled'));
 
             return;
         }
 
         if (!$settings->isConfigured()) {
-            $this->reply($settings, $userId, $text, WisdomAiAssistantUsage::STATUS_NOT_CONFIGURED, trans('wisdom-ai-assistant::strings.not_configured'));
+            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_NOT_CONFIGURED, trans('concierge::strings.not_configured'));
 
             return;
         }
 
         $limit = $settings->daily_message_limit;
 
-        if ($limit > 0 && WisdomAiAssistantUsage::todayCountFor($userId) >= $limit) {
-            $this->reply($settings, $userId, $text, WisdomAiAssistantUsage::STATUS_RATE_LIMITED, trans('wisdom-ai-assistant::strings.rate_limited', ['limit' => $limit]));
+        if ($limit > 0 && ConciergeUsage::todayCountFor($userId) >= $limit) {
+            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_RATE_LIMITED, trans('concierge::strings.rate_limited', ['limit' => $limit]));
 
             return;
         }
 
-        $this->streamTo('live-assistant', trans('wisdom-ai-assistant::strings.thinking'));
+        $this->streamTo('live-assistant', trans('concierge::strings.thinking'));
 
         $this->run(
             fn (AnthropicChatService $service) => $service->start($this->messages, ...$this->callbacks()),
@@ -887,7 +887,7 @@ class AgentSidebar extends Component
         $card = $this->pendingCard;
 
         // 🔴 **재개 상태를 먼저 꺼낸다.** `cacheKey()` 는 `pendingToken` 으로 만들어지므로
-        //    토큰을 비운 뒤에 부르면 키가 `wisdom-ai-assistant:pending:` 이 되어 **항상 null** 이고,
+        //    토큰을 비운 뒤에 부르면 키가 `concierge:pending:` 이 되어 **항상 null** 이고,
         //    모든 카드가 "확인이 만료되었습니다"로 끝난다. 실제로 그렇게 깨뜨린 적이 있다.
         //    (에이전트가 먼저 띄운 카드는 모델 루프 밖이라 꺼낼 상태 자체가 없다)
         $state = isset($card['standalone'])
@@ -899,7 +899,7 @@ class AgentSidebar extends Component
         $this->pendingToken = '';
 
         // 새로고침용 표시도 같이 걷는다. 안 걷으면 다음에 열 때 이미 처리한 카드가 되살아난다.
-        WisdomAiAssistantConversation::find($this->conversationId)?->clearPending();
+        ConciergeConversation::find($this->conversationId)?->clearPending();
 
         if (isset($card['standalone'])) {
             $this->resolveStandalone((string) $card['standalone'], $approved, (string) ($card['title'] ?? ''));
@@ -918,19 +918,19 @@ class AgentSidebar extends Component
 
         if (!is_array($state)) {
             // 캐시가 만료됐거나 서버가 재시작됐다. 명령을 보내지 않은 것이 확실하므로 그렇게 알린다.
-            $this->messages[] = ['role' => 'event', 'text' => trans('wisdom-ai-assistant::strings.card_expired')];
+            $this->messages[] = ['role' => 'event', 'text' => trans('concierge::strings.card_expired')];
 
             return;
         }
 
         $this->messages[] = [
             'role' => 'event',
-            'text' => trans($approved ? 'wisdom-ai-assistant::strings.card_approved' : 'wisdom-ai-assistant::strings.card_cancelled', [
+            'text' => trans($approved ? 'concierge::strings.card_approved' : 'concierge::strings.card_cancelled', [
                 'action' => $card['title'] ?? '',
             ]),
         ];
 
-        $settings = WisdomAiAssistantSettings::current();
+        $settings = ConciergeSettings::current();
 
         $this->run(
             fn (AnthropicChatService $service) => $service->resume($state, $approved, ...$this->callbacks()),
@@ -950,7 +950,7 @@ class AgentSidebar extends Component
     {
         $this->messages[] = [
             'role' => 'event',
-            'text' => trans($approved ? 'wisdom-ai-assistant::strings.card_approved' : 'wisdom-ai-assistant::strings.card_cancelled', [
+            'text' => trans($approved ? 'concierge::strings.card_approved' : 'concierge::strings.card_cancelled', [
                 'action' => $title,
             ]),
         ];
@@ -971,7 +971,7 @@ class AgentSidebar extends Component
             ->find((int) substr($action, strlen('reinstall:')));
 
         if ($server === null) {
-            $this->messages[] = ['role' => 'assistant', 'text' => trans('wisdom-ai-assistant::strings.reinstall_gone'), 'links' => []];
+            $this->messages[] = ['role' => 'assistant', 'text' => trans('concierge::strings.reinstall_gone'), 'links' => []];
 
             return;
         }
@@ -980,7 +980,7 @@ class AgentSidebar extends Component
             app(ReinstallServerService::class)->handle($server);
         } catch (Throwable $exception) {
             report($exception);
-            $this->messages[] = ['role' => 'assistant', 'text' => trans('wisdom-ai-assistant::strings.reinstall_failed'), 'links' => []];
+            $this->messages[] = ['role' => 'assistant', 'text' => trans('concierge::strings.reinstall_failed'), 'links' => []];
 
             return;
         }
@@ -991,7 +991,7 @@ class AgentSidebar extends Component
 
         // ⚠ 화면에 직접 넣지 않는다. deliverNotice 가 **그 서버를 다루던 대화**로 보내고,
         //   그게 지금 열린 대화면 화면에도 넣는다(#29).
-        $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.reinstall_started', ['server' => $server->name]),
+        $this->deliverNotice($server, trans('concierge::strings.reinstall_started', ['server' => $server->name]),
             ServerLinks::forToolCalls([
                 (object) ['name' => 'restart_server', 'serverId' => $server->id, 'isError' => false],
             ]));
@@ -1015,16 +1015,16 @@ class AgentSidebar extends Component
 
         // ⚠ 알림을 받은 뒤 권한이 회수됐을 수 있다. **누를 때 다시 확인한다.**
         if ($approved && !auth()->user()->can(SubuserPermission::ControlStop, $server)) {
-            $this->messages[] = ['role' => 'assistant', 'text' => trans('wisdom-ai-assistant::strings.idle_no_permission'), 'links' => []];
+            $this->messages[] = ['role' => 'assistant', 'text' => trans('concierge::strings.idle_no_permission'), 'links' => []];
 
             return;
         }
 
         if (!$approved) {
-            WisdomAiAssistantIdleWatch::where('server_id', $server->id)
+            ConciergeIdleWatch::where('server_id', $server->id)
                 ->update(['snoozed_at' => now(), 'notified_at' => null]);
 
-            $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.idle_snoozed', ['server' => $server->name]));
+            $this->deliverNotice($server, trans('concierge::strings.idle_snoozed', ['server' => $server->name]));
 
             return;
         }
@@ -1035,14 +1035,14 @@ class AgentSidebar extends Component
             report($exception);
 
             // 조용히 돌아가면 사용자는 눌렀는데 아무 일도 없는 것으로 본다.
-            $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.idle_stop_failed', ['server' => $server->name]));
+            $this->deliverNotice($server, trans('concierge::strings.idle_stop_failed', ['server' => $server->name]));
 
             return;
         }
 
-        WisdomAiAssistantIdleWatch::where('server_id', $server->id)->delete();
+        ConciergeIdleWatch::where('server_id', $server->id)->delete();
 
-        $this->deliverNotice($server, trans('wisdom-ai-assistant::strings.idle_stopped', ['server' => $server->name]),
+        $this->deliverNotice($server, trans('concierge::strings.idle_stopped', ['server' => $server->name]),
             ServerLinks::forToolCalls([
                 (object) ['name' => 'start_server', 'serverId' => $server->id, 'isError' => false],
             ]));
@@ -1054,7 +1054,7 @@ class AgentSidebar extends Component
      * @param  Closure(AnthropicChatService): ChatResult  $call
      * @param  array<string, mixed>  $previousState  재개일 때만 채워진다
      */
-    private function run(callable $call, WisdomAiAssistantSettings $settings, int $userId, string $userMessage, array $previousState = []): void
+    private function run(callable $call, ConciergeSettings $settings, int $userId, string $userMessage, array $previousState = []): void
     {
         /** @var User $user */
         $user = auth()->user();
@@ -1067,8 +1067,8 @@ class AgentSidebar extends Component
 
             $this->finish(
                 $settings, $userId, $userMessage, $previousState,
-                WisdomAiAssistantUsage::STATUS_ERROR,
-                trans('wisdom-ai-assistant::strings.error'),
+                ConciergeUsage::STATUS_ERROR,
+                trans('concierge::strings.error'),
                 0, 0, [],
                 $exception->getMessage(),
             );
@@ -1087,8 +1087,8 @@ class AgentSidebar extends Component
         if ($result->isRefusal()) {
             $this->finish(
                 $settings, $userId, $userMessage, $previousState,
-                WisdomAiAssistantUsage::STATUS_ERROR,
-                trans('wisdom-ai-assistant::strings.refused'),
+                ConciergeUsage::STATUS_ERROR,
+                trans('concierge::strings.refused'),
                 $result->inputTokens, $result->outputTokens, $result->toolCalls,
                 'stop_reason=refusal', $result->searchCount,
             );
@@ -1098,8 +1098,8 @@ class AgentSidebar extends Component
 
         $this->finish(
             $settings, $userId, $userMessage, $previousState,
-            WisdomAiAssistantUsage::STATUS_OK,
-            trim($result->text) !== '' ? $result->text : trans('wisdom-ai-assistant::strings.empty_reply'),
+            ConciergeUsage::STATUS_OK,
+            trim($result->text) !== '' ? $result->text : trans('concierge::strings.empty_reply'),
             $result->inputTokens, $result->outputTokens, $result->toolCalls,
             null, $result->searchCount,
         );
@@ -1111,7 +1111,7 @@ class AgentSidebar extends Component
      *
      * @param array<string, mixed> $previousState
      */
-    private function pauseForCard(ChatResult $result, WisdomAiAssistantSettings $settings, int $userId, string $userMessage, array $previousState): void
+    private function pauseForCard(ChatResult $result, ConciergeSettings $settings, int $userId, string $userMessage, array $previousState): void
     {
         $shownText = (string) ($previousState['persisted_text'] ?? '');
         $newText = mb_substr($result->text, mb_strlen($shownText));
@@ -1122,7 +1122,7 @@ class AgentSidebar extends Component
 
         $usage = $this->persist(
             $settings, $userId, $userMessage, $previousState,
-            WisdomAiAssistantUsage::STATUS_AWAITING,
+            ConciergeUsage::STATUS_AWAITING,
             $result->text,
             $result->inputTokens, $result->outputTokens, $result->toolCalls,
             null, $result->searchCount,
@@ -1142,15 +1142,15 @@ class AgentSidebar extends Component
 
         // 카드가 떠 있는 채로 새로고침해도 다시 그릴 수 있게 대화에 표시를 남긴다.
         // (persist() 가 방금 ensure() 했으므로 행은 반드시 있다)
-        WisdomAiAssistantConversation::find($this->conversationId)?->markPending($this->pendingToken, $result->card);
+        ConciergeConversation::find($this->conversationId)?->markPending($this->pendingToken, $result->card);
     }
 
     /**
      * @param array<string, mixed> $previousState
-     * @param array<int, \WisdomIT\WisdomAiAssistant\Tools\ToolCallResult> $toolCalls
+     * @param array<int, \WisdomIT\Concierge\Tools\ToolCallResult> $toolCalls
      */
     private function finish(
-        WisdomAiAssistantSettings $settings,
+        ConciergeSettings $settings,
         int $userId,
         string $userMessage,
         array $previousState,
@@ -1181,10 +1181,10 @@ class AgentSidebar extends Component
      * 사용량 행을 만들거나(첫 호출) 갱신한다(카드 이후). 한 번의 사용자 발화 = 한 행이다.
      *
      * @param array<string, mixed> $previousState
-     * @param array<int, \WisdomIT\WisdomAiAssistant\Tools\ToolCallResult> $toolCalls
+     * @param array<int, \WisdomIT\Concierge\Tools\ToolCallResult> $toolCalls
      */
     private function persist(
-        WisdomAiAssistantSettings $settings,
+        ConciergeSettings $settings,
         int $userId,
         string $userMessage,
         array $previousState,
@@ -1195,7 +1195,7 @@ class AgentSidebar extends Component
         array $toolCalls,
         ?string $error = null,
         int $searchCount = 0,
-    ): WisdomAiAssistantUsage {
+    ): ConciergeUsage {
         $attributes = [
             'conversation_id' => $this->conversationId,
             'status' => $status,
@@ -1210,10 +1210,10 @@ class AgentSidebar extends Component
 
         $usageId = $previousState['usage_id'] ?? null;
 
-        if ($usageId && $usage = WisdomAiAssistantUsage::find($usageId)) {
+        if ($usageId && $usage = ConciergeUsage::find($usageId)) {
             $usage->update($attributes);
         } else {
-            $usage = WisdomAiAssistantUsage::record($userId, $settings, $attributes);
+            $usage = ConciergeUsage::record($userId, $settings, $attributes);
         }
 
         // 시간이 걸리는 동작은 감시 목록에 넣는다 → 하단 카드로 진행이 보이고, 끝나면 알린다.
@@ -1226,7 +1226,7 @@ class AgentSidebar extends Component
         }
 
         // 대화 행은 **첫 발화 때** 만든다. 화면을 열기만 해도 만들면 사이드바가 빈 항목으로 찬다.
-        WisdomAiAssistantConversation::ensure($this->conversationId, $userId, $userMessage);
+        ConciergeConversation::ensure($this->conversationId, $userId, $userMessage);
 
         // 첫 발화면 이때 제목이 정해진다 → 사이드바에 바로 뜨게 목록을 다시 읽는다.
         $this->refreshConversations();
@@ -1234,7 +1234,7 @@ class AgentSidebar extends Component
         // "무엇을 답했는가"보다 **"무엇을 보고 답했는가"** 가 진단에 중요하다.
         // 카드 이전에 이미 저장한 것은 건너뛴다(한 번의 발화가 두 번 저장되면 안 된다).
         foreach (array_slice($toolCalls, (int) ($previousState['persisted_tools'] ?? 0)) as $call) {
-            WisdomAiAssistantToolCall::create([
+            ConciergeToolCall::create([
                 'usage_id' => $usage->id,
                 'conversation_id' => $this->conversationId,
                 'tool_name' => $call->name,
@@ -1250,7 +1250,7 @@ class AgentSidebar extends Component
     }
 
     /** 도구 없이 즉시 끝나는 경로(설정 안 됨·한도 초과 등). */
-    private function reply(WisdomAiAssistantSettings $settings, int $userId, string $userMessage, string $status, string $assistantMessage): void
+    private function reply(ConciergeSettings $settings, int $userId, string $userMessage, string $status, string $assistantMessage): void
     {
         $this->finish($settings, $userId, $userMessage, [], $status, $assistantMessage, 0, 0, []);
     }
@@ -1260,17 +1260,17 @@ class AgentSidebar extends Component
     {
         return [
             fn (string $accumulated) => $this->streamTo('live-assistant', $accumulated, asMarkdown: true),
-            fn () => $this->streamTo('live-assistant', trans('wisdom-ai-assistant::strings.thinking')),
+            fn () => $this->streamTo('live-assistant', trans('concierge::strings.thinking')),
             // 도구가 도는 동안 화면이 멈춘 것처럼 보이면 안 된다 — 무엇을 보고 있는지 알린다.
-            fn (string $tool) => $this->streamTo('live-assistant', trans('wisdom-ai-assistant::strings.using_tool', [
-                'tool' => trans('wisdom-ai-assistant::strings.tool_' . $tool),
+            fn (string $tool) => $this->streamTo('live-assistant', trans('concierge::strings.using_tool', [
+                'tool' => trans('concierge::strings.tool_' . $tool),
             ])),
         ];
     }
 
     private function cacheKey(): string
     {
-        return 'wisdom-ai-assistant:pending:' . $this->pendingToken;
+        return 'concierge:pending:' . $this->pendingToken;
     }
 
     /**

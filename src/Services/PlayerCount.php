@@ -1,10 +1,10 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
+use WisdomIT\Concierge\Catalog\GameCatalog;
 
 /**
  * 접속자 수 조회 (#18·#53). 유휴 판정·콘솔 위젯·에이전트 도구가 **같은 코드로 같은 숫자**를 본다.
@@ -64,7 +64,7 @@ class PlayerCount
 
         if ($schema === null) {
             // 카탈로그가 없는 쿼리 종류를 가리킨다 — 설정 실수다. 조용히 넘어가면 계속 틀린다.
-            Log::warning('wisdom-ai-assistant: 카탈로그가 모르는 쿼리 종류를 가리킨다', [
+            Log::warning('concierge: 카탈로그가 모르는 쿼리 종류를 가리킨다', [
                 'egg' => $server->egg?->name,
                 'query' => $type,
             ]);
@@ -74,7 +74,7 @@ class PlayerCount
 
         $result = $schema->process(
             $server,
-            config('wisdom-ai-assistant.query_host', '172.17.0.1'),
+            config('concierge.query_host', '172.17.0.1'),
             $this->queryPort($server, $game),
         );
 

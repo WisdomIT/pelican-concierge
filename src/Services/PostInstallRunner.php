@@ -1,12 +1,12 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Services;
+namespace WisdomIT\Concierge\Services;
 
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use Illuminate\Support\Facades\Log;
 use Throwable;
-use WisdomIT\WisdomAiAssistant\Catalog\GameCatalog;
+use WisdomIT\Concierge\Catalog\GameCatalog;
 
 /**
  * 설치가 끝난 뒤 카탈로그의 `post_install` 을 적용한다 (#7).
@@ -41,7 +41,7 @@ final class PostInstallRunner
             } catch (Throwable $exception) {
                 // 여기서 던지면 설치 완료 처리 전체가 깨진다. 서버는 만들어진 상태이므로
                 // 실패를 기록만 하고 넘어간다 — 에이전트가 사후 진단으로 커버한다(#7).
-                Log::warning('wisdom-ai-assistant: post_install 실패', [
+                Log::warning('concierge: post_install 실패', [
                     'server' => $server->uuid_short,
                     'action' => $action['type'],
                     'error' => $exception->getMessage(),

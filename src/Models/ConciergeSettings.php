@@ -1,6 +1,6 @@
 <?php
 
-namespace WisdomIT\WisdomAiAssistant\Models;
+namespace WisdomIT\Concierge\Models;
 
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
@@ -28,9 +28,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $idle_stop_enabled
  * @property int $idle_grace_minutes
  */
-class WisdomAiAssistantSettings extends Model
+class ConciergeSettings extends Model
 {
-    protected $table = 'wisdom_ai_assistant_settings';
+    protected $table = 'concierge_settings';
 
     protected $fillable = [
         'api_key',
@@ -73,10 +73,10 @@ class WisdomAiAssistantSettings extends Model
     public static function current(): self
     {
         return self::$cached ??= static::query()->first() ?? static::query()->create([
-            'model' => config('wisdom-ai-assistant.model'),
-            'effort' => config('wisdom-ai-assistant.effort'),
-            'max_tokens' => config('wisdom-ai-assistant.max_tokens'),
-            'daily_message_limit' => config('wisdom-ai-assistant.daily_message_limit'),
+            'model' => config('concierge.model'),
+            'effort' => config('concierge.effort'),
+            'max_tokens' => config('concierge.max_tokens'),
+            'daily_message_limit' => config('concierge.daily_message_limit'),
         ]);
     }
 
