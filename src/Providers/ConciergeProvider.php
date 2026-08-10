@@ -22,7 +22,7 @@ use WisdomIT\Concierge\Jobs\VerifyInstall;
 use WisdomIT\Concierge\Livewire\AgentSidebar;
 use WisdomIT\Concierge\Services\PostInstallRunner;
 
-class ConciergePluginProvider extends ServiceProvider
+class ConciergeProvider extends ServiceProvider
 {
     /** 사이드바를 띄울 패널. 관리자 패널은 제외한다 — 거기서 남의 서버를 조작할 물건이 아니다. */
     private const SIDEBAR_PANELS = ['app', 'server'];

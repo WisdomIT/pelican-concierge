@@ -44,7 +44,7 @@ class AgentSidebar extends Component
     /**
      * 재개 상태를 두는 캐시 스토어. **기본 스토어와 분리한다.**
      * `cache:clear` 는 기본 스토어만 비우므로, 여기 두면 배포에 휩쓸리지 않는다.
-     * (스토어 정의는 `ConciergePluginProvider::boot()`)
+     * (스토어 정의는 `ConciergeProvider::boot()`)
      */
     public const PENDING_STORE = 'concierge';
 
