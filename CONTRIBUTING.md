@@ -45,6 +45,10 @@ files — goes through `SecretMasker` first.
 never an exception. See `ModInstaller::providerFor()` and `PlayerCount::available()` for
 the pattern.
 
+Every integration's without-plugin behaviour is a decision, made in advance and recorded
+in the README's integrations table — never an accident discovered by whoever hits the
+missing path first. When adding an integration, write that table row before the code.
+
 🔴 `class_exists` is **not** a substitute: the panel autoloads every plugin's classes
 before filtering out disabled ones, so it stays true for a plugin the admin turned off —
 whose provider never booted. Measured: with Player Counter disabled, the old

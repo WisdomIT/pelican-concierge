@@ -94,6 +94,22 @@ class PlayerCount
             && is_string($this->catalog->findByEggName($server->egg?->name ?? '')['query'] ?? null);
     }
 
+    /**
+     * 접속자 수가 왜 없는지 (#15). null = 셀 수 있음 / 'game' = 게임이 쿼리를 선언하지
+     * 않음 / 'plugin' = 게임은 되는데 Player Counter 가 없거나 꺼짐.
+     * 마지막 경우를 구분해야 도구 응답이 "설치하면 됩니다"를 말할 수 있다.
+     */
+    public function unavailableReason(Server $server): ?string
+    {
+        $declared = is_string($this->catalog->findByEggName($server->egg?->name ?? '')['query'] ?? null);
+
+        if (!$declared) {
+            return 'game';
+        }
+
+        return self::available() ? null : 'plugin';
+    }
+
     /** Player Counter 플러그인이 설치되어 있고 **켜져** 있는가.
      *  ⚠ class_exists 로는 안 된다 — 꺼진 플러그인에도 true 다(#13). */
     private static function available(): bool
