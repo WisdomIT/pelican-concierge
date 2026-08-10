@@ -189,8 +189,8 @@ final class ServerProvisioner
     {
         $class = 'Boy132\\UserCreatableServers\\Models\\UserResourceLimits';
 
-        if (!class_exists($class)) {
-            // UCS 가 없으면 한도 개념 자체가 없다. 그 판단은 관리자 몫이라 통과시킨다.
+        if (!\WisdomIT\Concierge\Support\OptionalPlugins::usable('user-creatable-servers')) {
+            // UCS 가 없거나 꺼져 있으면 한도 개념 자체가 없다. 그 판단은 관리자 몫이라 통과시킨다.
             return;
         }
 

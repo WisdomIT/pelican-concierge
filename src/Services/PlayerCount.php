@@ -5,6 +5,7 @@ namespace WisdomIT\Concierge\Services;
 use App\Models\Server;
 use Illuminate\Support\Facades\Log;
 use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 
 /**
  * 접속자 수 조회 (#18·#53). 유휴 판정·콘솔 위젯·에이전트 도구가 **같은 코드로 같은 숫자**를 본다.
@@ -93,10 +94,11 @@ class PlayerCount
             && is_string($this->catalog->findByEggName($server->egg?->name ?? '')['query'] ?? null);
     }
 
-    /** Player Counter 플러그인이 설치돼 있는가. */
+    /** Player Counter 플러그인이 설치되어 있고 **켜져** 있는가.
+     *  ⚠ class_exists 로는 안 된다 — 꺼진 플러그인에도 true 다(#13). */
     private static function available(): bool
     {
-        return class_exists(self::QUERY_SERVICE);
+        return OptionalPlugins::usable('player-counter');
     }
 
     /** @param array<string, mixed> $game */

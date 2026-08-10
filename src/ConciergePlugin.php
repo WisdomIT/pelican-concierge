@@ -4,9 +4,11 @@ namespace WisdomIT\Concierge;
 
 use App\Contracts\Plugins\HasPluginSettings;
 use Filament\Contracts\Plugin;
+use App\Enums\PluginStatus;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Panel;
@@ -15,6 +17,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Throwable;
 use WisdomIT\Concierge\Models\ConciergeSettings;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 
 /**
  * 설정은 자체 관리자 페이지가 아니라 **플러그인 목록의 Settings 버튼**에 붙는다(#1).
@@ -218,7 +221,62 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->default(fn () => ConciergeSettings::current()->idle_grace_minutes)
                         ->visible(fn (Get $get) => (bool) $get('idle_enabled') && (bool) $get('idle_stop_enabled')),
                 ]),
+
+            $this->integrationsSection(),
         ];
+    }
+
+    /**
+     * 선택 연동 다섯의 상태 (#13). 없으면 해당 기능만 조용히 빠지는데, 그 사실이
+     * 어디에도 안 보이면 관리자는 설치 하나로 해결될 일을 영영 모른다.
+     *
+     * 다섯 상태는 서로 다른 안내가 필요하다 — "설치하세요"는 설치돼 있는데 꺼둔
+     * 경우엔 틀린 말이다. 버전은 경고만 하고 막지 않는다(OptionalPlugins 참고).
+     */
+    private function integrationsSection(): Section
+    {
+        $names = [
+            'player-counter' => 'Player Counter',
+            'minecraft-modrinth' => 'Minecraft Modrinth',
+            'rust-umod' => 'Rust uMod',
+            'user-creatable-servers' => 'User Creatable Servers',
+            'factorio-mod-installer' => 'Factorio Mod Installer',
+        ];
+
+        $fields = [];
+
+        foreach ($names as $id => $name) {
+            $fields[] = Placeholder::make('integration_' . str_replace('-', '_', $id))
+                ->label($name)
+                ->content(fn () => $this->integrationState($id))
+                ->helperText(trans('concierge::strings.integration_adds_' . str_replace('-', '_', $id)));
+        }
+
+        return Section::make(trans('concierge::strings.section_integrations'))
+            ->description(trans('concierge::strings.section_integrations_help'))
+            ->columns(2)
+            ->schema($fields);
+    }
+
+    private function integrationState(string $id): string
+    {
+        $status = OptionalPlugins::status($id);
+
+        if ($status === PluginStatus::Enabled) {
+            return OptionalPlugins::belowKnownVersion($id)
+                ? trans('concierge::strings.integration_below_known', [
+                    'version' => OptionalPlugins::version($id),
+                    'known' => OptionalPlugins::KNOWN[$id],
+                ])
+                : trans('concierge::strings.integration_ok', ['version' => OptionalPlugins::version($id)]);
+        }
+
+        return trans(match ($status) {
+            PluginStatus::Disabled => 'concierge::strings.integration_disabled',
+            PluginStatus::Errored => 'concierge::strings.integration_errored',
+            PluginStatus::Incompatible => 'concierge::strings.integration_incompatible',
+            default => 'concierge::strings.integration_not_installed',
+        });
     }
 
     /** @param array<mixed, mixed> $data */

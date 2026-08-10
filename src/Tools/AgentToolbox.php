@@ -1978,7 +1978,7 @@ final class AgentToolbox
     {
         $class = 'Boy132\\UserCreatableServers\\Models\\UserResourceLimits';
 
-        if (!class_exists($class)) {
+        if (!\WisdomIT\Concierge\Support\OptionalPlugins::usable('user-creatable-servers')) {
             return '-';
         }
 
