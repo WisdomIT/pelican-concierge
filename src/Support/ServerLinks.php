@@ -43,7 +43,7 @@ final class ServerLinks
         'allocations' => ListAllocations::class,
         'settings' => Settings::class,
         // 서버 삭제 버튼이 있는 화면. **UCS 플러그인 소유**라 문자열로 둔다 —
-        // 플러그인이 빠지면 `make()` 의 class_exists 가 걸러낸다.
+        // 플러그인이 빠졌거나 꺼졌으면 `make()` 가 OWNERS 판정으로 걸러낸다(#13).
         'delete' => 'Boy132\\UserCreatableServers\\Filament\\Server\\Pages\\ServerResourcePage',
         // 모드 플러그인 화면들. 전부 남의 플러그인 소유 → 같은 이유로 문자열.
         //  ⚠ egg 태그·feature 조건이 안 맞으면 페이지 자체가 접근 거부한다(각 플러그인의 canAccess).
@@ -52,6 +52,21 @@ final class ServerLinks
         'modrinth_mods' => 'Boy132\\MinecraftModrinth\\Filament\\Server\\Pages\\MinecraftModrinthModPage',
         'umod' => 'Boy132\\RustUMod\\Filament\\Server\\Pages\\RustUModPluginsPage',
         'factorio_mods' => 'gOOvER\\FactorioModInstaller\\Filament\\Server\\Pages\\FactorioModInstaller',
+    ];
+
+    /**
+     * 남의 플러그인 소유 화면 → 그 플러그인 id. 링크를 내밀기 전에 **켜져 있는지** 본다.
+     * ⚠ class_exists 로는 안 된다 — 꺼진 플러그인에도 true 인데 페이지는 등록되지 않아
+     *   링크가 404 로 간다(#13).
+     *
+     * @var array<string, string>
+     */
+    private const OWNERS = [
+        'delete' => 'user-creatable-servers',
+        'modrinth_plugins' => 'minecraft-modrinth',
+        'modrinth_mods' => 'minecraft-modrinth',
+        'umod' => 'rust-umod',
+        'factorio_mods' => 'factorio-mod-installer',
     ];
 
     /**
@@ -132,8 +147,14 @@ final class ServerLinks
     {
         $class = self::PAGES[$page] ?? null;
 
-        // 플러그인이 빠졌거나 이름이 바뀌면 그 화면만 조용히 사라진다.
+        // 플러그인이 빠졌거나 꺼졌거나 이름이 바뀌면 그 화면만 조용히 사라진다.
         if ($class === null || !class_exists($class)) {
+            return null;
+        }
+
+        $owner = self::OWNERS[$page] ?? null;
+
+        if ($owner !== null && !OptionalPlugins::usable($owner)) {
             return null;
         }
 

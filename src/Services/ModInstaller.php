@@ -5,13 +5,15 @@ namespace WisdomIT\Concierge\Services;
 use App\Models\Server;
 use App\Repositories\Daemon\DaemonFileRepository;
 use Illuminate\Support\Str;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
  * 모드 플러그인(Modrinth·uMod)의 서비스 계층을 에이전트 도구에서 재사용한다 (#16).
  *
- * **왜 감싸는가** — 두 플러그인은 남의 코드다. 없을 수도 있고(class_exists 가드),
- * 버전이 올라가며 API 가 바뀔 수도 있다. 결합을 이 한 파일로 모아 둔다.
+ * **왜 감싸는가** — 두 플러그인은 남의 코드다. 없거나 꺼져 있을 수 있고(OptionalPlugins
+ * 판정 — class_exists 는 꺼진 플러그인에도 true 라 못 쓴다, #13), 버전이 올라가며
+ * API 가 바뀔 수도 있다. 결합을 이 한 파일로 모아 둔다.
  *
  * ⚠ **버전 호환은 플러그인 서비스가 이미 해 준다.** Modrinth 의 getProjects/getProjectVersions 는
  *   서버의 마인크래프트 버전·로더로 걸러진 결과만 돌려준다 — 우리가 다시 거를 필요가 없고,
@@ -28,12 +30,12 @@ final class ModInstaller
     /** 이 서버에서 쓸 수 있는 공급자. 없으면 null — 도구가 사유를 안내한다. */
     public static function providerFor(Server $server): ?string
     {
-        if (class_exists('Boy132\MinecraftModrinth\Services\MinecraftModrinthService')
+        if (OptionalPlugins::usable('minecraft-modrinth')
             && self::modrinthType($server) !== null) {
             return 'modrinth';
         }
 
-        if (class_exists('Boy132\RustUMod\Services\RustUModService')
+        if (OptionalPlugins::usable('rust-umod')
             && app('Boy132\RustUMod\Services\RustUModService')->isRustServer($server)) {
             return 'umod';
         }
