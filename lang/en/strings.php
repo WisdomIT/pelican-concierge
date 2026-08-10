@@ -229,6 +229,9 @@ return [
     'refused' => 'I cannot answer that request. Please try asking a different way.',
     'empty_reply' => 'The reply came back empty. Please ask again.',
 
+    'section_search' => 'Web search',
+    'section_search_help' => 'Lets the agent search the web while answering. Searches are billed separately from tokens, on top of them.',
+    'field_clear_api_key' => 'Delete the stored API key',
     'section_idle' => 'Idle servers',
     'section_idle_help' => 'Finds servers nobody is connected to, tells the owner, and optionally stops them.',
     'field_search_enabled' => 'Allow web search',
@@ -266,8 +269,6 @@ return [
     'section_connection' => 'Model connection',
     'section_limits' => 'Limits and logging',
 
-    'field_enabled' => 'Enable assistant',
-    'help_enabled' => 'When off, the assistant button disappears from the user area.',
 
     'field_api_key' => 'Anthropic API key',
     'help_api_key' => 'Stored encrypted and never shown again. Leave blank when saving to keep the current key.',

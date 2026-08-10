@@ -33,6 +33,7 @@ class ConciergeUsage extends Model
 
     public const STATUS_NOT_CONFIGURED = 'not_configured';
 
+    /** ⚠ 더 이상 생산되지 않는다(#2 — 토글 제거). 과거 행이 이 값을 갖고 있어 상수는 남긴다. */
     public const STATUS_DISABLED = 'disabled';
 
     public const STATUS_ERROR = 'error';

@@ -230,6 +230,9 @@ return [
     'refused' => '그 요청에는 답할 수 없습니다. 다른 방식으로 물어봐 주세요.',
     'empty_reply' => '답변이 비어 있습니다. 다시 물어봐 주세요.',
 
+    'section_search' => '웹 검색',
+    'section_search_help' => '답변 중에 웹을 검색할 수 있게 합니다. 검색은 토큰과 별도로 추가 과금됩니다.',
+    'field_clear_api_key' => '저장된 API 키 삭제',
     'section_idle' => '유휴 서버 정리',
     'section_idle_help' => '아무도 접속하지 않은 서버를 찾아 알리고, 원하면 자동으로 끕니다. 판정은 네트워크 수신량으로 하며(마인크래프트는 접속자 수), CPU 는 쓰지 않습니다 — 접속 중인데도 유휴와 값이 같은 경우가 실측으로 확인됐습니다.',
     'field_search_enabled' => '웹 검색 허용',
@@ -267,8 +270,6 @@ return [
     'section_connection' => '모델 연결',
     'section_limits' => '한도와 로그',
 
-    'field_enabled' => '기능 켜기',
-    'help_enabled' => '끄면 사용자 화면에서 AI 도우미 버튼이 사라집니다.',
 
     'field_api_key' => 'Anthropic API 키',
     'help_api_key' => '입력한 값은 암호화되어 저장되며 이 화면에 다시 표시되지 않습니다. 비워두고 저장하면 기존 키가 그대로 유지됩니다.',

@@ -38,8 +38,12 @@
         open: localStorage.getItem('cg-open') === '1',
         apply() { document.documentElement.classList.toggle('cg-open', this.open) },
     }"
-    x-effect="localStorage.setItem('cg-open', open ? '1' : '0'); apply(); if (open && $wire.unread) $wire.markRead()"
+    x-effect="localStorage.setItem('cg-open', open ? '1' : '0'); apply();
+              document.documentElement.classList.toggle('cg-unread', ! open && $wire.unread);
+              if (open && $wire.unread) $wire.markRead()"
     x-on:livewire:navigated.document="apply()"
+    {{-- 트리거(#7)는 패널 크롬에 있어 이 컴포넌트 밖이다 — window 이벤트로 받는다. --}}
+    x-on:concierge-toggle.window="open = ! open"
     {{-- 에이전트가 먼저 말을 거는 통로. 설치는 몇 분 걸리므로 사용자가 물을 때까지 기다리면
          늦는다. 평소 30초면 충분하고, **진행 중인 서버가 있을 때만** 5초로 당긴다 —
          켜지는 걸 지켜보는 중에 30초는 멈춘 것처럼 보인다. --}}
@@ -67,24 +71,6 @@
     /* 좁은 화면에서는 밀 자리가 없다 → 덮는다. */
     @media (max-width: 1023px) { html.cg-open body { padding-right: 0; } }
 
-    .cg-launcher {
-        position: fixed; right: 0; bottom: 4.5rem; z-index: 29;
-        display: flex; align-items: center; gap: .4rem;
-        padding: .6rem .8rem;
-        border-radius: .625rem 0 0 .625rem;
-        background: var(--primary-600, #4f46e5);
-        color: #fff;
-        font-size: .8125rem; font-weight: 600;
-        box-shadow: 0 1px 6px rgb(0 0 0 / .25);
-    }
-    .cg-launcher:hover { filter: brightness(1.08); }
-    /* blade-icons 는 width/height=24 를 그대로 박아 넣는다 → 글자 크기에 맞춰 줄인다. */
-    .cg-launcher-icon { width: 1.1rem; height: 1.1rem; }
-    .cg-dot {
-        width: .5rem; height: .5rem; border-radius: 50%;
-        background: var(--danger-500, #ef4444);
-        box-shadow: 0 0 0 2px var(--primary-600, #4f46e5);
-    }
 
     .cg-panel {
         position: fixed; inset: 0 0 0 auto; z-index: 30;
@@ -391,17 +377,6 @@
     }
     .cg-input:disabled { opacity: .5; }
     </style>
-
-    {{-- 런처. topbar 에 넣지 않은 이유는 topbar 가 사용자 설정에 따라 꺼질 수 있기 때문이다. --}}
-    <button type="button" class="cg-launcher" x-show="! open"
-            x-on:click="open = true" x-cloak>
-        <x-filament::icon icon="tabler-message-chatbot" class="cg-launcher-icon" />
-        {{ trans('concierge::strings.title') }}
-        {{-- 닫혀 있는 동안 에이전트가 말을 걸었다는 표시. --}}
-        @if ($this->unread)
-            <span class="cg-dot"></span>
-        @endif
-    </button>
 
     <aside class="cg-panel" x-show="open" x-cloak>
         <div class="cg-chat">

@@ -2,7 +2,10 @@
 
 namespace WisdomIT\Concierge\Providers;
 
+use App\Enums\HeaderActionPosition;
 use App\Events\Server\Installed;
+use App\Filament\App\Resources\Servers\Pages\ListServers;
+use Filament\Actions\Action;
 use App\Enums\ConsoleWidgetPosition;
 use App\Filament\Server\Pages\Console;
 use App\Models\Role;
@@ -72,6 +75,33 @@ class ConciergeProvider extends ServiceProvider
         //   그래서 어느 패널인지는 그릴 때 직접 본다.
         FilamentView::registerRenderHook(PanelsRenderHook::BODY_END, fn (): string => $this->sidebar());
 
+        // 여는 버튼은 패널 크롬에 들어간다(#7) — 플로팅 런처는 없앴다. 훅 둘을 조건 없이
+        // 등록한다: Filament 이 패널마다 알림 위치(topbar/사이드바)를 정하므로, 패널 id 로
+        // 갈랐다가는 사용자가 내비게이션 설정을 바꾸는 순간 버튼이 사라진다.
+        // 자리 선정 근거(오답 훅 포함)는 트리거 뷰 머리말에 있다.
+        FilamentView::registerRenderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER, fn (): string => $this->trigger('topbar'));
+        FilamentView::registerRenderHook(PanelsRenderHook::SIDEBAR_NAV_END, fn (): string => $this->trigger('sidebar'));
+
+        // 서버 목록에는 UCS 의 Create server 옆에도 선다(#7). UCS 가 Before 를 쓰므로
+        // 우리는 After — 같은 공식 API(CanCustomizeHeaderActions)다.
+        //  ⚠ 클릭은 브라우저 안에서 끝나는 일이라 Livewire 왕복을 끈다. 끄지 않으면
+        //    mountAction 이 빈 라운드트립을 한 번 돈다.
+        ListServers::registerCustomHeaderActions(
+            HeaderActionPosition::After,
+            Action::make('concierge')
+                ->label(trans('concierge::strings.title'))
+                ->icon('tabler-message-chatbot')
+                ->color('gray')
+                ->livewireClickHandlerEnabled(false)
+                //  ⚠ '@click' 이어야 한다. 'x-on:click' 은 속성 이름의 콜론 탓에 렌더에서
+                //    떨어져 나간다(실측 — x-data 는 남고 이것만 사라졌다). 코어도 파일
+                //    업로드 버튼에 '@click' 을 쓴다(ListFiles::fileUploadAction).
+                ->extraAttributes([
+                    'x-data' => '',
+                    '@click' => "window.dispatchEvent(new CustomEvent('concierge-toggle'))",
+                ]),
+        );
+
         // 설치가 끝나면 카탈로그의 post_install 을 적용한다(#7).
         // 마인크래프트 EULA, 좀보이드 -Xmx 처럼 **안 하면 첫 기동이 실패하는** 전제들이다.
         //
@@ -110,6 +140,31 @@ class ConciergeProvider extends ServiceProvider
             }
 
             return view('concierge::sidebar-mount')->render();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return '';
+        }
+    }
+
+    /**
+     * 여는 버튼. 사이드바가 그려지는 조건과 **정확히 같아야** 한다 — 사이드바 없는
+     * 페이지에 버튼만 있으면 눌러도 아무 일이 없다.
+     *
+     * ⚠ 사이드바와 같은 이유로 통째로 감싼다 — 모든 페이지의 렌더 경로다.
+     */
+    private function trigger(string $variant): string
+    {
+        try {
+            if (!in_array(Filament::getCurrentPanel()?->getId(), self::SIDEBAR_PANELS, true)) {
+                return '';
+            }
+
+            if (!AgentSidebar::canAccess()) {
+                return '';
+            }
+
+            return view('concierge::trigger', ['variant' => $variant])->render();
         } catch (Throwable $exception) {
             report($exception);
 

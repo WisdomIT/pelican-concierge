@@ -808,13 +808,9 @@ class AgentSidebar extends Component
             return false;
         }
 
-        try {
-            return ConciergeSettings::current()->enabled;
-        } catch (Throwable) {
-            // 소스는 배포됐는데 마이그레이션이 아직 안 돈 짧은 구간에서 테이블이 없다.
-            // 그 사이 화면 전체가 500 나는 것보다 사이드바가 잠깐 안 보이는 편이 낫다.
-            return false;
-        }
+        // 켜기/끄기 설정은 없다(#2) — 끄고 싶으면 플러그인을 비활성화한다. 그러면
+        // 프로바이더가 부팅되지 않아 이 코드가 아예 실행되지 않는다.
+        return true;
     }
 
     public function send(): void
@@ -835,12 +831,6 @@ class AgentSidebar extends Component
 
         $settings = ConciergeSettings::current();
         $userId = (int) auth()->id();
-
-        if (!$settings->enabled) {
-            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_DISABLED, trans('concierge::strings.disabled'));
-
-            return;
-        }
 
         if (!$settings->isConfigured()) {
             $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_NOT_CONFIGURED, trans('concierge::strings.not_configured'));

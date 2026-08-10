@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $effort
  * @property int $max_tokens
  * @property int $daily_message_limit
- * @property bool $enabled
  * @property bool $idle_enabled
  * @property bool $search_enabled
  * @property int $search_max_uses
@@ -38,7 +37,6 @@ class ConciergeSettings extends Model
         'effort',
         'max_tokens',
         'daily_message_limit',
-        'enabled',
         'idle_enabled',
         'search_enabled',
         'search_max_uses',
@@ -56,7 +54,6 @@ class ConciergeSettings extends Model
             'api_key' => 'encrypted',
             'max_tokens' => 'integer',
             'daily_message_limit' => 'integer',
-            'enabled' => 'boolean',
             'idle_enabled' => 'boolean',
             'search_enabled' => 'boolean',
             'search_max_uses' => 'integer',
@@ -103,8 +100,12 @@ class ConciergeSettings extends Model
         return filled($this->apiKey());
     }
 
+    /**
+     * 켜기/끄기는 플러그인 자체의 활성화가 담당한다(#2) — 여기서는 키 유무만 본다.
+     * 플러그인이 꺼져 있으면 이 코드 자체가 부팅되지 않는다.
+     */
     public function isUsable(): bool
     {
-        return $this->enabled && $this->isConfigured();
+        return $this->isConfigured();
     }
 }
