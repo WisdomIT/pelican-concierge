@@ -60,11 +60,7 @@ final class ModInstaller
             return $this->searchUmod($server, $query);
         }
 
-        throw new ToolInputException(
-            'This server cannot search or install mods through the agent. '
-            . 'Only Minecraft (Paper, Fabric, Forge) and Rust (FRAMEWORK=oxide) are supported. '
-            . 'Factorio mods must be installed on its own tab (factorio_mods via suggest_page).',
-        );
+        throw new ToolInputException(self::unavailableMessage($server));
     }
 
     /**
@@ -86,7 +82,7 @@ final class ModInstaller
             return $this->planUmod($server, $mod);
         }
 
-        throw new ToolInputException('This server cannot install mods through the agent.');
+        throw new ToolInputException(self::unavailableMessage($server));
     }
 
     /** 실제 설치. `plan()` 과 같은 입력으로 다시 해석한다 — 카드와 실행이 어긋나면 안 된다. */
@@ -97,7 +93,7 @@ final class ModInstaller
         return match ($provider) {
             'modrinth' => $this->installModrinth($server, $mod),
             'umod' => $this->installUmod($server, $mod),
-            default => throw new ToolInputException('This server cannot install mods through the agent.'),
+            default => throw new ToolInputException(self::unavailableMessage($server)),
         };
     }
 
@@ -146,7 +142,7 @@ final class ModInstaller
             return ['provider' => 'umod', 'installed' => $installed, 'context' => 'uMod plugins record no version, so only file names are shown.'];
         }
 
-        throw new ToolInputException('This server cannot manage mods through the agent.');
+        throw new ToolInputException(self::unavailableMessage($server));
     }
 
     /**
@@ -360,6 +356,40 @@ final class ModInstaller
         }
 
         return [$project, $version, $file];
+    }
+
+    /**
+     * provider 가 null 인 **이유**를 말한다 (#15). "게임이 미지원"과 "플러그인이 없음/꺼짐"은
+     * 다른 문제고 해결책도 다르다 — 뭉뚱그리면 관리자는 설치 하나로 풀릴 일을 모른 채
+     * 사용자에게 "안 되는 게임"이라고 안내하게 된다.
+     *
+     * ⚠ 게임 판별에 그 플러그인의 코드를 쓸 수 없다(없을 수 있으니까) — egg 이름으로 본다.
+     */
+    private static function unavailableMessage(Server $server): string
+    {
+        $egg = (string) $server->egg?->name;
+
+        if (preg_match('/minecraft|paper|fabric|forge/i', $egg) && !OptionalPlugins::usable('minecraft-modrinth')) {
+            return self::pluginMessage('Minecraft Modrinth', 'minecraft-modrinth');
+        }
+
+        if (stripos($egg, 'rust') !== false && !OptionalPlugins::usable('rust-umod')) {
+            return self::pluginMessage('Rust uMod', 'rust-umod');
+        }
+
+        return 'This game cannot manage mods through the agent. '
+            . 'Only Minecraft (Paper, Fabric, Forge) and Rust (FRAMEWORK=oxide) are supported. '
+            . 'Factorio mods must be installed on its own tab (factorio_mods via suggest_page).';
+    }
+
+    private static function pluginMessage(string $name, string $id): string
+    {
+        $installed = OptionalPlugins::status($id) !== null;
+
+        return "This game supports mods, but the {$name} plugin is "
+            . ($installed ? 'installed and disabled' : 'not installed')
+            . ' on this panel, so the agent cannot manage them. '
+            . ($installed ? 'An admin can enable it on the plugin list.' : 'An admin can install it from the Hub.');
     }
 
     private static function modrinthType(Server $server): ?object

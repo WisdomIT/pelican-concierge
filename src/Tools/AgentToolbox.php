@@ -1467,7 +1467,17 @@ final class AgentToolbox
      */
     private function playerFields(Server $server, string $state): array
     {
-        if ($state !== 'running' || !app(PlayerCount::class)->supports($server)) {
+        if ($state !== 'running') {
+            return [];
+        }
+
+        // 폴백은 조용히 두지 않는다(#15) — 게임은 셀 수 있는데 플러그인이 없어서 못 세는
+        // 경우, 모델이 그 사실을 알아야 "관리자가 설치하면 됩니다"를 안내할 수 있다.
+        if (app(PlayerCount::class)->unavailableReason($server) === 'plugin') {
+            return ['players_note' => 'This game supports player counting, but the Player Counter plugin is not installed or is disabled on this panel — counts are unavailable until an admin installs/enables it.'];
+        }
+
+        if (!app(PlayerCount::class)->supports($server)) {
             return [];
         }
 

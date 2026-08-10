@@ -129,16 +129,23 @@ still replies in each user's own language, taken from their panel profile.
 
 ## Optional integrations
 
-All optional. If a plugin is absent the matching capability disappears and nothing else
-changes.
+All optional. The rule is simple: **when a plugin is installed and enabled, the assistant
+uses it; when it is not, the assistant follows the fallback below.** Each fallback is a
+deliberate decision, verified against a running panel — install nothing and the assistant
+still works, with exactly these differences:
 
-| Plugin | Adds |
-|---|---|
-| [Player Counter](https://hub.pelican.dev/plugins) | Player counts, and player-based idle detection |
-| [Minecraft Modrinth](https://hub.pelican.dev/plugins) | Mod and plugin install for Minecraft |
-| [Rust uMod](https://hub.pelican.dev/plugins) | Plugin install for Rust |
-| [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user resource quotas are honoured when sizing a new server |
-| Factorio Mod Installer | A link to the mod page (Factorio mods need an account, so the assistant hands off) |
+| Plugin | With it | Without it |
+|---|---|---|
+| [Player Counter](https://hub.pelican.dev/plugins) | Player counts in status answers; player-based idle detection | Counts unavailable (status answers say why); idle detection falls back to network traffic |
+| [Minecraft Modrinth](https://hub.pelican.dev/plugins) | Mod and plugin search & install for Minecraft | Mod tools explain the plugin is missing and that an admin can install it — they do not claim the game is unsupported |
+| [Rust uMod](https://hub.pelican.dev/plugins) | Plugin search & install for Rust | Same as above |
+| [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | No quota checks, and **no reserved-port protection** — creation uses any free allocation on the node. No delete link |
+| Factorio Mod Installer | A hand-off link to the mod page | No link (mods need a factorio.com account either way) |
+
+The settings screen shows each plugin's live status. A disabled plugin behaves like a
+missing one, with one exception: port and node-tag ranges come from User Creatable
+Servers' *configuration*, which the panel loads even for disabled plugins — so disabling
+UCS keeps the port protection while turning off its features.
 
 ## Tuning it for your panel
 
