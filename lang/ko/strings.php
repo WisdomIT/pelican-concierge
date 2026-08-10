@@ -246,6 +246,7 @@ return [
     'integration_adds_rust_umod' => 'uMod 에서 러스트 플러그인 검색과 설치.',
     'integration_adds_user_creatable_servers' => '서버 개설 시 사용자별 자원 한도를 지키고, 사용자가 자기 서버를 삭제할 수 있게 합니다.',
     'integration_adds_factorio_mod_installer' => '팩토리오 모드 페이지로 가는 링크(모드 설치에 factorio.com 계정이 필요해 어시스턴트가 안내만 합니다).',
+    'integration_adds_secret_variables' => '대화에서 받은 자격 증명(스팀 비밀번호, 라이선스 키)을 평문 서버 변수 대신 암호화해 저장합니다. 없으면 값이 Startup 페이지에서 읽힌다는 사실을 어시스턴트가 사용자에게 경고합니다.',
     'section_idle' => '유휴 서버 정리',
     'section_idle_help' => '아무도 접속하지 않은 서버를 찾아 알리고, 원하면 자동으로 끕니다. 판정은 네트워크 수신량으로 하며(마인크래프트는 접속자 수), CPU 는 쓰지 않습니다 — 접속 중인데도 유휴와 값이 같은 경우가 실측으로 확인됐습니다.',
     'field_search_enabled' => '웹 검색 허용',
