@@ -41,6 +41,13 @@ class ConciergeUsage extends Model
     /** 확인 카드를 띄우고 사용자의 결정을 기다리는 중. 결정이 오면 같은 행이 갱신된다. */
     public const STATUS_AWAITING = 'awaiting_confirmation';
 
+    /**
+     * 모델 루프 밖(standalone) 카드의 결정만 담는 행 (#6). 토큰 0, 본문 없음 —
+     * 카드가 대화 어느 지점에서 결정됐는지를 기록이 남기기 위한 자리다.
+     * ⚠ `todayCountFor` 가 세지 않는다 — 버튼 하나 누른 것이 일일 한도를 깎으면 안 된다.
+     */
+    public const STATUS_CARD = 'card_resolved';
+
     protected $table = 'concierge_usages';
 
     protected $fillable = [
@@ -56,6 +63,8 @@ class ConciergeUsage extends Model
         'error',
         'user_message',
         'assistant_message',
+        'segment',
+        'resolved_cards',
     ];
 
     /** @return array<string, string> */
@@ -65,6 +74,8 @@ class ConciergeUsage extends Model
             'input_tokens' => 'integer',
             'output_tokens' => 'integer',
             'search_count' => 'integer',
+            'segment' => 'integer',
+            'resolved_cards' => 'array',
         ];
     }
 
@@ -110,11 +121,32 @@ class ConciergeUsage extends Model
      */
     public static function record(int $userId, ConciergeSettings $settings, array $attributes): self
     {
+        // 새 행은 그 대화의 **현재 구간**에 속한다(#6). 호출부가 명시하면 그 값을 쓴다.
+        if (!array_key_exists('segment', $attributes) && filled($attributes['conversation_id'] ?? null)) {
+            $attributes['segment'] = (int) ConciergeConversation::query()
+                ->whereKey($attributes['conversation_id'])
+                ->value('active_segment');
+        }
+
         return static::query()->create([
             'user_id' => $userId,
             'model' => $settings->model,
             'effort' => $settings->effort,
             ...$attributes,
         ]);
+    }
+
+    /**
+     * 이 턴에서 결정된 카드를 기록에 덧붙인다 (#6). 한 턴에 카드가 이어질 수 있어(승인 후
+     * 다음 확인) 배열로 쌓는다. 화면 복원과 관리자 대화 보기가 이걸 그대로 그린다.
+     *
+     * @param array<string, mixed> $card
+     */
+    public function appendResolvedCard(array $card): void
+    {
+        $cards = $this->resolved_cards ?? [];
+        $cards[] = $card;
+
+        $this->forceFill(['resolved_cards' => $cards])->save();
     }
 }

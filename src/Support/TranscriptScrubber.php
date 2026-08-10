@@ -35,6 +35,32 @@ final class TranscriptScrubber
                 if ($user !== $usage->user_message || $assistant !== $usage->assistant_message) {
                     $usage->update(['user_message' => $user, 'assistant_message' => $assistant]);
                 }
+
+                // 보존된 카드도 대화의 일부다(#6) — 카드 내용(diff·변수 값)에 비밀이
+                // 실려 있을 수 있고, 영구 보존되므로 본문과 같은 기준으로 가린다.
+                $cards = $usage->resolved_cards;
+
+                if ($cards !== null && ($masked = self::maskCards($cards, $values)) !== $cards) {
+                    $usage->forceFill(['resolved_cards' => $masked])->save();
+                }
             });
+    }
+
+    /**
+     * 카드 배열의 모든 문자열 값을 가린다. 구조는 그대로 둔다.
+     *
+     * @param  array<int, mixed>  $cards
+     * @param  array<int, string>  $values
+     * @return array<int, mixed>
+     */
+    private static function maskCards(array $cards, array $values): array
+    {
+        array_walk_recursive($cards, function (&$item) use ($values): void {
+            if (is_string($item)) {
+                $item = SecretMasker::maskValues($item, $values);
+            }
+        });
+
+        return $cards;
     }
 }

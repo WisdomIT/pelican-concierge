@@ -23,6 +23,7 @@ use Illuminate\Support\Str;
  * @property ?string $pending_token
  * @property ?array<string, mixed> $pending_card
  * @property ?Carbon $notice_unread_at
+ * @property int $active_segment
  * @property Carbon $created_at
  */
 class ConciergeConversation extends Model
@@ -140,6 +141,19 @@ class ConciergeConversation extends Model
         }
 
         $this->forceFill(['pending_token' => null, 'pending_card' => null])->save();
+    }
+
+    /**
+     * 실행된 액션이 구간의 경계다 (#6) — 승인 시점에 부르면 **다음** 턴부터 새 구간이다.
+     * (승인된 턴 자체는 카드 대기 때 만든 행이라 옛 구간 번호를 이미 갖고 있다.)
+     *
+     * 취소·만료는 경계가 아니다: 서버가 바뀐 게 없는데 대화를 쪼개면 조각만 는다.
+     */
+    public function bumpSegment(): int
+    {
+        $this->forceFill(['active_segment' => $this->active_segment + 1])->save();
+
+        return $this->active_segment;
     }
 
     /**

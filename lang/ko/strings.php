@@ -49,9 +49,12 @@ return [
     'card_game' => '게임',
     'card_current_state' => '현재 상태',
     'card_note_disconnect' => '접속 중인 사람이 있으면 함께 끊깁니다.',
-    'card_approved' => ':action → 실행했습니다',
-    'card_cancelled' => ':action → 취소했습니다',
-    'card_expired' => '확인 시간이 지나 취소되었습니다. 아무것도 실행하지 않았습니다.',
+    // 확정된 카드의 결과 배지(#6) — 카드가 버튼 없이 대화에 남고, 이 배지가 결말을 말한다.
+    'card_outcome_approved' => '실행됨',
+    'card_outcome_cancelled' => '취소됨',
+    'card_outcome_expired' => '만료됨 — 실행되지 않음',
+    // 구간 항목(#6)의 대체 제목 — 발화 없이 알림만 있는 구간.
+    'segment_continued' => '이어진 대화',
     'card_title_install_mod' => '설치할까요?',
     'card_confirm_install_mod' => '설치하기',
     'card_mod' => '모드·플러그인',
@@ -340,6 +343,7 @@ return [
     'status_disabled' => '꺼짐',
     'status_error' => '오류',
     'status_awaiting_confirmation' => '확인 대기',
+    'status_card_resolved' => '카드 결정',
 
     'stat_today_messages' => '오늘 메시지',
     'stat_today_users' => '오늘 사용한 사람',

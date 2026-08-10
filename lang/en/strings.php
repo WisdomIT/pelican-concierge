@@ -49,9 +49,12 @@ return [
     'card_game' => 'Game',
     'card_current_state' => 'Current state',
     'card_note_disconnect' => 'Anyone currently connected will be disconnected.',
-    'card_approved' => ':action - done',
-    'card_cancelled' => ':action - cancelled',
-    'card_expired' => 'The confirmation expired, so nothing was run.',
+    // 확정된 카드의 결과 배지(#6) — 카드가 버튼 없이 대화에 남고, 이 배지가 결말을 말한다.
+    'card_outcome_approved' => 'Ran',
+    'card_outcome_cancelled' => 'Cancelled',
+    'card_outcome_expired' => 'Expired — nothing ran',
+    // 구간 항목(#6)의 대체 제목 — 발화 없이 알림만 있는 구간.
+    'segment_continued' => 'Continued',
     'card_title_install_mod' => 'Install this?',
     'card_confirm_install_mod' => 'Install',
     'card_mod' => 'Mod / plugin',
@@ -339,6 +342,7 @@ return [
     'status_disabled' => 'Disabled',
     'status_error' => 'Error',
     'status_awaiting_confirmation' => 'Awaiting confirmation',
+    'status_card_resolved' => 'Card resolved',
 
     'stat_today_messages' => 'Messages today',
     'stat_today_users' => 'Users today',
