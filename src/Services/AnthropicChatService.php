@@ -85,6 +85,7 @@ final class AnthropicChatService
         if ($approved) {
             $onTool($pending['name']);
             $result = $toolbox->run($pending['name'], $pending['input']);
+            $this->drainSecrets($state, $toolbox);
         } else {
             $result = ToolCallResult::denied($pending['name'], $pending['input'], $pending['server_id'] ?? null);
         }
@@ -206,6 +207,8 @@ final class AnthropicChatService
                     continue;
                 }
 
+                $this->drainSecrets($state, $toolbox);
+
                 $state['pending'] = [
                     'id' => $use['id'],
                     'name' => $use['name'],
@@ -218,9 +221,23 @@ final class AnthropicChatService
 
             $onTool($use['name']);
             $this->pushResult($state, $use, $toolbox->run($use['name'], $use['input']));
+            $this->drainSecrets($state, $toolbox);
         }
 
         return null;
+    }
+
+    /** 도구상자가 수집한 비밀 값을 상태로 옮긴다(#11) — 재개까지 살아남아야 한다. */
+    private function drainSecrets(array &$state, AgentToolbox $toolbox): void
+    {
+        $values = $toolbox->pullSecretValues();
+
+        if ($values !== []) {
+            $state['secret_values'] = array_values(array_unique(array_merge(
+                $state['secret_values'] ?? [],
+                $values,
+            )));
+        }
     }
 
     /**
@@ -250,6 +267,7 @@ final class AnthropicChatService
             null,
             [],
             $state['search_count'],
+            $state['secret_values'] ?? [],
         );
     }
 
@@ -268,6 +286,7 @@ final class AnthropicChatService
             $card,
             $state,
             $state['search_count'],
+            $state['secret_values'] ?? [],
         );
     }
 

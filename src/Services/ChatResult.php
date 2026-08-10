@@ -27,6 +27,13 @@ final readonly class ChatResult
         public array $state = [],
         /** 이 응답에서 돈 웹 검색 횟수. 토큰과 별도로 과금되므로 따로 센다(#43). */
         public int $searchCount = 0,
+        /**
+         * 이 턴에서 값이 확인된 비밀들(#11) — 저장 직전 마스킹·대화 스크럽용.
+         * ⚠ 표시·전송용이 아니다. 로그로 흘리지 말 것.
+         *
+         * @var array<int, string>
+         */
+        public array $secretValues = [],
     ) {}
 
     public function needsConfirmation(): bool

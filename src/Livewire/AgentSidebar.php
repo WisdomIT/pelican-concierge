@@ -22,7 +22,9 @@ use WisdomIT\Concierge\Models\ConciergeUsage;
 use WisdomIT\Concierge\Services\AnthropicChatService;
 use WisdomIT\Concierge\Services\ChatResult;
 use WisdomIT\Concierge\Support\Markdown;
+use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
+use WisdomIT\Concierge\Support\TranscriptScrubber;
 use WisdomIT\Concierge\Support\Tenancy;
 
 /**
@@ -1091,7 +1093,7 @@ class AgentSidebar extends Component
             ConciergeUsage::STATUS_OK,
             trim($result->text) !== '' ? $result->text : trans('concierge::strings.empty_reply'),
             $result->inputTokens, $result->outputTokens, $result->toolCalls,
-            null, $result->searchCount,
+            null, $result->searchCount, $result->secretValues,
         );
     }
 
@@ -1115,7 +1117,7 @@ class AgentSidebar extends Component
             ConciergeUsage::STATUS_AWAITING,
             $result->text,
             $result->inputTokens, $result->outputTokens, $result->toolCalls,
-            null, $result->searchCount,
+            null, $result->searchCount, $result->secretValues,
         );
 
         $state = $result->state;
@@ -1151,6 +1153,7 @@ class AgentSidebar extends Component
         array $toolCalls,
         ?string $error = null,
         int $searchCount = 0,
+        array $secretValues = [],
     ): void {
         $shownText = (string) ($previousState['persisted_text'] ?? '');
         $newText = mb_substr($assistantMessage, mb_strlen($shownText));
@@ -1164,6 +1167,7 @@ class AgentSidebar extends Component
         $this->persist(
             $settings, $userId, $userMessage, $previousState,
             $status, $assistantMessage, $inputTokens, $outputTokens, $toolCalls, $error, $searchCount,
+            $secretValues,
         );
     }
 
@@ -1185,7 +1189,14 @@ class AgentSidebar extends Component
         array $toolCalls,
         ?string $error = null,
         int $searchCount = 0,
+        array $secretValues = [],
     ): ConciergeUsage {
+        // 저장되는 사본만 가린다(#11) — 화면의 진행 중 대화는 그대로 둔다(TranscriptScrubber 머리말).
+        if ($secretValues !== []) {
+            $userMessage = SecretMasker::maskValues($userMessage, $secretValues);
+            $assistantMessage = SecretMasker::maskValues($assistantMessage, $secretValues);
+        }
+
         $attributes = [
             'conversation_id' => $this->conversationId,
             'status' => $status,
@@ -1205,6 +1216,9 @@ class AgentSidebar extends Component
         } else {
             $usage = ConciergeUsage::record($userId, $settings, $attributes);
         }
+
+        // 이전 턴들(비밀을 물어보고 답한 대화)도 소급해 가린다 — 값을 안 순간이 지금이다(#11).
+        TranscriptScrubber::apply($this->conversationId, $secretValues);
 
         // 시간이 걸리는 동작은 감시 목록에 넣는다 → 하단 카드로 진행이 보이고, 끝나면 알린다.
         foreach ($toolCalls as $call) {
