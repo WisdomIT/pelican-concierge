@@ -39,9 +39,17 @@ from the panel and loses its validation.
 **Mask before the model sees it.** Any text pulled from a server — install logs, config
 files — goes through `SecretMasker` first.
 
-**Other plugins are optional.** Every integration is guarded with `class_exists`. A
-missing plugin must degrade to "this capability is unavailable", never an exception. See
-`ModInstaller::providerFor()` and `PlayerCount::available()` for the pattern.
+**Other plugins are optional.** Every integration is guarded through
+`Support\OptionalPlugins::usable()`, which asks the panel whether the plugin's status is
+`Enabled`. A missing or disabled plugin must degrade to "this capability is unavailable",
+never an exception. See `ModInstaller::providerFor()` and `PlayerCount::available()` for
+the pattern.
+
+🔴 `class_exists` is **not** a substitute: the panel autoloads every plugin's classes
+before filtering out disabled ones, so it stays true for a plugin the admin turned off —
+whose provider never booted. Measured: with Player Counter disabled, the old
+`class_exists` guard let the code call an auto-resolved service with an empty registry,
+which broke player counts silently and logged a warning blaming the catalog.
 
 **English in, user's language out.** The system prompt, tool names and tool descriptions
 are English — it measures ~40% cheaper in tokens. The reply language is chosen from the
