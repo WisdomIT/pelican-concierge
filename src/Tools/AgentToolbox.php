@@ -2405,6 +2405,11 @@ final class AgentToolbox
     /** @param array<string, mixed> $input */
     private function listAvailableGames(array $input): ToolCallResult
     {
+        // 개설이 막힌 사용자를 게임 고르기까지 데려갔다가 마지막에 거절하지 않는다(#17).
+        if ($message = ServerProvisioner::creationGate($this->user)) {
+            throw new ToolInputException($message);
+        }
+
         $games = array_map(fn (array $g) => [
             'game' => $g['id'],
             'name' => $g['name'],
@@ -2500,17 +2505,19 @@ final class AgentToolbox
             'create_server',
             // ⚠ 답변에는 비밀번호가 들어 있다. 로그 테이블로 그대로 흘러가면 안 된다.
             $this->maskAnswers($input, $game),
-            $this->json([
+            $this->json(array_filter([
                 'created' => true,
                 'id' => $server->uuid_short,
                 'name' => $server->name,
                 'game' => $game['name'],
                 'address' => $server->allocation?->address,
                 'ports' => $ports,
+                // 관리자가 UCS 없이 만들었다면 그 사실과 부작용을 답이 직접 말한다(#17).
+                'without_ucs_note' => ServerProvisioner::noUcsCaveat(),
                 'state' => 'installing',
                 'notice' => 'The install has started. Downloading the game files takes several minutes, sometimes longer, '
                     . 'and the server starts by itself when done. Progress is visible via get_server_status.',
-            ]),
+            ])),
             $server->id,
         );
     }

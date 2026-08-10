@@ -139,7 +139,7 @@ still works, with exactly these differences:
 | [Player Counter](https://hub.pelican.dev/plugins) | Player counts in status answers; player-based idle detection | Counts unavailable (status answers say why); idle detection falls back to network traffic |
 | [Minecraft Modrinth](https://hub.pelican.dev/plugins) | Mod and plugin search & install for Minecraft | Mod tools explain the plugin is missing and that an admin can install it — they do not claim the game is unsupported |
 | [Rust uMod](https://hub.pelican.dev/plugins) | Plugin search & install for Rust | Same as above |
-| [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | No quota checks, and **no reserved-port protection** — creation uses any free allocation on the node. No delete link |
+| [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | **Creation requires admin authority** (the panel's `create server` permission) — ordinary users cannot create at all. Admin creations skip quota and the port pool (reserved ports included) and get 0 backup/database limits; the assistant's reply says so. No delete link |
 | Factorio Mod Installer | A hand-off link to the mod page | No link (mods need a factorio.com account either way) |
 
 The settings screen shows each plugin's live status. A disabled plugin behaves like a

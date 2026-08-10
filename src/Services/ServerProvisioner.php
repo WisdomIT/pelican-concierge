@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use WisdomIT\Concierge\Catalog\GameCatalog;
 use WisdomIT\Concierge\Catalog\JavaRuntime;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 use WisdomIT\Concierge\Tools\ToolInputException;
 
 /**
@@ -42,6 +43,10 @@ final class ServerProvisioner
      */
     public function plan(string $gameId, string $sizeId, string $name, array $answers): array
     {
+        if ($message = self::creationGate($this->user)) {
+            throw new ToolInputException($message);
+        }
+
         $game = $this->catalog->find($gameId);
 
         if (!$game) {
@@ -142,8 +147,62 @@ final class ServerProvisioner
      *
      * @throws \Throwable
      */
+    /**
+     * 개설을 허용할 수 없으면 그 **이유**를, 허용이면 null (#17).
+     *
+     * 패널의 규칙은 "사용자 개설은 UCS 의 기능"이다 — 어시스턴트가 그걸 우회하면 UCS 없는
+     * 패널에서 채팅만 열 수 있으면 누구나 무제한 개설이 된다(실측). UCS 가 없거나 꺼져
+     * 있으면 **관리자 권한**이 있는 사용자만 통과한다.
+     *
+     * ⚠ 관리자 판별은 우리가 정의하지 않는다 — 패널 자신의 `create server` 권한을 쓴다
+     *   (ServerPolicy → DefaultAdminPolicies, 루트 관리자는 Gate::before 로 통과).
+     *   운영자가 스태프 role 에 개설을 위임했다면 그 role 도 여기서 통과해야 맞다.
+     */
+    public static function creationGate(User $user): ?string
+    {
+        if (OptionalPlugins::usable('user-creatable-servers')) {
+            return null;
+        }
+
+        if ($user->can('create', Server::class)) {
+            return null;
+        }
+
+        $installed = OptionalPlugins::status('user-creatable-servers') !== null;
+
+        return 'Server creation is unavailable for this user. This panel '
+            . ($installed
+                ? 'has the User Creatable Servers plugin installed but disabled'
+                : 'does not have the User Creatable Servers plugin')
+            . ', and without it only administrators (users with the panel\'s "create server" permission) '
+            . 'can create servers through the assistant. Ask an admin to '
+            . ($installed ? 'enable the plugin' : 'install it from the Hub')
+            . ', or to create the server for you.';
+    }
+
+    /**
+     * 관리자가 UCS 없이 개설할 때 따라붙는 주의(#17) — 문서화된 폴백(무제한 할당·한도 0)을
+     * 답변이 직접 말해야 한다(#15 규칙). 해당 없으면 null.
+     */
+    public static function noUcsCaveat(): ?string
+    {
+        if (OptionalPlugins::usable('user-creatable-servers')) {
+            return null;
+        }
+
+        return 'Created without the User Creatable Servers plugin: no per-user quota was applied, '
+            . 'the allocation was not restricted to a deployment port pool (reserved ports included), '
+            . 'and the server has backup/database limits of 0.';
+    }
+
     public function create(array $plan): Server
     {
+        // ⚠ plan 과 별개로 **여기서도** 막는다. 확인 카드의 재개 상태는 캐시에 살아 있어,
+        //   계획 후 정책이 바뀌어도(UCS 제거 등) 버튼 하나로 실행될 수 있다(#17).
+        if ($message = self::creationGate($this->user)) {
+            throw new ToolInputException($message);
+        }
+
         /** @var Collection<int, Allocation> $allocations */
         $allocations = $plan['allocations'];
         $size = $plan['size'];
