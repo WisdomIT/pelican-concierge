@@ -82,7 +82,9 @@
         display: flex; flex-direction: column;
         width: var(--cg-w); max-width: 100vw;
         padding: 1rem;
-        background: var(--gray-50, #fff);
+        /* 순백(사용자 요청) — gray-50 은 살짝 회색빛이라 패널 좌측 내비게이션(테마가
+           #fff 로 칠함)과 미묘하게 어긋났다. 다크 모드는 아래 오버라이드 그대로. */
+        background: #fff;
         border-left: 1px solid var(--gray-200, #e5e7eb);
     }
     :where(.dark) .cg-panel {
@@ -330,7 +332,7 @@
         border-radius: .625rem;
         padding: .25rem;
         /* 오버레이는 아래가 비쳐 보이면 안 된다 — 패널과 같은 불투명 배경 + 그림자. */
-        background: var(--gray-50, #fff);
+        background: #fff;
         box-shadow: 0 8px 24px rgb(0 0 0 / .18);
     }
     :where(.dark) .cg-history {
