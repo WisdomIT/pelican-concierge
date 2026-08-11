@@ -429,8 +429,9 @@
     /* ── 입력 ── */
     .cg-form { display: flex; align-items: flex-end; gap: .5rem; }
 
-    /* 한도 게이지(#4) — 입력창 위의 가는 줄 하나. 80% 경고색, 초과 위험색. */
-    .cg-limit { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+    /* 한도 게이지(#4) — 입력창 위의 가는 줄 하나. 80% 경고색, 초과 위험색.
+       음수 마진: .cg-chat 의 gap(1rem)이 그대로 벌리면 입력창과 남남처럼 보인다. */
+    .cg-limit { display: flex; align-items: center; gap: .5rem; margin-bottom: -.65rem; }
     .cg-limit-bar {
         flex: 1 1 auto; height: 4px; border-radius: 999px; overflow: hidden;
         background: color-mix(in oklab, currentColor 12%, transparent);
@@ -696,16 +697,18 @@
                 </div>
             @endif
 
-            {{-- 한도 게이지(#4) — 내가 한도의 몇 %를 썼는지. 규칙이 없으면 안 그린다. --}}
+            {{-- 한도 게이지(#4) — 70% 이상 썼을 때만 뜬다. 무엇 기준인지는 툴팁이 말한다. --}}
             @if ($this->limitStatus)
-                <div class="cg-limit {{ $this->limitStatus['percent'] >= 100 ? 'is-full' : ($this->limitStatus['percent'] >= 80 ? 'is-warn' : '') }}">
+                <div class="cg-limit {{ $this->limitStatus['percent'] >= 100 ? 'is-full' : ($this->limitStatus['percent'] >= 80 ? 'is-warn' : '') }}"
+                     title="{{ trans('concierge::strings.limit_meter_tip', [
+                         'scope' => trans('concierge::strings.limit_meter_scope_' . $this->limitStatus['scope']),
+                         'period' => trans('concierge::strings.limit_hit_period_' . $this->limitStatus['period']),
+                         'metric' => trans('concierge::strings.limit_hit_metric_' . $this->limitStatus['metric']),
+                     ]) }}">
                     <div class="cg-limit-bar">
                         <div class="cg-limit-fill" style="width: {{ $this->limitStatus['percent'] }}%"></div>
                     </div>
                     <span class="cg-limit-text">{{ trans('concierge::strings.limit_meter', [
-                        'scope' => trans('concierge::strings.limit_meter_scope_' . $this->limitStatus['scope']),
-                        'period' => trans('concierge::strings.limit_hit_period_' . $this->limitStatus['period']),
-                        'metric' => trans('concierge::strings.limit_hit_metric_' . $this->limitStatus['metric']),
                         'percent' => $this->limitStatus['percent'],
                     ]) }}</span>
                 </div>

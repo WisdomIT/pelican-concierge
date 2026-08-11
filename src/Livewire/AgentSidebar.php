@@ -915,7 +915,8 @@ class AgentSidebar extends Component
     }
 
     /**
-     * 보내기 버튼 위 한도 게이지(#4) — 내가 한도의 몇 %를 썼는지. 규칙이 없으면 null.
+     * 보내기 버튼 위 한도 게이지(#4) — 내가 한도의 몇 %를 썼는지.
+     * 규칙이 없거나 **70% 미만이면 null** — 여유가 있을 때는 눈에 걸릴 이유가 없다.
      *
      * 매 렌더마다 계산된다(메시지 후·30초 폴링마다 갱신). 사용자 범위는 인덱스 타는
      * 싼 조회고, 패널 범위는 UsageLimiter 의 60초 캐시를 그대로 탄다.
@@ -932,9 +933,14 @@ class AgentSidebar extends Component
         }
 
         $used = UsageLimiter::usedIn($rule, (int) auth()->id());
+        $percent = min(100, (int) floor($used / $rule['amount'] * 100));
+
+        if ($percent < 70) {
+            return null;
+        }
 
         return [
-            'percent' => min(100, (int) floor($used / $rule['amount'] * 100)),
+            'percent' => $percent,
             'scope' => $rule['scope'],
             'period' => $rule['period'],
             'metric' => $rule['metric'],
