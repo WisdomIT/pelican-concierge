@@ -22,6 +22,7 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\VerticalAlignment;
+use Illuminate\Support\HtmlString;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Llm\ProviderProbe;
@@ -254,9 +255,19 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                                 }),
                         ])
                             ->grow(false)
+                            ->extraAttributes(['class' => 'cg-verify'])
                             // 하단 정렬은 input 아래 helperText 높이까지 끌려 내려간다 —
                             // 상단 정렬 + label 높이만큼의 빈 라벨로 input 본체와 나란히 맞춘다.
-                            ->label("\u{00A0}"),
+                            // 라벨에 스타일을 함께 싣는다 — 별도 컴포넌트로 넣으면 그리드
+                            // 칸이 하나 생겨 간격이 틀어진다. 보정 내용:
+                            //  · 빈 라벨과 실제 field 라벨의 4px 높이 차이
+                            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것
+                            ->label(new HtmlString(
+                                '<style>'
+                                . '.cg-verify{margin-top:-4px}'
+                                . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
+                                . '</style>&nbsp;'
+                            )),
                     ])->verticalAlignment(VerticalAlignment::Start)->columnSpanFull(),
 
                     // 확인 통과의 지문 — 무엇을(공급자·키·주소) 확인했는지까지 담아,
