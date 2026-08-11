@@ -47,16 +47,21 @@ final class AnthropicProvider implements LlmProvider
         Closure $onText,
         Closure $onThinking,
     ): TurnResult {
+        // Haiku(4.5)는 adaptive thinking·effort 를 모른다 — 보내면 매 호출이
+        // "adaptive thinking is not supported" 400 이다. 5 세대(Opus·Sonnet)만 보낸다.
+        $adaptive = !str_starts_with((string) $this->settings->model, 'claude-haiku');
+
         $stream = $this->client()->messages->createStream(
             maxTokens: $this->settings->max_tokens,
             messages: $this->wireMessages($messages),
             model: $this->settings->model,
-            outputConfig: ['effort' => $this->settings->effort],
+            outputConfig: $adaptive ? ['effort' => $this->settings->effort] : null,
             system: $system,
             // Opus 5 는 thinking 이 기본으로 켜져 있다. display 는 기본값(omitted)을 쓰고,
             // thinking 블록이 열리는 시점만 "생각 중" 표시에 쓴다.
-            thinking: ['type' => 'adaptive'],
-            tools: $tools === [] ? null : $this->wireTools($tools),
+            thinking: $adaptive ? ['type' => 'adaptive'] : null,
+            // 도구상자가 비어도 웹 검색이 켜져 있으면 검색 도구는 실려야 한다.
+            tools: ($tools !== [] || $this->settings->search_enabled) ? $this->wireTools($tools) : null,
         );
 
         $text = $accumulatedText;
@@ -224,10 +229,15 @@ final class AnthropicProvider implements LlmProvider
     {
         if ($this->settings->search_enabled) {
             $tools[] = [
-                'type' => 'web_search_20250305',
+                'type' => 'web_search_20260318',
                 'name' => 'web_search',
                 // 검색은 토큰과 별도로 과금된다 — 한 턴에 무한정 돌지 않게 상한을 건다.
                 'max_uses' => max(1, $this->settings->search_max_uses),
+                // 신버전 기본은 동적 필터링(검색을 코드 실행으로 감싼다)인데, 그러면
+                // 4.6 미만 모델(Haiku 4.5)이 400 을 내고 응답에 코드 실행 블록이 섞인다.
+                // direct 를 명시해 종전과 같은 직접 검색으로 고정한다 — 동적 필터링
+                // 도입은 별도 작업(#34 후속).
+                'allowed_callers' => ['direct'],
             ];
         }
 
