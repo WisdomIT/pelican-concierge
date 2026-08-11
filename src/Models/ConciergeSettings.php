@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $idle_stop_enabled
  * @property int $idle_grace_minutes
  * @property bool $allow_conversation_delete
+ * @property ?string $sidebar_color
  */
 class ConciergeSettings extends Model
 {
@@ -45,6 +46,7 @@ class ConciergeSettings extends Model
         'idle_stop_enabled',
         'idle_grace_minutes',
         'allow_conversation_delete',
+        'sidebar_color',
     ];
 
     private static ?self $cached = null;

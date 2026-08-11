@@ -786,6 +786,55 @@ class AgentSidebar extends Component
         $this->pendingCard = $conversation->pending_card ?? [];
     }
 
+    /**
+     * 커스텀 색의 50–950 스케일 (#10). null = 패널을 따른다(기본, 오버라이드 없음).
+     *
+     * 단일 hex 로는 안 된다 — CSS 가 음영(--primary-600)과 color-mix 하이라이트를 쓰므로
+     * 스케일이 필요하다. Filament 이 팔레트 등록에 쓰는 Color::hex() 를 그대로 쓴다.
+     *
+     * @return ?array<int, string>
+     */
+    public function sidebarPalette(): ?array
+    {
+        $hex = (string) ConciergeSettings::current()->sidebar_color;
+
+        // ⚠ 형식을 직접 검사한다 — Color::hex() 는 잘못된 값("banana")에도 예외 없이
+        //   쓰레기 스케일을 돌려준다(실측). try/catch 만으로는 못 거른다.
+        if (!preg_match('/^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/i', $hex)) {
+            return null; // 패널 색으로 조용히 돌아간다 — 값 하나가 사이드바를 죽이면 안 된다
+        }
+
+        try {
+            return \Filament\Support\Colors\Color::hex(str_starts_with($hex, '#') ? $hex : '#' . $hex);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * 선택한 색 위의 글자색 (#10). 채움 요소(사용자 말풍선)의 흰 글자는 밝은 커스텀 색에서
+     * 읽을 수 없다 — 밝기를 재서 흰/검을 고른다. 운영자에게 "어두운 색만 고르라"고
+     * 요구하는 것보다 낫다.
+     */
+    public function sidebarOnPrimary(): string
+    {
+        $hex = ltrim((string) ConciergeSettings::current()->sidebar_color, '#');
+
+        if (strlen($hex) === 3) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+
+        $parts = sscanf($hex, '%02x%02x%02x');
+
+        if ($parts === null || in_array(null, $parts, true)) {
+            return '#ffffff';
+        }
+
+        [$r, $g, $b] = $parts;
+
+        return (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255 > 0.6 ? '#111827' : '#ffffff';
+    }
+
     /** 기록 목록에 삭제 버튼을 그릴지 — 설정이며 기본 꺼짐(#8). */
     public function canDeleteConversations(): bool
     {

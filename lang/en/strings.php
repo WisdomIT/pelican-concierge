@@ -64,6 +64,13 @@ return [
 
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => 'Resize the assistant sidebar (arrow keys; Shift for bigger steps; Home resets)',
+
+    // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
+    'section_appearance' => 'Appearance',
+    'section_appearance_help' => 'By default the sidebar follows the panel\'s primary colour, including any active theme.',
+    'field_sidebar_color_custom' => 'Use a custom colour',
+    'field_sidebar_color' => 'Sidebar colour',
+    'help_sidebar_color' => 'Repaints the assistant sidebar only — the rest of the panel is untouched. Text on filled elements adjusts to stay readable. Check both light and dark mode.',
     'card_title_install_mod' => 'Install this?',
     'card_confirm_install_mod' => 'Install',
     'card_mod' => 'Mod / plugin',

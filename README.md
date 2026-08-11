@@ -125,6 +125,7 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 | Idle watch | off | Interval, and whether to stop the server or only ask |
 | Web search | off | Adds a per-search fee on top of tokens |
 | Conversation deletion | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
+| Sidebar colour | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
 
 Model and effort choices are listed in `config/concierge.php`. When Anthropic
 ships a new model you can add it there without touching code.
