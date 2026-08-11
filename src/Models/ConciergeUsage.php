@@ -54,6 +54,7 @@ class ConciergeUsage extends Model
         'user_id',
         // 대화를 묶는 ULID = `concierge_conversations.id`.
         'conversation_id',
+        'provider',
         'model',
         'effort',
         'input_tokens',
@@ -130,6 +131,8 @@ class ConciergeUsage extends Model
 
         return static::query()->create([
             'user_id' => $userId,
+            // 어느 공급자의 지출인지 행마다 남는다(#3) — 단가·집계가 공급자별로 다르다.
+            'provider' => $settings->provider ?? 'anthropic',
             'model' => $settings->model,
             'effort' => $settings->effort,
             ...$attributes,

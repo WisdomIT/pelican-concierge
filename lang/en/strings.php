@@ -65,6 +65,14 @@ return [
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => 'Resize the assistant sidebar (arrow keys; Shift for bigger steps; Home resets)',
 
+    // LLM 공급자(#3).
+    'field_provider' => 'LLM provider',
+    'help_provider' => 'Which service answers the chat. Switching keeps each provider\'s API key and model choice — switch back and they are restored.',
+    'field_base_url' => 'Endpoint URL',
+    'help_base_url' => 'The OpenAI-compatible endpoint, including /v1 — e.g. http://localhost:11434/v1 for Ollama. No API key is needed for most local servers.',
+    'help_model_free' => 'The model name as your endpoint knows it (e.g. an Ollama tag). Pick one that supports tool calling — the assistant is built on tools.',
+    'search_unsupported' => 'This provider has no web search. The assistant will say so when a question needs current information.',
+
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => 'Appearance',
     'section_appearance_help' => 'By default the sidebar follows the panel\'s primary colour, including any active theme.',

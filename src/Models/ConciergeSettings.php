@@ -28,6 +28,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $idle_grace_minutes
  * @property bool $allow_conversation_delete
  * @property ?string $sidebar_color
+ * @property string $provider
+ * @property ?string $base_url
+ * @property ?array<string, array<string, mixed>> $provider_settings
  */
 class ConciergeSettings extends Model
 {
@@ -47,6 +50,9 @@ class ConciergeSettings extends Model
         'idle_grace_minutes',
         'allow_conversation_delete',
         'sidebar_color',
+        'provider',
+        'base_url',
+        'provider_settings',
     ];
 
     private static ?self $cached = null;
@@ -65,6 +71,8 @@ class ConciergeSettings extends Model
             'idle_stop_enabled' => 'boolean',
             'idle_grace_minutes' => 'integer',
             'allow_conversation_delete' => 'boolean',
+            // 공급자별 키 스냅샷이 들어간다 — 통째로 암호화한다(#3).
+            'provider_settings' => 'encrypted:array',
         ];
     }
 
@@ -102,6 +110,11 @@ class ConciergeSettings extends Model
 
     public function isConfigured(): bool
     {
+        // 로컬 OpenAI 호환 엔드포인트는 키가 없는 게 보통이다 — 주소와 모델이 있으면 된다(#3).
+        if (($this->provider ?? 'anthropic') === 'openai-compatible') {
+            return filled($this->base_url) && filled($this->model);
+        }
+
         return filled($this->apiKey());
     }
 
@@ -112,5 +125,41 @@ class ConciergeSettings extends Model
     public function isUsable(): bool
     {
         return $this->isConfigured();
+    }
+
+    /**
+     * 활성 값(키·주소·모델·effort)을 **현재 공급자**의 스냅샷으로 저장한다 (#3).
+     * 전환 직전마다 불린다 — 그래서 공급자를 오가도 각자의 키·모델 선택이 남는다.
+     */
+    public function stashProviderSnapshot(): void
+    {
+        $snapshots = $this->provider_settings ?? [];
+
+        $snapshots[$this->provider ?? 'anthropic'] = [
+            'api_key' => $this->apiKey(),
+            'base_url' => $this->base_url,
+            'model' => $this->model,
+            'effort' => $this->effort,
+        ];
+
+        $this->provider_settings = $snapshots;
+    }
+
+    /**
+     * 공급자를 바꾸고, 그 공급자의 스냅샷(없으면 config 기본값)을 활성 값으로 적재한다.
+     * 저장은 호출자 몫이다 — 폼의 다른 필드와 함께 한 번에 save 된다.
+     */
+    public function switchProvider(string $id): void
+    {
+        $this->stashProviderSnapshot();
+
+        $snapshot = ($this->provider_settings ?? [])[$id] ?? [];
+        $defaults = (array) config("concierge.providers.{$id}", []);
+
+        $this->provider = $id;
+        $this->api_key = $snapshot['api_key'] ?? null;
+        $this->base_url = $snapshot['base_url'] ?? null;
+        $this->model = (string) ($snapshot['model'] ?? $defaults['default_model'] ?? '');
+        $this->effort = (string) ($snapshot['effort'] ?? $defaults['default_effort'] ?? 'medium');
     }
 }

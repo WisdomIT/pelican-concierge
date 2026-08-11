@@ -65,6 +65,14 @@ return [
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => '어시스턴트 사이드바 너비 조절 (화살표 키, Shift 는 큰 단위, Home 은 기본값)',
 
+    // LLM 공급자(#3).
+    'field_provider' => 'LLM 공급자',
+    'help_provider' => '채팅에 답하는 서비스입니다. 전환해도 각 공급자의 API 키·모델 선택은 남습니다 — 다시 돌아오면 복원됩니다.',
+    'field_base_url' => '엔드포인트 주소',
+    'help_base_url' => 'OpenAI 호환 엔드포인트를 /v1 까지 포함해 입력합니다 — Ollama 는 http://localhost:11434/v1. 로컬 서버는 보통 API 키가 필요 없습니다.',
+    'help_model_free' => '엔드포인트가 아는 모델 이름(예: Ollama 태그). 이 어시스턴트는 도구 위에 서 있으므로 도구 호출을 지원하는 모델이어야 합니다.',
+    'search_unsupported' => '이 공급자는 웹 검색이 없습니다. 최신 정보가 필요한 질문에는 어시스턴트가 그 사실을 말합니다.',
+
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => '모양',
     'section_appearance_help' => '기본값은 패널의 primary 색을 그대로 따릅니다(활성 테마 포함).',

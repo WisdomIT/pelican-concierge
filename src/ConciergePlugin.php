@@ -17,6 +17,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Throwable;
+use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Support\OptionalPlugins;
 
@@ -77,7 +78,10 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             // api_key 는 절대 되돌려 채우지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
             'api_key' => '',
             'clear_api_key' => false,
+            'provider' => $settings->provider ?? 'anthropic',
+            'base_url' => $settings->base_url,
             'model' => $settings->model,
+            'model_free' => $settings->model,
             'effort' => $settings->effort,
             'max_tokens' => $settings->max_tokens,
             'daily_message_limit' => $settings->daily_message_limit,
@@ -114,6 +118,17 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             Section::make(trans('concierge::strings.section_connection'))
                 ->columns(2)
                 ->schema([
+                    // LLM 공급자(#3). 바꿔도 다른 공급자의 키·모델 선택은 스냅샷에 남는다.
+                    Select::make('provider')
+                        ->label(trans('concierge::strings.field_provider'))
+                        ->options(ProviderFactory::options())
+                        ->helperText(trans('concierge::strings.help_provider'))
+                        ->native(false)
+                        ->default(fn () => ConciergeSettings::current()->provider ?? 'anthropic')
+                        ->live()
+                        ->required()
+                        ->columnSpanFull(),
+
                     TextInput::make('api_key')
                         ->label(trans('concierge::strings.field_api_key'))
                         ->password()
@@ -134,21 +149,41 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->visible($hasApiKey)
                         ->columnSpanFull(),
 
+                    // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
+                    TextInput::make('base_url')
+                        ->label(trans('concierge::strings.field_base_url'))
+                        ->helperText(trans('concierge::strings.help_base_url'))
+                        ->placeholder('http://localhost:11434/v1')
+                        ->url()
+                        ->default(fn () => ConciergeSettings::current()->base_url)
+                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
+                        ->columnSpanFull(),
+
+                    // 선택지가 정의된 공급자는 드롭다운으로 —
                     Select::make('model')
                         ->label(trans('concierge::strings.field_model'))
-                        ->options(config('concierge.available_models'))
+                        ->options(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []))
                         ->helperText(trans('concierge::strings.help_model'))
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->model)
-                        ->required(),
+                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== [])
+                        ->required(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== []),
+
+                    // — 로컬 엔드포인트는 모델 이름이 설치마다 달라 자유 입력이다.
+                    TextInput::make('model_free')
+                        ->label(trans('concierge::strings.field_model'))
+                        ->helperText(trans('concierge::strings.help_model_free'))
+                        ->placeholder('llama3.3:70b')
+                        ->default(fn () => ConciergeSettings::current()->model)
+                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []),
 
                     Select::make('effort')
                         ->label(trans('concierge::strings.field_effort'))
-                        ->options(config('concierge.available_efforts'))
+                        ->options(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.efforts', []))
                         ->helperText(trans('concierge::strings.help_effort'))
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->effort)
-                        ->required(),
+                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->supportsEffort),
 
                     TextInput::make('max_tokens')
                         ->label(trans('concierge::strings.field_max_tokens'))
@@ -200,7 +235,11 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 ->schema([
                     Toggle::make('search_enabled')
                         ->label(trans('concierge::strings.field_search_enabled'))
-                        ->helperText(trans('concierge::strings.help_search_enabled'))
+                        // 공급자가 검색을 지원하지 않으면(로컬 등) 켤 수 없고, 이유가 보인다(#3).
+                        ->helperText(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->supportsWebSearch
+                            ? trans('concierge::strings.help_search_enabled')
+                            : trans('concierge::strings.search_unsupported'))
+                        ->disabled(fn (Get $get) => !ProviderFactory::capabilitiesOf((string) $get('provider'))->supportsWebSearch)
                         ->live()
                         ->inline(false)
                         ->default(fn () => ConciergeSettings::current()->search_enabled),
@@ -318,6 +357,39 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         $clearApiKey = (bool) ($data['clear_api_key'] ?? false);
         unset($data['api_key'], $data['clear_api_key']);
 
+        $settings = ConciergeSettings::current();
+
+        // ── 공급자 전환 (#3) ──────────────────────────────────────
+        $provider = (string) ($data['provider'] ?? $settings->provider ?? 'anthropic');
+        unset($data['provider']);
+
+        if ($provider !== ($settings->provider ?? 'anthropic')) {
+            // 이전 공급자의 키·모델을 스냅샷에 넣고, 새 공급자의 스냅샷(또는 기본값)을
+            // 활성 값으로 적재한다 — 아래 fill 이 폼에서 온 값으로 덮는다(폼이 이긴다).
+            $settings->switchProvider($provider);
+        }
+
+        // 자유 입력 모델(로컬 엔드포인트)은 별도 필드로 받는다 — 선택지형과 하나로 합친다.
+        $models = array_keys((array) config("concierge.providers.{$provider}.models", []));
+
+        if ($models === []) {
+            $data['model'] = trim((string) ($data['model_free'] ?? ''));
+        }
+
+        unset($data['model_free']);
+
+        // 공급자를 바꾼 직후 폼의 모델·effort 가 이전 공급자의 값일 수 있다 —
+        // 그 공급자의 선택지에 없는 값은 기본값으로 되돌린다(404 를 설정 화면에서 막는다).
+        if ($models !== [] && !in_array($data['model'] ?? '', $models, true)) {
+            $data['model'] = (string) config("concierge.providers.{$provider}.default_model", $settings->model);
+        }
+
+        $efforts = array_keys((array) config("concierge.providers.{$provider}.efforts", []));
+
+        if ($efforts !== [] && !in_array($data['effort'] ?? '', $efforts, true)) {
+            $data['effort'] = (string) (config("concierge.providers.{$provider}.default_effort") ?? $efforts[0]);
+        }
+
         // 커스텀 색(#10): 토글이 꺼져 있으면 "패널을 따른다" = null. 색 값이 남아 있으면
         // 토글을 다시 켰을 때 이전 색이 돌아오는 게 아니라, 꺼짐 = 값 없음으로 둔다.
         if (!($data['sidebar_color_custom'] ?? false)) {
@@ -326,16 +398,19 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
         unset($data['sidebar_color_custom']);
 
-        $settings = ConciergeSettings::current();
         $settings->fill($data);
 
         // 빈 입력은 "그대로 두기"다 — 다른 설정만 고칠 때 키를 다시 칠 필요가 없어야 한다.
         // 새 키와 삭제가 동시에 오면 새 키가 이긴다(치고 나서 체크박스를 되돌리지 않은 경우).
+        // 공급자를 바꾼 경우 "그대로"의 기준은 switchProvider 가 적재한 그 공급자의 스냅샷 키다.
         if ($apiKey !== '') {
             $settings->api_key = $apiKey;
         } elseif ($clearApiKey) {
             $settings->api_key = null;
         }
+
+        // 활성 값이 확정됐다 — 현재 공급자의 스냅샷도 같은 값으로 맞춰 둔다.
+        $settings->stashProviderSnapshot();
 
         $settings->save();
         ConciergeSettings::forgetCached();
