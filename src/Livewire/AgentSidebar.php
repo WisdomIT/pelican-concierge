@@ -8,6 +8,7 @@ use App\Repositories\Daemon\DaemonServerRepository;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Illuminate\Support\Str;
 use Throwable;
@@ -911,6 +912,33 @@ class AgentSidebar extends Component
                 'unread' => $c->notice_unread_at !== null,
             ])
             ->all();
+    }
+
+    /**
+     * 보내기 버튼 위 한도 게이지(#4) — 내가 한도의 몇 %를 썼는지. 규칙이 없으면 null.
+     *
+     * 매 렌더마다 계산된다(메시지 후·30초 폴링마다 갱신). 사용자 범위는 인덱스 타는
+     * 싼 조회고, 패널 범위는 UsageLimiter 의 60초 캐시를 그대로 탄다.
+     *
+     * @return ?array{percent: int, scope: string, period: string, metric: string}
+     */
+    #[Computed]
+    public function limitStatus(): ?array
+    {
+        $rule = UsageLimiter::rules(ConciergeSettings::current())[0] ?? null;
+
+        if ($rule === null) {
+            return null;
+        }
+
+        $used = UsageLimiter::usedIn($rule, (int) auth()->id());
+
+        return [
+            'percent' => min(100, (int) floor($used / $rule['amount'] * 100)),
+            'scope' => $rule['scope'],
+            'period' => $rule['period'],
+            'metric' => $rule['metric'],
+        ];
     }
 
     public function render(): View

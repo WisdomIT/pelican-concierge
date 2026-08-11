@@ -276,6 +276,10 @@ return [
     'limit_hit_period_month' => '이번 달',
     'limit_hit_metric_messages' => '메시지',
     'limit_hit_metric_tokens' => '토큰',
+    // 입력창 위 한도 게이지 — 예: "오늘 내 메시지 한도 42% 사용"
+    'limit_meter' => ':period :scope :metric 한도 :percent% 사용',
+    'limit_meter_scope_user' => '내',
+    'limit_meter_scope_panel' => '패널 전체',
     'error' => '지금 응답을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요. 계속 그러면 관리자에게 알려주세요.',
     'refused' => '그 요청에는 답할 수 없습니다. 다른 방식으로 물어봐 주세요.',
     'empty_reply' => '답변이 비어 있습니다. 다시 물어봐 주세요.',

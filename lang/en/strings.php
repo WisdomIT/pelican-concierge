@@ -275,6 +275,11 @@ return [
     'limit_hit_period_month' => 'this month',
     'limit_hit_metric_messages' => 'message',
     'limit_hit_metric_tokens' => 'token',
+    // Limit meter above the composer — e.g. "42% of your message limit for today".
+    // Own scope words: the limit_hit ones start a sentence and are capitalised.
+    'limit_meter' => ':percent% of :scope :metric limit for :period',
+    'limit_meter_scope_user' => 'your',
+    'limit_meter_scope_panel' => 'the panel-wide',
     'error' => 'Could not get a reply just now. Please try again shortly, and tell an administrator if it keeps happening.',
     'refused' => 'I cannot answer that request. Please try asking a different way.',
     'empty_reply' => 'The reply came back empty. Please ask again.',
