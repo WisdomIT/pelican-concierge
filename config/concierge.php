@@ -4,7 +4,7 @@
  |  이 파일은 PluginService 가 부팅 때 `config()->set('concierge', require ...)` 로 읽는다.
  |
  |  ⚠ 여기 있는 값은 **설정이 아니라 기본값·선택지**다. 실제 설정은 DB(concierge_settings)에
- |     있고 관리자 화면(Admin → 고급 → AI 도우미 설정)에서 바꾼다.
+ |     있고 관리자 화면(Admin → 고급 → AI Agent 설정)에서 바꾼다.
  |     API 키를 여기나 env 에 두지 않는 이유는 README 의 "왜 DB 인가" 절 참고.
  */
 

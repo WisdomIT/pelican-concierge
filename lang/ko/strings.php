@@ -2,7 +2,8 @@
 
 return [
     // ── 사용자 채팅 화면 ──
-    'title' => 'AI 도우미',
+    // 제품명은 언어와 무관하게 "AI Agent" (#31) — 주변 단어만 번역한다.
+    'title' => 'AI Agent',
     'empty' => '무엇을 도와줄까요? 예: "마인크래프트 서버 하나 만들고 싶어"',
     'placeholder' => '하고 싶은 걸 그냥 말로 적어주세요',
     'send' => '보내기',
@@ -262,9 +263,9 @@ return [
     'state_missing' => '확인 불가',
     'state_unknown' => '알 수 없음',
 
-    'not_configured' => 'AI 도우미가 아직 설정되지 않았습니다. 관리자에게 알려주세요.',
+    'not_configured' => 'AI Agent가 아직 설정되지 않았습니다. 관리자에게 알려주세요.',
     'not_implemented' => '아직 준비 중입니다. 지금은 서버 목록의 "서버 만들기" 버튼을 이용해 주세요.',
-    'disabled' => 'AI 도우미가 꺼져 있습니다.',
+    'disabled' => 'AI Agent가 꺼져 있습니다.',
     // 3축 한도(#4)의 차단 문구 — 어느 한도인지, 언제 풀리는지까지.
     // 예: "오늘 내 메시지 한도(50)를 다 썼습니다. 2026-08-12 00:00 부터 다시 쓸 수 있습니다."
     'limit_hit' => ':period :scope :metric 한도(:amount)를 다 썼습니다. :reset 부터 다시 쓸 수 있습니다.',
@@ -338,7 +339,7 @@ return [
     'idle_snoozed' => '알겠습니다. :server 는 그대로 두고 다시 지켜볼게요.',
 
     // ── 관리자 · 설정 ──
-    'settings_title' => 'AI 도우미 설정',
+    'settings_title' => 'AI Agent 설정',
     'save' => '저장',
     'saved' => '설정을 저장했습니다.',
 
@@ -353,8 +354,8 @@ return [
     'api_key_set' => '설정됨 — 바꾸려면 새 값을 입력하세요',
     'api_key_unset' => '아직 설정되지 않음',
     'clear_api_key' => '키 삭제',
-    'api_key_cleared' => 'API 키를 삭제했습니다. AI 도우미가 응답하지 않습니다.',
-    'confirm_clear_key' => 'API 키를 삭제하면 AI 도우미가 즉시 멈춥니다. 계속할까요?',
+    'api_key_cleared' => 'API 키를 삭제했습니다. AI Agent가 응답하지 않습니다.',
+    'confirm_clear_key' => 'API 키를 삭제하면 AI Agent가 즉시 멈춥니다. 계속할까요?',
 
     'field_model' => '모델',
     'help_model' => '도구를 써서 사용자 서버를 조작하므로 Opus 를 권장합니다.',
@@ -380,7 +381,7 @@ return [
     'help_limit_amount' => '0 = 무제한',
 
     // ── 관리자 · 사용량 ──
-    'usage_title' => 'AI 도우미 사용량',
+    'usage_title' => 'AI Agent 사용 통계',
     'usage_label' => '사용 기록',
     'conversation_label' => '대화',
     'view_conversation' => '대화 보기',
