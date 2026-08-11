@@ -128,6 +128,25 @@ class ConciergeSettings extends Model
     }
 
     /**
+     * 그 공급자의 키가 저장돼 있는가 (#3) — 활성 공급자는 활성 컬럼을, 나머지는
+     * 스냅샷을 본다. 설정 화면의 "키 저장됨" 표시가 이걸 쓴다: 활성 키 하나만 보면
+     * Claude 키가 있을 때 OpenAI·로컬에도 "저장됨"이 떠서 오해를 부른다.
+     */
+    public function hasApiKeyFor(string $provider): bool
+    {
+        if ($provider === ($this->provider ?? 'anthropic')) {
+            return filled($this->apiKey());
+        }
+
+        try {
+            return filled(($this->provider_settings ?? [])[$provider]['api_key'] ?? null);
+        } catch (DecryptException) {
+            // APP_KEY 가 바뀐 경우 — apiKey() 와 같은 태도로 "없음" 취급한다.
+            return false;
+        }
+    }
+
+    /**
      * 활성 값(키·주소·모델·effort)을 **현재 공급자**의 스냅샷으로 저장한다 (#3).
      * 전환 직전마다 불린다 — 그래서 공급자를 오가도 각자의 키·모델 선택이 남는다.
      */

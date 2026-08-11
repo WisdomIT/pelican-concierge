@@ -105,16 +105,18 @@ class ConciergePlugin implements Plugin, HasPluginSettings
      *
      * @return Component[]
      */
+    /** 폼 표시용 — 마이그레이션 전(설치 직후) 구간에도 죽지 않는다. */
+    private function hasApiKeyFor(string $provider): bool
+    {
+        try {
+            return ConciergeSettings::current()->hasApiKeyFor($provider);
+        } catch (Throwable) {
+            return false; // "미설정"으로 보이면 충분하다.
+        }
+    }
+
     public function getSettingsForm(): array
     {
-        $hasApiKey = false;
-
-        try {
-            $hasApiKey = ConciergeSettings::current()->isConfigured();
-        } catch (Throwable) {
-            // 위와 같은 구간. "미설정"으로 보이면 충분하다.
-        }
-
         return [
             Section::make(trans('concierge::strings.section_connection'))
                 ->columns(2)
@@ -150,7 +152,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->revealable()
                         ->autocomplete(false)
                         ->default('')
-                        ->placeholder($hasApiKey
+                        // "저장돼 있음" 표시는 **선택된 공급자**의 키를 본다 — 활성 키 하나만
+                        // 보면 Claude 키가 있을 때 다른 공급자에도 저장됨이 떠서 오해를 부른다.
+                        ->placeholder(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider'))
                             ? trans('concierge::strings.api_key_set')
                             : trans('concierge::strings.api_key_unset'))
                         ->helperText(trans('concierge::strings.help_api_key'))
@@ -161,7 +165,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     Checkbox::make('clear_api_key')
                         ->label(trans('concierge::strings.field_clear_api_key'))
                         ->default(false)
-                        ->visible($hasApiKey)
+                        ->visible(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider')))
                         ->columnSpanFull(),
 
                     // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
