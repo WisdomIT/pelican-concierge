@@ -522,7 +522,14 @@
                 ⚠ 태그 안에 공백·줄바꿈을 넣지 말 것 — :empty 가 안 먹어서 빈 말풍선이 남는다.
             --}}
             <div wire:stream="live-user" class="cg-bubble cg-user"></div>
-            <div wire:stream="live-assistant" class="cg-bubble cg-agent cg-md"></div>
+            {{--
+                응답 스트림은 **더블 버퍼**다(#22). API 가 텍스트를 ~30자 덩어리로 0.7초씩
+                띄엄띄엄 보내는 것을 실측했다(와이어 레벨 — 우리 파이프라인 문제가 아니다).
+                Livewire 는 숨은 원본에 쓰고, 보이는 쪽은 타자기처럼 일정 속도로 드러낸다.
+                ⚠ 원본은 렌더된 HTML 이다 — 글자 수로 자르되 태그 안은 자르지 않는다(스크립트).
+            --}}
+            <div wire:stream="live-assistant" class="cg-stream-src" hidden></div>
+            <div class="cg-bubble cg-agent cg-md" x-data x-init="window.cgTypewriter($el)"></div>
 
             {{--
                 확인 카드. 내용은 **모델이 쓴 문장이 아니라 우리가 조회한 사실**이다 —
@@ -623,4 +630,95 @@
             </form>
         </div>
     </aside>
+
+    {{-- ⚠ Livewire 루트는 요소 하나여야 한다 — <style> 과 같은 이유로 루트 div **안**에 둔다.
+         morph 는 스크립트를 다시 실행하지 않고, ??= 가 재정의도 막는다. --}}
+    <script>
+        // 타자기 스무딩(#22). API 는 텍스트를 ~30자 덩어리로 0.7초 간격으로 보낸다(실측).
+        // 덩어리를 받아 두고 글자 단위로 일정 속도로 드러낸다 — 표시만 다르고,
+        // 모델·기록에 닿는 것은 아무것도 없다.
+        window.cgTypewriter ??= function (view) {
+            const src = view.previousElementSibling; // wire:stream 원본(숨김)
+            const instant = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let shown = 0;   // 지금까지 드러낸 글자 수 — 상태 문구로 잠깐 줄어도 유지한다(아래)
+            let timer = null;
+
+            // 글자 예산만큼만 남긴다. **텍스트 노드 단위**로 자르므로 태그 안이 잘리지 않는다.
+            const truncate = (node, budget) => {
+                for (let child = node.firstChild; child;) {
+                    const next = child.nextSibling;
+
+                    if (budget <= 0) {
+                        child.remove();
+                    } else if (child.nodeType === Node.TEXT_NODE) {
+                        if (child.textContent.length > budget) {
+                            child.textContent = child.textContent.slice(0, budget);
+                            budget = 0;
+                        } else {
+                            budget -= child.textContent.length;
+                        }
+                    } else {
+                        budget = truncate(child, budget);
+                    }
+
+                    child = next;
+                }
+
+                return budget;
+            };
+
+            const render = (count) => {
+                const clone = src.cloneNode(true);
+                truncate(clone, count);
+                view.replaceChildren(...clone.childNodes);
+            };
+
+            const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+
+            const tick = () => {
+                const total = src.textContent.length;
+
+                // 응답이 끝나면 Livewire 가 원본을 비운다(정식 말풍선이 위 목록 루프로 뜬다) —
+                // 애니메이션을 즉시 접어야 마지막 렌더와 싸우지 않는다.
+                // ⚠ 이 스크립트의 주석에 blade 지시문 이름을 쓰면 안 된다 — script 안이라도
+                //   컴파일러가 @ 로 시작하는 단어를 지시문으로 파싱한다(실측: 컴파일 실패).
+                if (total === 0) {
+                    shown = 0;
+                    view.replaceChildren();
+                    stop();
+
+                    return;
+                }
+
+                // 원본이 줄었다 = "생각 중" 같은 상태 문구로 교체된 것 → 통째로 비춘다.
+                // shown 은 **줄이지 않는다** — 도구 왕복 뒤 본문이 돌아왔을 때 이미 보여준
+                // 부분을 처음부터 다시 치면 안 된다.
+                if (shown >= total) {
+                    render(total);
+                    stop(); // 다음 덩어리가 오면 옵저버가 다시 깨운다
+
+                    return;
+                }
+
+                // 밀린 만큼에 비례해 빨라진다 — 덩어리 하나(~30자)를 다음 덩어리가 오기
+                // 전(~0.5초)에 소화하고, 큰 버스트도 화면이 스트림에 크게 뒤처지지 않는다.
+                shown = Math.min(total, shown + Math.max(1, Math.round((total - shown) / 14)));
+                render(shown);
+            };
+
+            new MutationObserver(() => {
+                // 동작 축소 선호(접근성) — 애니메이션 없이 그대로 비춘다.
+                if (instant) {
+                    shown = src.textContent.length;
+                    render(shown);
+
+                    return;
+                }
+
+                if (!timer) {
+                    timer = setInterval(tick, 33);
+                }
+            }).observe(src, { childList: true, characterData: true, subtree: true });
+        };
+    </script>
 </div>
