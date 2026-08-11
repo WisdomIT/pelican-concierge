@@ -2,7 +2,8 @@
 
 return [
     // ── User chat page ──
-    'title' => 'AI Assistant',
+    // The product name is "AI Agent" in every locale (#31) — only surrounding words translate.
+    'title' => 'AI Agent',
     'empty' => 'What can I help with? For example: "I want a Minecraft server"',
     'placeholder' => 'Just say what you want in plain words',
     'send' => 'Send',
@@ -337,7 +338,7 @@ return [
     'idle_snoozed' => 'Alright, leaving :server running. I will keep watching.',
 
     // ── Admin · settings ──
-    'settings_title' => 'AI Assistant Settings',
+    'settings_title' => 'AI Agent Settings',
     'save' => 'Save',
     'saved' => 'Settings saved.',
 
@@ -379,7 +380,7 @@ return [
     'help_limit_amount' => '0 = unlimited',
 
     // ── Admin · usage ──
-    'usage_title' => 'AI Assistant Usage',
+    'usage_title' => 'AI Agent Usage',
     'usage_label' => 'Usage record',
     'conversation_label' => 'Conversation',
     'view_conversation' => 'View conversation',

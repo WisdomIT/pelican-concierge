@@ -111,7 +111,7 @@ The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 Keep the zip filename as-is — the panel derives the plugin folder name from it, and it
 has to match the `id` in `plugin.json`.
 
-Then open **Admin → Advanced → AI Assistant Settings** and paste your API key.
+Then open **Admin → Advanced → AI Agent Settings** and paste your API key.
 
 ## Configuration
 
@@ -137,7 +137,7 @@ ships a new model you can add it there without touching code.
 
 Every message costs money on your Anthropic key. Two things keep it visible and bounded:
 
-- **Usage tracking** — *Admin → Advanced → AI Assistant Usage* shows tokens and estimated
+- **Usage tracking** — *Admin → Advanced → AI Agent Usage* shows tokens and estimated
   cost per user and per conversation, with the full message and tool log.
 - **A configurable usage limit**, on by default (50 messages per user per day). Count
   messages or tokens, per user or panel-wide, per hour/day/week/month — a panel-wide
