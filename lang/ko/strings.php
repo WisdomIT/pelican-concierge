@@ -64,6 +64,13 @@ return [
 
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => '어시스턴트 사이드바 너비 조절 (화살표 키, Shift 는 큰 단위, Home 은 기본값)',
+
+    // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
+    'section_appearance' => '모양',
+    'section_appearance_help' => '기본값은 패널의 primary 색을 그대로 따릅니다(활성 테마 포함).',
+    'field_sidebar_color_custom' => '커스텀 색 사용',
+    'field_sidebar_color' => '사이드바 색',
+    'help_sidebar_color' => '어시스턴트 사이드바만 다시 칠합니다 — 패널의 나머지는 그대로입니다. 채움 요소의 글자색은 읽히도록 자동 조정됩니다. 라이트·다크 모드 모두 확인하세요.',
     'card_title_install_mod' => '설치할까요?',
     'card_confirm_install_mod' => '설치하기',
     'card_mod' => '모드·플러그인',

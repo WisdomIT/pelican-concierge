@@ -6,6 +6,7 @@ use App\Contracts\Plugins\HasPluginSettings;
 use Filament\Contracts\Plugin;
 use App\Enums\PluginStatus;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Placeholder;
@@ -87,6 +88,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'idle_stop_enabled' => $settings->idle_stop_enabled,
             'idle_grace_minutes' => $settings->idle_grace_minutes,
             'allow_conversation_delete' => $settings->allow_conversation_delete,
+            'sidebar_color_custom' => filled($settings->sidebar_color),
+            'sidebar_color' => $settings->sidebar_color,
         ];
     }
 
@@ -171,6 +174,25 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->helperText(trans('concierge::strings.help_allow_conversation_delete'))
                         ->default(fn () => ConciergeSettings::current()->allow_conversation_delete)
                         ->columnSpanFull(),
+                ]),
+
+            // 모양(#10) — 기본은 패널의 primary 를 그대로 따른다(오버라이드 없음).
+            // 에이전트를 패널과 구분되는 물건으로 표시하고 싶은 운영자만 색을 고른다.
+            Section::make(trans('concierge::strings.section_appearance'))
+                ->description(trans('concierge::strings.section_appearance_help'))
+                ->columns(2)
+                ->schema([
+                    Toggle::make('sidebar_color_custom')
+                        ->label(trans('concierge::strings.field_sidebar_color_custom'))
+                        ->default(fn () => filled(ConciergeSettings::current()->sidebar_color))
+                        ->live(),
+
+                    ColorPicker::make('sidebar_color')
+                        ->label(trans('concierge::strings.field_sidebar_color'))
+                        ->helperText(trans('concierge::strings.help_sidebar_color'))
+                        ->default(fn () => ConciergeSettings::current()->sidebar_color)
+                        ->visible(fn (Get $get) => (bool) $get('sidebar_color_custom'))
+                        ->requiredIf('sidebar_color_custom', true),
                 ]),
 
             Section::make(trans('concierge::strings.section_search'))
@@ -295,6 +317,14 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         $apiKey = trim((string) ($data['api_key'] ?? ''));
         $clearApiKey = (bool) ($data['clear_api_key'] ?? false);
         unset($data['api_key'], $data['clear_api_key']);
+
+        // 커스텀 색(#10): 토글이 꺼져 있으면 "패널을 따른다" = null. 색 값이 남아 있으면
+        // 토글을 다시 켰을 때 이전 색이 돌아오는 게 아니라, 꺼짐 = 값 없음으로 둔다.
+        if (!($data['sidebar_color_custom'] ?? false)) {
+            $data['sidebar_color'] = null;
+        }
+
+        unset($data['sidebar_color_custom']);
 
         $settings = ConciergeSettings::current();
         $settings->fill($data);

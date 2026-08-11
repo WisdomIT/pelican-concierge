@@ -105,7 +105,7 @@
     .cg-resize:hover,
     .cg-resize:focus-visible,
     .cg-resize.is-dragging {
-        background: color-mix(in oklab, var(--primary-600, #4f46e5) 35%, transparent);
+        background: color-mix(in oklab, var(--primary-600) 35%, transparent);
     }
     .cg-resize:focus-visible { outline: none; }
     /* 1024px 아래는 오버레이 모드(위 media) — 밀어낼 본문이 없으니 조절 자체를 없앤다. */
@@ -131,8 +131,9 @@
 
     .cg-user {
         align-self: flex-end;
-        background: var(--primary-600, #4f46e5);
-        color: #fff;
+        background: var(--primary-600);
+        /* 커스텀 색(#10)이 밝으면 흰 글자가 안 읽힌다 — 서버가 밝기로 골라 준다. */
+        color: var(--cg-on-primary, #fff);
         white-space: pre-wrap;
     }
     .cg-agent {
@@ -154,12 +155,12 @@
         max-width: 100%;
         padding: .35rem .7rem;
         border-radius: .5rem;
-        border: 1px solid var(--primary-600, #4f46e5);
-        color: var(--primary-600, #4f46e5);
+        border: 1px solid var(--primary-600);
+        color: var(--primary-600);
         font-size: .8125rem; font-weight: 600;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .cg-link:hover { background: color-mix(in oklab, var(--primary-600, #4f46e5) 12%, transparent); }
+    .cg-link:hover { background: color-mix(in oklab, var(--primary-600) 12%, transparent); }
 
     /* ── 마크다운 ── */
     .cg-md > :first-child { margin-top: 0; }
@@ -378,7 +379,7 @@
     :where(.dark) .cg-history-item { color: var(--gray-300, #d1d5db); }
     .cg-history-item:hover { background: color-mix(in oklab, currentColor 10%, transparent); }
     .cg-history-item.is-active {
-        background: color-mix(in oklab, var(--primary-600, #4f46e5) 15%, transparent);
+        background: color-mix(in oklab, var(--primary-600) 15%, transparent);
         font-weight: 600;
     }
     .cg-history-empty { padding: .45rem .6rem; font-size: .8125rem; color: var(--gray-500, #6b7280); }
@@ -420,7 +421,7 @@
     .cg-spinner {
         width: .7rem; height: .7rem; border-radius: 50%;
         border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
-        border-top-color: var(--primary-600, #4f46e5);
+        border-top-color: var(--primary-600);
         animation: cg-spin .8s linear infinite;
     }
     @keyframes cg-spin { to { transform: rotate(360deg); } }
@@ -445,6 +446,17 @@
         color: var(--gray-100, #f3f4f6);
     }
     .cg-input:disabled { opacity: .5; }
+
+    {{-- 커스텀 색(#10). 스코프는 .cg-root — :root 에 쓰면 패널 전체가 다시 칠해진다
+         (의도의 정반대이고 활성 테마와 싸운다). 기본(패널 따름)은 이 블록 자체가 없다. --}}
+    @if ($palette = $this->sidebarPalette())
+    .cg-root {
+        @foreach ($palette as $shade => $value)
+        --primary-{{ $shade }}: {{ $value }};
+        @endforeach
+        --cg-on-primary: {{ $this->sidebarOnPrimary() }};
+    }
+    @endif
     </style>
 
     <aside class="cg-panel" x-show="open" x-cloak>
