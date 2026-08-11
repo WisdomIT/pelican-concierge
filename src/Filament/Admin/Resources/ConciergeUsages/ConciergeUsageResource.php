@@ -94,9 +94,10 @@ class ConciergeUsageResource extends Resource
             // 행 아무 데나 눌러도 대화가 열린다.
             ->recordAction('view')
             ->columns([
+                // 시각 표시는 패널 규약대로 보는 사용자의 프로필 timezone (저장은 UTC).
                 TextColumn::make('created_at')
                     ->label(trans('concierge::strings.field_started_at'))
-                    ->dateTime('Y-m-d H:i')
+                    ->dateTime('Y-m-d H:i', timezone: user()->timezone ?? 'UTC')
                     ->sortable(),
 
                 TextColumn::make('user.username')
@@ -172,7 +173,7 @@ class ConciergeUsageResource extends Resource
                     ->modalHeading(fn (ConciergeUsage $record) => sprintf(
                         '%s · %s%s',
                         $record->user?->username ?? '-',
-                        $record->created_at->format('Y-m-d H:i'),
+                        $record->created_at->timezone(user()->timezone ?? 'UTC')->format('Y-m-d H:i'),
                         // 목록 쿼리의 selectSub 값 — 모달에서도 지워진 대화임이 보여야 한다(#8).
                         ($record->conversation_deleted ?? 0)
                             ? ' · ' . trans('concierge::strings.conversation_deleted_badge')

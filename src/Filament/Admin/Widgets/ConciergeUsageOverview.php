@@ -15,8 +15,10 @@ class ConciergeUsageOverview extends StatsOverviewWidget
     {
         $settings = ConciergeSettings::current();
 
-        $today = ConciergeUsage::query()->where('created_at', '>=', Carbon::today());
-        $month = ConciergeUsage::query()->where('created_at', '>=', Carbon::now()->startOfMonth());
+        // 집계 경계는 서버 기준시(TZ) — 한도 판정과 같은 자정을 본다. 저장은 UTC 라 되돌린다.
+        $tz = UsageLimiter::timezone();
+        $today = ConciergeUsage::query()->where('created_at', '>=', Carbon::today($tz)->utc());
+        $month = ConciergeUsage::query()->where('created_at', '>=', Carbon::now($tz)->startOfMonth()->utc());
 
         $rules = UsageLimiter::rules($settings);
 

@@ -254,7 +254,8 @@
                 @endforeach
 
                 <div class="wac-meta">
-                    <span>{{ $message->created_at->format('H:i:s') }}</span>
+                    {{-- 시각 표시는 패널 규약대로 보는 사용자의 프로필 timezone (저장은 UTC). --}}
+                    <span>{{ $message->created_at->timezone(auth()->user()?->timezone ?? 'UTC')->format('H:i:s') }}</span>
                     <span class="wac-chip">in {{ number_format($message->input_tokens) }}</span>
                     <span class="wac-chip">out {{ number_format($message->output_tokens) }}</span>
 

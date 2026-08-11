@@ -108,24 +108,45 @@ final class UsageLimiter
         return self::aggregate($rule['metric'], $since, $userId);
     }
 
+    /**
+     * 기간 경계의 시간대 — **컨테이너의 TZ**(운영자가 compose 에 정한 서버 기준시).
+     *
+     * Pelican 은 앱 시간대를 UTC 로 고정하므로(저장은 UTC, 표시는 프로필 시간대)
+     * config('app.timezone')는 못 쓴다. TZ 를 기준으로 하면 "오늘"의 초기화가
+     * **모든 사용자에게 같은 자정**(예: Asia/Seoul 이면 KST 00:00)이 된다.
+     */
+    public static function timezone(): string
+    {
+        return getenv('TZ') ?: config('app.timezone', 'UTC');
+    }
+
+    /** 서버 기준시(TZ)의 시각 — 차단 문구·화면의 리셋 표시용. */
     public static function resetsAt(string $period): CarbonInterface
     {
+        $tz = self::timezone();
+
         return match ($period) {
-            'hour' => Carbon::now()->addHour()->startOfHour(),
-            'week' => Carbon::now()->addWeek()->startOfWeek(),
-            'month' => Carbon::now()->addMonthNoOverflow()->startOfMonth(),
-            default => Carbon::tomorrow(),
+            'hour' => Carbon::now($tz)->addHour()->startOfHour(),
+            'week' => Carbon::now($tz)->addWeek()->startOfWeek(),
+            'month' => Carbon::now($tz)->addMonthNoOverflow()->startOfMonth(),
+            default => Carbon::tomorrow($tz),
         };
     }
 
     private static function windowStart(string $period): CarbonInterface
     {
-        return match ($period) {
-            'hour' => Carbon::now()->startOfHour(),
-            'week' => Carbon::now()->startOfWeek(),
-            'month' => Carbon::now()->startOfMonth(),
-            default => Carbon::today(),
+        $tz = self::timezone();
+
+        $start = match ($period) {
+            'hour' => Carbon::now($tz)->startOfHour(),
+            'week' => Carbon::now($tz)->startOfWeek(),
+            'month' => Carbon::now($tz)->startOfMonth(),
+            default => Carbon::today($tz),
         };
+
+        // ⚠ created_at 은 UTC 로 저장돼 있고, 쿼리 빌더는 Carbon 의 시간대를 변환하지
+        //   않고 그대로 포맷한다 — UTC 로 바꿔서 넘겨야 경계가 어긋나지 않는다.
+        return $start->utc();
     }
 
     private static function aggregate(string $metric, CarbonInterface $since, ?int $userId): int
