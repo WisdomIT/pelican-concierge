@@ -16,8 +16,12 @@ use Filament\Panel;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Hidden;
+use Filament\Schemas\Components\Actions as FormActions;
+use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Enums\VerticalAlignment;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Llm\ProviderProbe;
@@ -82,6 +86,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'api_key' => '',
             'clear_api_key' => false,
             'provider' => $settings->provider ?? 'anthropic',
+            'key_verified' => '',
             'base_url' => $settings->base_url,
             'model' => $settings->model,
             'model_free' => $settings->model,
@@ -134,6 +139,15 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         );
     }
 
+    /**
+     * "연결 확인" 통과의 지문 (#3 후속). 무엇을 확인했는지(공급자·폼에 친 키·주소)를
+     * 담는다 — 확인만 눌러 놓고 값을 바꿔 저장하는 우회를 막는 근거다.
+     */
+    private static function verifyFingerprint(string $provider, string $typedKey, string $baseUrl): string
+    {
+        return sha1($provider . '|' . $typedKey . '|' . $baseUrl);
+    }
+
     /** 폼 표시용 — 마이그레이션 전(설치 직후) 구간에도 죽지 않는다. */
     private function hasApiKeyFor(string $provider): bool
     {
@@ -164,6 +178,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                             $set('model', (string) config("concierge.providers.{$state}.default_model", ''));
                             $set('model_free', '');
                             $set('effort', (string) (config("concierge.providers.{$state}.default_effort") ?? ''));
+                            // 다른 공급자에 대한 확인은 무효다.
+                            $set('key_verified', '');
                         })
                         ->required()
                         ->columnSpanFull(),
@@ -177,51 +193,68 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->url()
                         // 주소를 치고 벗어나면 아래 모델 드롭다운이 그 엔드포인트의 목록으로 채워진다.
                         ->live(onBlur: true)
+                        ->afterStateUpdated(fn (Set $set) => $set('key_verified', '')) // 다른 주소에 대한 확인은 무효
                         ->default(fn () => ConciergeSettings::current()->base_url)
                         ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
                         ->columnSpanFull(),
 
-                    TextInput::make('api_key')
-                        // 키 라벨은 선택된 공급자를 따른다 — 전부 "Anthropic API 키"면 오해를 부른다.
-                        ->label(function (Get $get) {
-                            $short = (string) config('concierge.providers.' . $get('provider') . '.short', '');
+                    // 키 입력 + 우측 "연결 확인" 버튼. 아이콘 suffix 는 아무도 용도를 모른다 —
+                    // 라벨 있는 버튼으로 뺀다. 확인이 통과하면 지문(key_verified)이 찍히고,
+                    // 새 키·키 없는 공급자 전환은 그 지문 없이는 저장되지 않는다(아래 saveSettings).
+                    Flex::make([
+                        TextInput::make('api_key')
+                            // 키 라벨은 선택된 공급자를 따른다 — 전부 "Anthropic API 키"면 오해를 부른다.
+                            ->label(function (Get $get) {
+                                $short = (string) config('concierge.providers.' . $get('provider') . '.short', '');
 
-                            return $short !== ''
-                                ? trans('concierge::strings.field_api_key_for', ['provider' => $short])
-                                : trans('concierge::strings.field_api_key_generic');
-                        })
-                        ->password()
-                        ->revealable()
-                        ->autocomplete(false)
-                        ->default('')
-                        // "저장돼 있음" 표시는 **선택된 공급자**의 키를 본다 — 활성 키 하나만
-                        // 보면 Claude 키가 있을 때 다른 공급자에도 저장됨이 떠서 오해를 부른다.
-                        ->placeholder(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider'))
-                            ? trans('concierge::strings.api_key_set')
-                            : trans('concierge::strings.api_key_unset'))
-                        ->helperText(trans('concierge::strings.help_api_key'))
-                        // 키(와 연결)를 저장 전에 확인한다 — GET /models 는 토큰을 안 쓰는
-                        // 가장 싼 인증 검사다. 폼에 친 키가 있으면 그걸, 없으면 저장된 키를 쓴다.
-                        ->suffixAction(
+                                return $short !== ''
+                                    ? trans('concierge::strings.field_api_key_for', ['provider' => $short])
+                                    : trans('concierge::strings.field_api_key_generic');
+                            })
+                            ->password()
+                            ->revealable()
+                            ->autocomplete(false)
+                            ->default('')
+                            // 키를 새로 치면 이전 확인은 무효다 — 지문을 지워 재확인을 강제한다.
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Set $set) => $set('key_verified', ''))
+                            // "저장돼 있음" 표시는 **선택된 공급자**의 키를 본다 — 활성 키 하나만
+                            // 보면 Claude 키가 있을 때 다른 공급자에도 저장됨이 떠서 오해를 부른다.
+                            ->placeholder(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider'))
+                                ? trans('concierge::strings.api_key_set')
+                                : trans('concierge::strings.api_key_unset'))
+                            ->helperText(trans('concierge::strings.help_api_key')),
+
+                        FormActions::make([
+                            // GET /models — 토큰을 안 쓰는 가장 싼 인증 검사. 폼에 친 키가
+                            // 있으면 그걸, 없으면 그 공급자의 저장된 키로 확인한다.
                             Action::make('verify_key')
                                 ->label(trans('concierge::strings.verify_key'))
-                                ->icon('tabler-plug-connected')
-                                ->action(function (Get $get, ?string $state): void {
+                                ->color('gray')
+                                ->action(function (Get $get, Set $set): void {
                                     $provider = (string) $get('provider');
-                                    $key = filled($state)
-                                        ? trim((string) $state)
+                                    $typed = trim((string) $get('api_key'));
+                                    $key = $typed !== ''
+                                        ? $typed
                                         : ConciergeSettings::current()->apiKeyValueFor($provider);
+                                    $baseUrl = (string) $get('base_url');
 
-                                    $error = ProviderProbe::verify($provider, $key, (string) $get('base_url'));
+                                    $error = ProviderProbe::verify($provider, $key, $baseUrl);
 
-                                    $notification = $error === null
-                                        ? Notification::make()->success()->title(trans('concierge::strings.verify_ok'))
-                                        : Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error);
-
-                                    $notification->send();
+                                    if ($error === null) {
+                                        $set('key_verified', self::verifyFingerprint($provider, $typed, $baseUrl));
+                                        Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
+                                    } else {
+                                        $set('key_verified', '');
+                                        Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
+                                    }
                                 }),
-                        )
-                        ->columnSpanFull(),
+                        ])->grow(false),
+                    ])->verticalAlignment(VerticalAlignment::End)->columnSpanFull(),
+
+                    // 확인 통과의 지문 — 무엇을(공급자·키·주소) 확인했는지까지 담아,
+                    // 확인 후 값을 바꾸는 우회를 막는다.
+                    Hidden::make('key_verified')->default(''),
 
                     // 전용 페이지 시절의 "키 삭제" 버튼을 대신한다 — 플러그인 설정 모달에는
                     // 임의 액션 버튼을 놓을 자리가 없어 체크박스로 받는다.
@@ -450,6 +483,25 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         // ── 공급자 전환 (#3) ──────────────────────────────────────
         $provider = (string) ($data['provider'] ?? $settings->provider ?? 'anthropic');
         unset($data['provider']);
+
+        // ── 연결 확인 게이트 (#3 후속) ────────────────────────────
+        // 새 키를 쳤거나, 키가 등록되지 않은 공급자로 바꾸는 저장은 "연결 확인"을
+        // 통과한 지문이 있어야 한다 — 틀린 키로 조용히 저장돼 채팅이 죽는 것을 막는다.
+        $fingerprint = (string) ($data['key_verified'] ?? '');
+        unset($data['key_verified']);
+
+        $providerChanged = $provider !== ($settings->provider ?? 'anthropic');
+        $needsVerify = $apiKey !== '' || ($providerChanged && !$settings->hasApiKeyFor($provider));
+
+        if ($needsVerify && $fingerprint !== self::verifyFingerprint($provider, $apiKey, (string) ($data['base_url'] ?? ''))) {
+            Notification::make()
+                ->danger()
+                ->title(trans('concierge::strings.verify_required'))
+                ->body(trans('concierge::strings.verify_required_body'))
+                ->send();
+
+            return;
+        }
 
         if ($provider !== ($settings->provider ?? 'anthropic')) {
             // 이전 공급자의 키·모델을 스냅샷에 넣고, 새 공급자의 스냅샷(또는 기본값)을
