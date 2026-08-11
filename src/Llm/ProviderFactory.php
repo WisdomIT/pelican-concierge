@@ -3,6 +3,7 @@
 namespace WisdomIT\Concierge\Llm;
 
 use WisdomIT\Concierge\Llm\Providers\AnthropicProvider;
+use WisdomIT\Concierge\Llm\Providers\GeminiProvider;
 use WisdomIT\Concierge\Llm\Providers\OpenAiCompatibleProvider;
 use WisdomIT\Concierge\Llm\Providers\OpenAiProvider;
 use WisdomIT\Concierge\Models\ConciergeSettings;
@@ -20,6 +21,7 @@ final class ProviderFactory
         return match ($settings->provider ?? 'anthropic') {
             'openai' => new OpenAiProvider($settings),
             'openai-compatible' => new OpenAiCompatibleProvider($settings),
+            'gemini' => new GeminiProvider($settings),
             // 모르는 값(다운그레이드 등)은 기본 공급자로 — 죽는 것보다 낫다.
             default => new AnthropicProvider($settings),
         };
@@ -37,6 +39,7 @@ final class ProviderFactory
         return match ($id) {
             'openai' => new Capabilities(true, true, true, false),
             'openai-compatible' => new Capabilities(true, false, false, true),
+            'gemini' => new Capabilities(true, false, false, false),
             default => new Capabilities(true, true, true, false),
         };
     }

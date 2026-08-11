@@ -37,9 +37,12 @@ final class ProviderProbe
 
             $code = $response->getStatusCode();
 
+            // Gemini 는 잘못된 키에 401 이 아니라 400(API_KEY_INVALID)을 준다.
+            $badKeyCodes = $provider === 'gemini' ? [400, 401, 403] : [401, 403];
+
             return match (true) {
                 $code === 200 => null,
-                in_array($code, [401, 403], true) => trans('concierge::strings.verify_bad_key'),
+                in_array($code, $badKeyCodes, true) => trans('concierge::strings.verify_bad_key'),
                 default => trans('concierge::strings.verify_http', ['code' => $code]),
             };
         } catch (ConnectException) {
@@ -96,6 +99,10 @@ final class ProviderProbe
             'openai-compatible' => [
                 rtrim((string) $baseUrl, '/') . '/models',
                 array_filter(['Authorization' => filled($apiKey) ? 'Bearer ' . $apiKey : null]),
+            ],
+            'gemini' => [
+                (filled($baseUrl) ? rtrim($baseUrl, '/') : 'https://generativelanguage.googleapis.com/v1beta') . '/models',
+                ['x-goog-api-key' => (string) $apiKey],
             ],
             default => [
                 'https://api.anthropic.com/v1/models',

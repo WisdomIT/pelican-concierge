@@ -60,6 +60,22 @@ return [
             ],
         ],
 
+        'gemini' => [
+            'label' => 'Google (Gemini)',
+            'short' => 'Gemini',
+            'badge' => 'Gemini',
+            'default_model' => 'gemini-3-pro-preview',
+            'default_effort' => null,
+            'models' => [
+                'gemini-3-pro-preview' => 'Gemini 3 Pro (권장)',
+                'gemini-2.5-pro' => 'Gemini 2.5 Pro',
+                'gemini-2.5-flash' => 'Gemini 2.5 Flash',
+            ],
+            // thinking 어휘가 모델 세대마다 달라(3: thinkingLevel, 2.5: thinkingBudget)
+            // 기본 동작(dynamic)에 맡긴다 — 어댑터 주석 참고.
+            'efforts' => [],
+        ],
+
         'openai-compatible' => [
             'label' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',
             'short' => '',
