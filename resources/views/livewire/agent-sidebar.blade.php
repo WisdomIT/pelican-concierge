@@ -91,9 +91,11 @@
         border-color: var(--gray-800, #1f2937);
     }
 
-    /* 폭 조절 손잡이(#9) — 패널 왼쪽 가장자리 전체. VS Code 채팅 독과 같은 조작감. */
+    /* 폭 조절 손잡이(#9) — 패널 왼쪽 가장자리 전체. VS Code 채팅 독과 같은 조작감.
+       경계선을 기준으로 절반은 본문 쪽, 절반은 패널 쪽에 걸친다(사용자 요청) —
+       선 위에서 잡는 느낌이 나고, 패널 안쪽 콘텐츠도 덜 가린다. */
     .cg-resize {
-        position: absolute; inset: 0 auto 0 0;
+        position: absolute; inset: 0 auto 0 -.25rem;
         width: .5rem;
         cursor: col-resize;
         /* 포인터 드래그가 스크롤 제스처로 새면 안 된다. */
