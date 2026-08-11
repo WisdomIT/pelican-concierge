@@ -84,8 +84,10 @@ player query it counts players; otherwise it watches network traffic.
 ## Requirements
 
 - Pelican Panel `v1.0.0-beta35` or newer
-- An **[Anthropic API key](https://console.anthropic.com/)** — this plugin calls the
-  Claude API, and that usage is billed to your key. See *Cost* below.
+- An **LLM provider**. [Anthropic (Claude)](https://console.anthropic.com/) is the
+  default and what this plugin is tuned for; **OpenAI** and **local OpenAI-compatible
+  endpoints** (Ollama, vLLM, llama.cpp) are also supported. API usage is billed to your
+  key. See *Cost* below.
 - A working queue worker (server creation and install checks run as background jobs)
 
 The `anthropic-ai/sdk` composer package is installed automatically by the panel.
@@ -117,8 +119,9 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 
 | Setting | Default | Notes |
 |---|---|---|
-| API key | — | Stored encrypted in the database |
-| Model | `claude-opus-5` | Sonnet and Haiku are also offered; cheaper, less capable at multi-step tool use |
+| LLM provider | Anthropic | OpenAI and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
+| API key | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
+| Model | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
 | Effort | `medium` | How hard the model thinks. Higher costs more |
 | Max tokens | `8192` | Per reply |
 | Daily message limit | `50` | Per user |

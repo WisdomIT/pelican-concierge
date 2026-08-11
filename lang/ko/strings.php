@@ -55,6 +55,8 @@ return [
     'card_outcome_expired' => '만료됨 — 실행되지 않음',
 
     // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'section_conversations' => '대화',
+    'section_conversations_help' => '사용자 쪽 대화 기능의 정책입니다.',
     'field_allow_conversation_delete' => '사용자가 자기 대화를 삭제할 수 있음',
     'help_allow_conversation_delete' => '삭제해도 목록에서만 사라집니다 — 관리자의 기록과 사용량 집계는 그대로 남습니다.',
     'delete_conversation' => '대화 삭제',
@@ -64,6 +66,25 @@ return [
 
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => '어시스턴트 사이드바 너비 조절 (화살표 키, Shift 는 큰 단위, Home 은 기본값)',
+
+    // LLM 공급자(#3).
+    'field_provider' => 'LLM 공급자',
+    'help_provider' => '채팅에 답하는 서비스입니다. 전환해도 각 공급자의 API 키·모델 선택은 남습니다 — 다시 돌아오면 복원됩니다.',
+    'field_base_url' => '엔드포인트 주소',
+    'help_base_url' => 'OpenAI 호환 엔드포인트를 /v1 까지 포함해 입력합니다 — Ollama 는 http://localhost:11434/v1. 로컬 서버는 보통 API 키가 필요 없습니다.',
+    'help_model_free' => '엔드포인트가 아는 모델 이름(예: Ollama 태그). 이 어시스턴트는 도구 위에 서 있으므로 도구 호출을 지원하는 모델이어야 합니다.',
+    'search_unsupported' => '이 공급자는 웹 검색이 없습니다. 최신 정보가 필요한 질문에는 어시스턴트가 그 사실을 말합니다.',
+    'verify_key' => '연결 확인',
+    'verify_required' => '연결 확인이 필요합니다',
+    'verify_required_body' => '새 키 또는 새 공급자는 "연결 확인"을 통과해야 저장됩니다. 버튼을 눌러 확인한 뒤 다시 저장하세요.',
+    'verify_ok' => '연결 정상 — 키가 유효합니다.',
+    'verify_failed' => '연결 확인 실패',
+    'verify_no_key' => '확인할 키가 없습니다 — 키를 입력하거나 저장한 뒤 다시 시도하세요.',
+    'verify_no_base_url' => '엔드포인트 주소를 먼저 입력하세요.',
+    'verify_bad_key' => '키가 거부되었습니다(401/403) — 값을 다시 확인하세요.',
+    'verify_http' => '엔드포인트가 HTTP :code 를 돌려줬습니다.',
+    'verify_unreachable' => '엔드포인트에 연결할 수 없습니다 — 주소와 서버 상태를 확인하세요.',
+    'help_model_local' => '엔드포인트의 /models 목록에서 골랐습니다. 도구 호출을 지원하는 모델이어야 합니다.',
 
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => '모양',
@@ -304,7 +325,8 @@ return [
     'section_limits' => '한도와 로그',
 
 
-    'field_api_key' => 'Anthropic API 키',
+    'field_api_key_for' => ':provider API 키',
+    'field_api_key_generic' => 'API 키 (선택)',
     'help_api_key' => '입력한 값은 암호화되어 저장되며 이 화면에 다시 표시되지 않습니다. 비워두고 저장하면 기존 키가 그대로 유지됩니다.',
     'api_key_set' => '설정됨 — 바꾸려면 새 값을 입력하세요',
     'api_key_unset' => '아직 설정되지 않음',

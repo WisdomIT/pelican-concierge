@@ -28,6 +28,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $idle_grace_minutes
  * @property bool $allow_conversation_delete
  * @property ?string $sidebar_color
+ * @property string $provider
+ * @property ?string $base_url
+ * @property ?array<string, array<string, mixed>> $provider_settings
  */
 class ConciergeSettings extends Model
 {
@@ -47,6 +50,9 @@ class ConciergeSettings extends Model
         'idle_grace_minutes',
         'allow_conversation_delete',
         'sidebar_color',
+        'provider',
+        'base_url',
+        'provider_settings',
     ];
 
     private static ?self $cached = null;
@@ -65,6 +71,8 @@ class ConciergeSettings extends Model
             'idle_stop_enabled' => 'boolean',
             'idle_grace_minutes' => 'integer',
             'allow_conversation_delete' => 'boolean',
+            // 공급자별 키 스냅샷이 들어간다 — 통째로 암호화한다(#3).
+            'provider_settings' => 'encrypted:array',
         ];
     }
 
@@ -102,6 +110,11 @@ class ConciergeSettings extends Model
 
     public function isConfigured(): bool
     {
+        // 로컬 OpenAI 호환 엔드포인트는 키가 없는 게 보통이다 — 주소와 모델이 있으면 된다(#3).
+        if (($this->provider ?? 'anthropic') === 'openai-compatible') {
+            return filled($this->base_url) && filled($this->model);
+        }
+
         return filled($this->apiKey());
     }
 
@@ -112,5 +125,74 @@ class ConciergeSettings extends Model
     public function isUsable(): bool
     {
         return $this->isConfigured();
+    }
+
+    /**
+     * 그 공급자의 키가 저장돼 있는가 (#3) — 활성 공급자는 활성 컬럼을, 나머지는
+     * 스냅샷을 본다. 설정 화면의 "키 저장됨" 표시가 이걸 쓴다: 활성 키 하나만 보면
+     * Claude 키가 있을 때 OpenAI·로컬에도 "저장됨"이 떠서 오해를 부른다.
+     */
+    public function hasApiKeyFor(string $provider): bool
+    {
+        if ($provider === ($this->provider ?? 'anthropic')) {
+            return filled($this->apiKey());
+        }
+
+        try {
+            return filled(($this->provider_settings ?? [])[$provider]['api_key'] ?? null);
+        } catch (DecryptException) {
+            // APP_KEY 가 바뀐 경우 — apiKey() 와 같은 태도로 "없음" 취급한다.
+            return false;
+        }
+    }
+
+    /** 그 공급자의 저장된 키 값 — 키 검증 버튼이 폼에 새 키가 없을 때 쓴다(#3). 서버 밖으로 내보내지 말 것. */
+    public function apiKeyValueFor(string $provider): ?string
+    {
+        if ($provider === ($this->provider ?? 'anthropic')) {
+            return $this->apiKey();
+        }
+
+        try {
+            return ($this->provider_settings ?? [])[$provider]['api_key'] ?? null;
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
+    /**
+     * 활성 값(키·주소·모델·effort)을 **현재 공급자**의 스냅샷으로 저장한다 (#3).
+     * 전환 직전마다 불린다 — 그래서 공급자를 오가도 각자의 키·모델 선택이 남는다.
+     */
+    public function stashProviderSnapshot(): void
+    {
+        $snapshots = $this->provider_settings ?? [];
+
+        $snapshots[$this->provider ?? 'anthropic'] = [
+            'api_key' => $this->apiKey(),
+            'base_url' => $this->base_url,
+            'model' => $this->model,
+            'effort' => $this->effort,
+        ];
+
+        $this->provider_settings = $snapshots;
+    }
+
+    /**
+     * 공급자를 바꾸고, 그 공급자의 스냅샷(없으면 config 기본값)을 활성 값으로 적재한다.
+     * 저장은 호출자 몫이다 — 폼의 다른 필드와 함께 한 번에 save 된다.
+     */
+    public function switchProvider(string $id): void
+    {
+        $this->stashProviderSnapshot();
+
+        $snapshot = ($this->provider_settings ?? [])[$id] ?? [];
+        $defaults = (array) config("concierge.providers.{$id}", []);
+
+        $this->provider = $id;
+        $this->api_key = $snapshot['api_key'] ?? null;
+        $this->base_url = $snapshot['base_url'] ?? null;
+        $this->model = (string) ($snapshot['model'] ?? $defaults['default_model'] ?? '');
+        $this->effort = (string) ($snapshot['effort'] ?? $defaults['default_effort'] ?? 'medium');
     }
 }

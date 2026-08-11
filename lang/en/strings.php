@@ -55,6 +55,8 @@ return [
     'card_outcome_expired' => 'Expired — nothing ran',
 
     // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'section_conversations' => 'Conversations',
+    'section_conversations_help' => 'Policies for the user-facing chat.',
     'field_allow_conversation_delete' => 'Let users delete their own conversations',
     'help_allow_conversation_delete' => 'Deletion is soft: the conversation disappears from the user\'s history, while administrators keep the full record and usage totals.',
     'delete_conversation' => 'Delete conversation',
@@ -64,6 +66,25 @@ return [
 
     // 폭 조절 손잡이(#9)의 접근성 이름.
     'resize_sidebar' => 'Resize the assistant sidebar (arrow keys; Shift for bigger steps; Home resets)',
+
+    // LLM 공급자(#3).
+    'field_provider' => 'LLM provider',
+    'help_provider' => 'Which service answers the chat. Switching keeps each provider\'s API key and model choice — switch back and they are restored.',
+    'field_base_url' => 'Endpoint URL',
+    'help_base_url' => 'The OpenAI-compatible endpoint, including /v1 — e.g. http://localhost:11434/v1 for Ollama. No API key is needed for most local servers.',
+    'help_model_free' => 'The model name as your endpoint knows it (e.g. an Ollama tag). Pick one that supports tool calling — the assistant is built on tools.',
+    'search_unsupported' => 'This provider has no web search. The assistant will say so when a question needs current information.',
+    'verify_key' => 'Verify connection',
+    'verify_required' => 'Verification required',
+    'verify_required_body' => 'A new key or a new provider must pass "Verify connection" before saving. Verify first, then save again.',
+    'verify_ok' => 'Connected — the key is valid.',
+    'verify_failed' => 'Verification failed',
+    'verify_no_key' => 'Nothing to verify — enter or save a key first.',
+    'verify_no_base_url' => 'Enter the endpoint URL first.',
+    'verify_bad_key' => 'The key was rejected (401/403) — double-check the value.',
+    'verify_http' => 'The endpoint returned HTTP :code.',
+    'verify_unreachable' => 'Could not reach the endpoint — check the URL and that the server is running.',
+    'help_model_local' => 'Picked from the endpoint\'s /models list. The model must support tool calling.',
 
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => 'Appearance',
@@ -303,7 +324,8 @@ return [
     'section_limits' => 'Limits and logging',
 
 
-    'field_api_key' => 'Anthropic API key',
+    'field_api_key_for' => ':provider API key',
+    'field_api_key_generic' => 'API key (optional)',
     'help_api_key' => 'Stored encrypted and never shown again. Leave blank when saving to keep the current key.',
     'api_key_set' => 'Set — enter a new value to replace it',
     'api_key_unset' => 'Not set yet',
