@@ -634,7 +634,7 @@ class AgentSidebar extends Component
      * ⚠ **소유자 확인이 여기 있다.** id 는 브라우저에서 오므로, 없는 것과 남의 것을
      *   구분하지 않고 똑같이 새 대화로 떨어뜨린다.
      */
-    public function openConversation(string $id, ?int $segment = null): void
+    public function openConversation(string $id): void
     {
         $conversation = ConciergeConversation::query()
             ->where('user_id', (int) auth()->id())
@@ -657,13 +657,6 @@ class AgentSidebar extends Component
 
         $this->restorePendingCard($conversation);
         $this->refreshConversations();
-
-        // 기록 패널의 구간 항목(#6) — 대화 전체를 복원한 채 그 경계로 **이동만** 한다.
-        // 화면을 구간만큼 잘라 열면 모델 맥락도 같이 잘린다(화면 == 맥락 원칙, 상단 주석) —
-        // 방금 만든 서버에 대한 후속 질문("됐어?")이 성립하려면 맥락은 이어져야 한다.
-        if ($segment !== null && $segment > 0) {
-            $this->dispatch('cg-scroll-segment', segment: $segment);
-        }
     }
 
     /**
@@ -806,87 +799,22 @@ class AgentSidebar extends Component
     }
 
     /**
-     * 기록 목록. 구간이 나뉜 대화(#6)는 구간마다 항목이 생긴다 — "이 서버를 만든 대화"로
-     * 곧장 갈 수 있어야 한다. 한 구간짜리 대화는 지금까지와 똑같이 한 항목이다.
+     * 기록 목록. 대화당 **한 항목**이다 — 구간(#6)은 대화 안의 경계(카드·구분선)로만
+     * 보이고 목록에는 나열하지 않는다(구간마다 항목을 만들었더니 목록이 조각으로
+     * 찼다 — 사용자 결정으로 되돌림). 구간 번호는 행에 남아 있어 언제든 다시 쓸 수 있다.
      */
     private function refreshConversations(): void
     {
-        $rows = ConciergeConversation::listFor((int) auth()->id())
+        $this->conversations = ConciergeConversation::listFor((int) auth()->id())
             ->limit(self::CONVERSATION_LIST_LIMIT)
-            ->get();
-
-        // 대화별 구간 목록과, 구간 제목이 될 첫 사용자 발화. 목록 전체에 쿼리 두 번이다.
-        $segments = ConciergeUsage::query()
-            ->whereIn('conversation_id', $rows->pluck('id'))
-            ->selectRaw('conversation_id, segment, MIN(id) as first_id')
-            ->groupBy('conversation_id', 'segment')
-            ->orderBy('segment')
             ->get()
-            ->groupBy('conversation_id');
-
-        // 구간의 첫 행이 알림(발화 없음)일 수 있어 제목은 **첫 사용자 발화**로 따로 찾는다.
-        $firstUser = ConciergeUsage::query()
-            ->whereIn('conversation_id', $rows->pluck('id'))
-            ->where('segment', '>', 0)
-            ->whereNotNull('user_message')
-            ->where('user_message', '!=', '')
-            ->selectRaw('conversation_id, segment, MIN(id) as first_id')
-            ->groupBy('conversation_id', 'segment')
-            ->get();
-
-        $titles = ConciergeUsage::query()
-            ->findMany($firstUser->pluck('first_id'))
-            ->keyBy(fn (ConciergeUsage $u) => $u->conversation_id . ':' . $u->segment);
-
-        $this->conversations = [];
-
-        foreach ($rows as $conversation) {
-            $parts = $segments->get($conversation->id);
-
-            if ($parts === null || $parts->count() < 2) {
-                $this->conversations[] = [
-                    'id' => $conversation->id,
-                    'title' => $conversation->displayTitle(),
-                    'when' => $conversation->lastMessageLabel(),
-                    'unread' => $conversation->notice_unread_at !== null,
-                ];
-
-                continue;
-            }
-
-            // ⚠ groupBy 는 원본 컬렉션의 키를 보존한다 — values() 없이는 $index 가 0 에서
-            //   시작하지 않아 모든 항목이 하위 구간으로 그려진다.
-            foreach ($parts->values() as $index => $part) {
-                $first = $titles->get($conversation->id . ':' . $part->segment);
-
-                $this->conversations[] = [
-                    'id' => $conversation->id,
-                    // 첫 구간은 대화 제목 그대로 — 앵커도 없다(경계는 구간 1부터 생긴다).
-                    'segment' => $index === 0 ? null : (int) $part->segment,
-                    'sub' => $index !== 0,
-                    'title' => $index === 0
-                        ? $conversation->displayTitle()
-                        : $this->segmentTitle($first?->user_message),
-                    'when' => $index === 0 ? $conversation->lastMessageLabel() : '',
-                    'unread' => $index === 0 && $conversation->notice_unread_at !== null,
-                ];
-            }
-        }
-    }
-
-    /**
-     * 구간 항목의 제목 = 그 구간의 첫 사용자 발화. 대화 제목과 같은 규칙으로 다듬는다
-     * (마크다운 표식 제거·첫 줄·60자). 발화 없이 알림만 있는 구간은 대체 문구를 쓴다.
-     */
-    private function segmentTitle(?string $firstMessage): string
-    {
-        if (blank($firstMessage)) {
-            return trans('concierge::strings.segment_continued');
-        }
-
-        $firstLine = trim((string) Str::of($firstMessage)->replace(['**', '`'], '')->explode("\n")->first());
-
-        return Str::limit($firstLine, 60);
+            ->map(fn (ConciergeConversation $c) => [
+                'id' => $c->id,
+                'title' => $c->displayTitle(),
+                'when' => $c->lastMessageLabel(),
+                'unread' => $c->notice_unread_at !== null,
+            ])
+            ->all();
     }
 
     public function render(): View

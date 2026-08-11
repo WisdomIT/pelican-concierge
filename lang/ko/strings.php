@@ -53,8 +53,6 @@ return [
     'card_outcome_approved' => '실행됨',
     'card_outcome_cancelled' => '취소됨',
     'card_outcome_expired' => '만료됨 — 실행되지 않음',
-    // 구간 항목(#6)의 대체 제목 — 발화 없이 알림만 있는 구간.
-    'segment_continued' => '이어진 대화',
     'card_title_install_mod' => '설치할까요?',
     'card_confirm_install_mod' => '설치하기',
     'card_mod' => '모드·플러그인',

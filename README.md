@@ -58,9 +58,8 @@ alone.
 
 A resolved card stays in the transcript as a card — the summary it showed (name, game,
 resources, the exact file change) is the record of what was decided, marked approved,
-cancelled or expired. An approved action also marks a boundary: the conversation history
-lists the exchanges before and after it separately, so you can jump straight to "the
-conversation that created this server".
+cancelled or expired. An approved action also draws a visible boundary in the
+conversation, separating the talk that led up to it from what happened after.
 
 ### Secrets are masked
 

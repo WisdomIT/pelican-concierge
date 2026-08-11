@@ -53,8 +53,6 @@ return [
     'card_outcome_approved' => 'Ran',
     'card_outcome_cancelled' => 'Cancelled',
     'card_outcome_expired' => 'Expired — nothing ran',
-    // 구간 항목(#6)의 대체 제목 — 발화 없이 알림만 있는 구간.
-    'segment_continued' => 'Continued',
     'card_title_install_mod' => 'Install this?',
     'card_confirm_install_mod' => 'Install',
     'card_mod' => 'Mod / plugin',

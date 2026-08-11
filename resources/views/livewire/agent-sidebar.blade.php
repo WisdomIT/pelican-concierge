@@ -44,9 +44,6 @@
     x-on:livewire:navigated.document="apply()"
     {{-- 트리거(#7)는 패널 크롬에 있어 이 컴포넌트 밖이다 — window 이벤트로 받는다. --}}
     x-on:concierge-toggle.window="open = ! open"
-    {{-- 기록 패널의 구간 항목(#6)이 보낸 이동 요청. 대화 복원(morph)이 끝난 뒤에 스크롤해야
-         하고, 바닥 고정 MutationObserver 보다도 늦게 돌아야 이긴다 — 그래서 지연을 둔다. --}}
-    x-on:cg-scroll-segment.window="setTimeout(() => document.getElementById('cg-seg-' + $event.detail.segment)?.scrollIntoView({ block: 'center' }), 150)"
     {{-- 에이전트가 먼저 말을 거는 통로. 설치는 몇 분 걸리므로 사용자가 물을 때까지 기다리면
          늦는다. 평소 30초면 충분하고, **진행 중인 서버가 있을 때만** 5초로 당긴다 —
          켜지는 걸 지켜보는 중에 30초는 멈춘 것처럼 보인다. --}}
@@ -360,9 +357,6 @@
     }
     .cg-history-empty { padding: .45rem .6rem; font-size: .8125rem; color: var(--gray-500, #6b7280); }
 
-    /* 구간 하위 항목(#6) — 들여쓰기로 어느 대화에 속하는지 보인다. */
-    .cg-history-item.is-sub { padding-left: 1.6rem; font-size: .78125rem; }
-
     /* ── 진행 중 카드 ── */
     .cg-watch {
         border: 1px solid var(--gray-200, #e5e7eb);
@@ -447,17 +441,12 @@
 
             <div class="cg-history" x-show="history" x-cloak>
                 @forelse ($this->conversations as $conversation)
-                    {{-- 구간이 나뉜 대화(#6)는 하위 항목이 딸린다 — 같은 대화를 열되 그 경계로 이동한다. --}}
                     <button
                         type="button"
-                        wire:key="conv-{{ $conversation['id'] }}-{{ $conversation['segment'] ?? 0 }}"
-                        wire:click="openConversation('{{ $conversation['id'] }}', {{ $conversation['segment'] ?? 'null' }})"
+                        wire:key="conv-{{ $conversation['id'] }}"
+                        wire:click="openConversation('{{ $conversation['id'] }}')"
                         x-on:click="history = false"
-                        @class([
-                            'cg-history-item',
-                            'is-sub' => $conversation['sub'] ?? false,
-                            'is-active' => $conversation['id'] === $this->conversationId && !($conversation['sub'] ?? false),
-                        ])
+                        @class(['cg-history-item', 'is-active' => $conversation['id'] === $this->conversationId])
                     ><span class="cg-history-name">{{ $conversation['title'] }}</span>@if ($conversation['unread'] ?? false)<span class="cg-history-dot"></span>@endif<span class="cg-history-when">{{ $conversation['when'] ?? '' }}</span></button>
                 @empty
                     <div class="cg-history-empty">{{ trans('concierge::strings.empty') }}</div>
@@ -504,9 +493,9 @@
                         @endif
                     </div>
 
-                    {{-- 승인된 액션이 구간 경계다(#6). 기록 패널의 구간 항목이 이 앵커로 온다. --}}
+                    {{-- 승인된 액션이 구간 경계다(#6) — 실행 전후의 대화가 눈으로 나뉜다. --}}
                     @if ($card['anchor'] ?? null)
-                        <div class="cg-boundary" id="cg-seg-{{ $card['anchor'] }}"></div>
+                        <div class="cg-boundary"></div>
                     @endif
                 @else
                     <div class="cg-bubble cg-agent cg-md">{!! $this->markdown($message['text']) !!}</div>
