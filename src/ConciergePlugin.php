@@ -16,6 +16,7 @@ use Filament\Panel;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Models\ConciergeSettings;
@@ -126,11 +127,25 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->provider ?? 'anthropic')
                         ->live()
+                        // 공급자를 바꾸면 모델·effort 도 그 공급자의 권장값으로 함께 바뀐다 —
+                        // 이전 공급자의 모델이 남아 있으면 저장 때까지 잘못된 조합으로 보인다.
+                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                            $set('model', (string) config("concierge.providers.{$state}.default_model", ''));
+                            $set('model_free', '');
+                            $set('effort', (string) (config("concierge.providers.{$state}.default_effort") ?? ''));
+                        })
                         ->required()
                         ->columnSpanFull(),
 
                     TextInput::make('api_key')
-                        ->label(trans('concierge::strings.field_api_key'))
+                        // 키 라벨은 선택된 공급자를 따른다 — 전부 "Anthropic API 키"면 오해를 부른다.
+                        ->label(function (Get $get) {
+                            $short = (string) config('concierge.providers.' . $get('provider') . '.short', '');
+
+                            return $short !== ''
+                                ? trans('concierge::strings.field_api_key_for', ['provider' => $short])
+                                : trans('concierge::strings.field_api_key_generic');
+                        })
                         ->password()
                         ->revealable()
                         ->autocomplete(false)
@@ -201,14 +216,18 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->minValue(0)
                         ->default(fn () => ConciergeSettings::current()->daily_message_limit)
                         ->required(),
+                ]),
 
+            // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
+            Section::make(trans('concierge::strings.section_conversations'))
+                ->description(trans('concierge::strings.section_conversations_help'))
+                ->schema([
                     // 기본 꺼짐(#8) — 삭제는 soft 라 관리자 기록은 남지만,
                     // 사용자에게 지우기를 줄지 자체가 운영자의 결정이다.
                     Toggle::make('allow_conversation_delete')
                         ->label(trans('concierge::strings.field_allow_conversation_delete'))
                         ->helperText(trans('concierge::strings.help_allow_conversation_delete'))
-                        ->default(fn () => ConciergeSettings::current()->allow_conversation_delete)
-                        ->columnSpanFull(),
+                        ->default(fn () => ConciergeSettings::current()->allow_conversation_delete),
                 ]),
 
             // 모양(#10) — 기본은 패널의 primary 를 그대로 따른다(오버라이드 없음).

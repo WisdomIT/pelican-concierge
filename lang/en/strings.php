@@ -55,6 +55,8 @@ return [
     'card_outcome_expired' => 'Expired — nothing ran',
 
     // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'section_conversations' => 'Conversations',
+    'section_conversations_help' => 'Policies for the user-facing chat.',
     'field_allow_conversation_delete' => 'Let users delete their own conversations',
     'help_allow_conversation_delete' => 'Deletion is soft: the conversation disappears from the user\'s history, while administrators keep the full record and usage totals.',
     'delete_conversation' => 'Delete conversation',
@@ -311,7 +313,8 @@ return [
     'section_limits' => 'Limits and logging',
 
 
-    'field_api_key' => 'Anthropic API key',
+    'field_api_key_for' => ':provider API key',
+    'field_api_key_generic' => 'API key (optional)',
     'help_api_key' => 'Stored encrypted and never shown again. Leave blank when saving to keep the current key.',
     'api_key_set' => 'Set — enter a new value to replace it',
     'api_key_unset' => 'Not set yet',

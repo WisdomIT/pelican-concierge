@@ -55,6 +55,8 @@ return [
     'card_outcome_expired' => '만료됨 — 실행되지 않음',
 
     // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'section_conversations' => '대화',
+    'section_conversations_help' => '사용자 쪽 대화 기능의 정책입니다.',
     'field_allow_conversation_delete' => '사용자가 자기 대화를 삭제할 수 있음',
     'help_allow_conversation_delete' => '삭제해도 목록에서만 사라집니다 — 관리자의 기록과 사용량 집계는 그대로 남습니다.',
     'delete_conversation' => '대화 삭제',
@@ -312,7 +314,8 @@ return [
     'section_limits' => '한도와 로그',
 
 
-    'field_api_key' => 'Anthropic API 키',
+    'field_api_key_for' => ':provider API 키',
+    'field_api_key_generic' => 'API 키 (선택)',
     'help_api_key' => '입력한 값은 암호화되어 저장되며 이 화면에 다시 표시되지 않습니다. 비워두고 저장하면 기존 키가 그대로 유지됩니다.',
     'api_key_set' => '설정됨 — 바꾸려면 새 값을 입력하세요',
     'api_key_unset' => '아직 설정되지 않음',

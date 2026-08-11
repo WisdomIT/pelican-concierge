@@ -21,12 +21,13 @@ return [
     'providers' => [
         'anthropic' => [
             'label' => 'Anthropic (Claude)',
+            'short' => 'Anthropic',
             'default_model' => 'claude-opus-5',
             'default_effort' => 'medium',
             'models' => [
-                'claude-opus-5' => 'Claude Opus 5 (권장 — 도구를 쓰는 에이전트)',
-                'claude-sonnet-5' => 'Claude Sonnet 5 (더 저렴)',
-                'claude-haiku-4-5' => 'Claude Haiku 4.5 (가장 저렴 · 단순 작업용)',
+                'claude-opus-5' => 'Claude Opus 5 (권장)',
+                'claude-sonnet-5' => 'Claude Sonnet 5',
+                'claude-haiku-4-5' => 'Claude Haiku 4.5',
             ],
             'efforts' => [
                 'low' => 'low — 가장 저렴 · 단순한 요청',
@@ -39,11 +40,12 @@ return [
 
         'openai' => [
             'label' => 'OpenAI (ChatGPT)',
+            'short' => 'OpenAI',
             'default_model' => 'gpt-5.1',
             'default_effort' => 'medium',
             'models' => [
-                'gpt-5.1' => 'GPT-5.1 (도구 사용에 권장)',
-                'gpt-5.1-mini' => 'GPT-5.1 mini (더 저렴)',
+                'gpt-5.1' => 'GPT-5.1 (권장)',
+                'gpt-5.1-mini' => 'GPT-5.1 mini',
                 'gpt-5' => 'GPT-5',
                 'gpt-5-mini' => 'GPT-5 mini',
             ],
@@ -58,6 +60,7 @@ return [
 
         'openai-compatible' => [
             'label' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',
+            'short' => '',
             'default_model' => '',
             'default_effort' => null,
             // 로컬 엔드포인트의 모델 이름은 설치마다 다르다 — 자유 입력.
