@@ -269,6 +269,13 @@ return [
     'refused' => 'I cannot answer that request. Please try asking a different way.',
     'empty_reply' => 'The reply came back empty. Please ask again.',
 
+    // Known kinds of provider failure — say the reason and the next step, not the raw error (#3).
+    'provider_quota' => 'The AI model\'s usage quota was exceeded. Try again shortly, and tell an administrator if it keeps happening — the API key may have no quota for the selected model (for example, Gemini\'s Pro preview models require a key with billing enabled).',
+    'provider_model_gone' => 'The configured AI model is not offered by the provider. Tell an administrator — the model needs to be re-selected in settings.',
+    'provider_auth' => 'The AI provider rejected the API key. Tell an administrator — the key needs to be checked in settings.',
+    'provider_down' => 'The AI provider is having an outage. Please try again shortly.',
+    'provider_unreachable' => 'Could not reach the AI provider. Try again shortly, and tell an administrator if it keeps happening — the endpoint URL may be wrong or the server may be down.',
+
     'section_search' => 'Web search',
     'section_search_help' => 'Lets the agent search the web while answering. Searches are billed separately from tokens, on top of them.',
     'field_clear_api_key' => 'Delete the stored API key',
