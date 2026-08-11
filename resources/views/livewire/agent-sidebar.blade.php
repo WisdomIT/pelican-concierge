@@ -217,7 +217,8 @@
         border: 1px solid var(--gray-300, #d1d5db);
         border-radius: .75rem;
         padding: .9rem 1rem;
-        background: var(--gray-50, #fff);
+        /* 패널과 같은 순백 — 구분은 테두리가 한다. */
+        background: #fff;
         font-size: .875rem;
     }
     :where(.dark) .cg-card { border-color: var(--gray-700, #374151); background: var(--gray-900, #111827); }
