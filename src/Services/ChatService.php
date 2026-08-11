@@ -2,29 +2,29 @@
 
 namespace WisdomIT\Concierge\Services;
 
-use Anthropic\Client;
-use Anthropic\Messages\InputJSONDelta;
-use Anthropic\Messages\RawContentBlockDeltaEvent;
-use Anthropic\Messages\RawContentBlockStartEvent;
-use Anthropic\Messages\RawMessageDeltaEvent;
-use Anthropic\Messages\RawMessageStartEvent;
-use Anthropic\Messages\TextDelta;
 use App\Models\Egg;
 use App\Models\User;
 use Closure;
 use Throwable;
+use WisdomIT\Concierge\Llm\LlmProvider;
+use WisdomIT\Concierge\Llm\ProviderFactory;
+use WisdomIT\Concierge\Llm\StopKind;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Tools\AgentToolbox;
 use WisdomIT\Concierge\Tools\ToolCallResult;
 use WisdomIT\Concierge\Tools\ToolException;
 
 /**
- * 모델 호출 + 도구 루프.
+ * 모델 호출 + 도구 루프 — **공급자 무관** 층 (#3).
  *
  * 흐름: 요청 → (도구 호출이 오면) 실행 → 결과를 붙여 다시 요청 → … → 최종 답변.
  * 텍스트는 매 회차 스트리밍되고, 회차 사이에 어떤 도구를 쓰는지 사용자에게 알린다.
+ *
+ * 와이어 층(요청 형식·SSE 파싱·웹 검색)은 LlmProvider 어댑터의 소관이다. 이 클래스는
+ * 중립 형식만 다룬다 — 대화 상태(`$state['messages']`)도 중립 형식으로 저장되므로,
+ * 확인 카드가 떠 있는 동안 공급자를 바꿔도 재개가 성립한다.
  */
-final class AnthropicChatService
+final class ChatService
 {
     /** 모델에 넘길 최근 대화 수. 길어질수록 비용이 선형으로 는다. */
     private const HISTORY_LIMIT = 20;
@@ -35,12 +35,21 @@ final class AnthropicChatService
      */
     private const MAX_TOOL_ROUNDS = 6;
 
+    /**
+     * 재개 상태의 형식 버전. 2 = 중립 대화 형식(#3).
+     * ⚠ 배포 순간 캐시에 살아 있던 구형(공급자 형식) 상태는 재개할 수 없다 —
+     *   버전이 다르면 도구 없이 말로 마무리하는 기존의 "깨진 상태" 경로로 보낸다.
+     */
+    private const STATE_VERSION = 2;
+
     public function __construct(
         private readonly ConciergeSettings $settings,
         private readonly User $user,
     ) {}
 
     private ?AgentToolbox $toolbox = null;
+
+    private ?LlmProvider $provider = null;
 
     /**
      * @param  array<int, array{role: string, text: string}>  $history  마지막 항목이 이번 사용자 발화
@@ -51,7 +60,8 @@ final class AnthropicChatService
     public function start(array $history, Closure $onText, Closure $onThinking, Closure $onTool): ChatResult
     {
         return $this->runLoop([
-            'messages' => $this->toApiMessages($history),
+            'v' => self::STATE_VERSION,
+            'messages' => $this->toNeutralMessages($history),
             'text' => '',
             'input_tokens' => 0,
             'output_tokens' => 0,
@@ -73,6 +83,26 @@ final class AnthropicChatService
     {
         $pending = $state['pending'] ?? null;
 
+        // 형식 버전이 다른 상태(중립화 이전 배포에서 만든 카드)는 안전하게 재개할 수 없다.
+        // ⚠ 대화도 공급자 형식이므로 그대로 쓰면 변환이 깨진다(content 없는 메시지 → 400,
+        //   실측) — 문자열 발화만 건져 중립으로 바꾸고, 도구 블록·결과는 버린다.
+        if (($state['v'] ?? 1) !== self::STATE_VERSION) {
+            $pending = null;
+            $state['results'] = [];
+            $state['messages'] = array_values(array_filter(array_map(
+                fn (array $m) => match (true) {
+                    isset($m['text']) => $m,
+                    is_string($m['content'] ?? null) => ['role' => $m['role'], 'text' => $m['content']],
+                    default => null,
+                },
+                $state['messages'] ?? [],
+            )));
+
+            if ($state['messages'] === []) {
+                $state['messages'][] = ['role' => 'user', 'text' => (string) ($state['user_message'] ?: '...')];
+            }
+        }
+
         if (!$pending) {
             // 상태가 깨졌다 — 도구 없이 한 번 더 불러 말로 마무리하게 한다.
             $state['queue'] = [];
@@ -92,10 +122,9 @@ final class AnthropicChatService
 
         $state['tool_calls'][] = $result->toArray();
         $state['results'][] = [
-            'type' => 'tool_result',
-            'toolUseID' => $pending['id'],
+            'id' => $pending['id'],
             'content' => $result->output,
-            'isError' => $result->isError,
+            'is_error' => $result->isError,
         ];
         $state['pending'] = null;
 
@@ -113,7 +142,6 @@ final class AnthropicChatService
         // 응답이 중간에 끊기고 사용자는 잘린 문장을 보게 된다.
         set_time_limit(600);
 
-        $client = new Client(apiKey: $this->settings->apiKey());
         $toolbox = new AgentToolbox($this->user);
 
         while (true) {
@@ -132,30 +160,34 @@ final class AnthropicChatService
             //    → assistant 의 tool_use 에 짝이 없어 API 가 400 을 낸다.
             //  tool_result 는 그 턴의 tool_use **전부**에 대해 한 번에 보내야 한다.
             if ($state['results'] !== []) {
-                $state['messages'][] = ['role' => 'user', 'content' => $state['results']];
+                $state['messages'][] = ['role' => 'user', 'tool_results' => $state['results']];
                 $state['results'] = [];
             }
 
             // 3) 상한을 넘기면 도구를 빼고 한 번만 더 불러 말로 끝내게 한다.
             $isFinalRound = $state['round'] >= self::MAX_TOOL_ROUNDS;
 
-            // ⚠ 마지막 라운드에는 도구를 빼는데, **모델은 그 이유를 모른다.** 그래서 "이어서
-            //   예약을 걸어드릴게요"라고 약속해 놓고 아무것도 못 한 채 턴이 끝났다(실측).
-            //   도구가 없다는 사실과 어떻게 마무리할지를 알려준다.
-            $turn = $this->runTurn($client, $state['messages'], $state['text'], $isFinalRound, $onText, $onThinking);
+            $turn = $this->provider()->runTurn(
+                $state['messages'],
+                $this->systemPrompt($isFinalRound),
+                $isFinalRound ? [] : $this->toolbox()->definitions(),
+                $state['text'],
+                $onText,
+                $onThinking,
+            );
 
-            $state['text'] = $turn['text'];
-            $state['input_tokens'] += $turn['input_tokens'];
-            $state['output_tokens'] += $turn['output_tokens'];
-            $state['search_count'] += $turn['search_count'];
-            $state['stop_reason'] = $turn['stop_reason'];
+            $state['text'] = $turn->text;
+            $state['input_tokens'] += $turn->inputTokens;
+            $state['output_tokens'] += $turn->outputTokens;
+            $state['search_count'] += $turn->searchCount;
+            $state['stop_reason'] = $turn->rawStopReason;
 
-            // ⚠ 웹 검색이 길어지면 API 가 턴을 **중간에 끊고** pause_turn 을 준다(#43).
+            // ⚠ 공급자가 턴을 **중간에 끊었다**(Anthropic 의 pause_turn — 웹 검색이 길 때, #43).
             //   여기서 끝내 버리면 사용자는 문장이 잘린 답을 본다 — 이어받아야 한다.
-            //   assistant 발화를 그대로 되돌려주고 도구 없이 한 바퀴 더 돈다.
-            if ($turn['stop_reason'] === 'pause_turn' && !$isFinalRound) {
-                if (trim($turn['turn_text']) !== '') {
-                    $state['messages'][] = ['role' => 'assistant', 'content' => $turn['turn_text']];
+            //   assistant 발화를 그대로 되돌려주고 한 바퀴 더 돈다.
+            if ($turn->stopKind === StopKind::Paused && !$isFinalRound) {
+                if (trim($turn->turnText) !== '') {
+                    $state['messages'][] = ['role' => 'assistant', 'text' => $turn->turnText];
                 }
 
                 $state['round']++;
@@ -163,13 +195,17 @@ final class AnthropicChatService
                 continue;
             }
 
-            if ($isFinalRound || $turn['stop_reason'] !== 'tool_use' || $turn['tool_uses'] === []) {
+            if ($isFinalRound || $turn->stopKind !== StopKind::ToolUse || $turn->toolUses === []) {
                 return $this->finalResult($state);
             }
 
             // 이번 턴의 assistant 발화를 그대로 되돌려줘야 tool_result 가 짝이 맞는다.
-            $state['messages'][] = ['role' => 'assistant', 'content' => $this->assistantContent($turn)];
-            $state['queue'] = $turn['tool_uses'];
+            $state['messages'][] = [
+                'role' => 'assistant',
+                'text' => $turn->turnText,
+                'tool_uses' => $turn->toolUses,
+            ];
+            $state['queue'] = $turn->toolUses;
             $state['round']++;
         }
     }
@@ -248,10 +284,9 @@ final class AnthropicChatService
     {
         $state['tool_calls'][] = $result->toArray();
         $state['results'][] = [
-            'type' => 'tool_result',
-            'toolUseID' => $use['id'],
+            'id' => $use['id'],
             'content' => $result->output,
-            'isError' => $result->isError,
+            'is_error' => $result->isError,
         ];
     }
 
@@ -290,225 +325,38 @@ final class AnthropicChatService
         );
     }
 
-    /**
-     * 한 번의 API 호출을 스트리밍으로 소비한다.
-     *
-     * @param  array<int, mixed>  $messages
-     * @return array{text: string, input_tokens: int, output_tokens: int, stop_reason: ?string, search_count: int, turn_text: string, tool_uses: array<int, array{id: string, name: string, input: array<string, mixed>}>}
-     */
-    private function runTurn(
-        Client $client,
-        array $messages,
-        string $accumulatedText,
-        bool $withoutTools,
-        Closure $onText,
-        Closure $onThinking,
-    ): array {
-        $system = $this->systemPrompt();
-
-        if ($withoutTools) {
-            $system .= "\n\n            ## Tool budget for this turn is used up\n"
-                . "            You have no tools this round. **Do not promise to do anything else** —\n"
-                . "            do not say \"I'll set that up next\" or \"let me just add that\".\n"
-                . "            Summarise what you actually did, say plainly what is still left, and ask the\n"
-                . "            user to say the word so you can carry on in the next message.\n";
-        }
-
-        $stream = $client->messages->createStream(
-            maxTokens: $this->settings->max_tokens,
-            messages: $messages,
-            model: $this->settings->model,
-            outputConfig: ['effort' => $this->settings->effort],
-            system: $system,
-            // Opus 5 는 thinking 이 기본으로 켜져 있다. display 는 기본값(omitted)을 쓰고,
-            // thinking 블록이 열리는 시점만 "생각 중" 표시에 쓴다.
-            thinking: ['type' => 'adaptive'],
-            tools: $withoutTools ? null : $this->toolDefinitions(),
-        );
-
-        $text = $accumulatedText;
-        $turnText = '';
-        $inputTokens = 0;
-        $outputTokens = 0;
-        $stopReason = null;
-        $thinkingAnnounced = false;
-        $searchCount = 0;
-
-        /** @var array<int, array{id: string, name: string, json: string}> $pendingTools */
-        $pendingTools = [];
-
-        foreach ($stream as $event) {
-            if ($event instanceof RawMessageStartEvent) {
-                $inputTokens = $event->message->usage->inputTokens;
-
-                continue;
-            }
-
-            if ($event instanceof RawContentBlockStartEvent) {
-                $block = $event->contentBlock;
-
-                // ⚠ **서버 측 도구는 우리가 실행하지 않는다.** 웹 검색을 켜면 응답에
-                //   server_tool_use / web_search_tool_result 블록이 섞여 온다. 이것을
-                //   tool_use 로 착각해 큐에 넣으면 "없는 도구"로 실패한다.
-                //   (thinking 블록에서 겪은 것과 같은 종류의 함정)
-                if (($block->type ?? null) === 'server_tool_use') {
-                    $searchCount++;
-
-                    continue;
-                }
-
-                if (($block->type ?? null) === 'web_search_tool_result') {
-                    continue;
-                }
-
-                if (($block->type ?? null) === 'tool_use') {
-                    // 입력 JSON 은 이어지는 델타로 조각조각 온다 → index 로 모은다.
-                    $pendingTools[$event->index] = ['id' => $block->id, 'name' => $block->name, 'json' => ''];
-
-                    continue;
-                }
-
-                if (!$thinkingAnnounced && ($block->type ?? null) === 'thinking') {
-                    $thinkingAnnounced = true;
-                    $onThinking();
-                }
-
-                continue;
-            }
-
-            if ($event instanceof RawContentBlockDeltaEvent) {
-                if ($event->delta instanceof TextDelta) {
-                    // 도구 왕복 사이의 발화가 이어 붙으므로 한 줄 띄워 구분한다.
-                    if ($turnText === '' && $text !== '') {
-                        $text .= "\n\n";
-                    }
-
-                    $turnText .= $event->delta->text;
-                    $text .= $event->delta->text;
-                    $onText($text);
-                } elseif ($event->delta instanceof InputJSONDelta && isset($pendingTools[$event->index])) {
-                    $pendingTools[$event->index]['json'] .= $event->delta->partialJSON;
-                }
-
-                continue;
-            }
-
-            if ($event instanceof RawMessageDeltaEvent) {
-                $stopReason = $event->delta->stopReason;
-                $outputTokens = $event->usage->outputTokens;
-            }
-        }
-
-        return [
-            'text' => $text,
-            'turn_text' => $turnText,
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'stop_reason' => $stopReason,
-            'search_count' => $searchCount,
-            'tool_uses' => $this->decodeToolUses($pendingTools),
-        ];
+    private function provider(): LlmProvider
+    {
+        return $this->provider ??= ProviderFactory::for($this->settings);
     }
 
-    /**
-     * 우리 도구 + **서버 측 도구**(웹 검색).
-     *
-     * ⚠ 웹 검색은 우리가 실행하지 않는다 — Anthropic 서버가 추론 도중 직접 돌리고 결과를
-     *   모델에게 먹인다. 그래서 `AgentToolbox` 에 넣지 않고 여기서만 붙인다.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     private function toolbox(): AgentToolbox
     {
         // 한 요청 안에서 도구 선별 판단을 재사용한다(#47).
         return $this->toolbox ??= new AgentToolbox($this->user);
     }
 
-    private function toolDefinitions(): array
-    {
-        $tools = $this->toolbox()->definitions();
-
-        if ($this->settings->search_enabled) {
-            $tools[] = [
-                'type' => 'web_search_20250305',
-                'name' => 'web_search',
-                // 검색은 토큰과 별도로 과금된다 — 한 턴에 무한정 돌지 않게 상한을 건다.
-                'max_uses' => max(1, $this->settings->search_max_uses),
-            ];
-        }
-
-        return $tools;
-    }
-
     /**
-     * @param  array<int, array{id: string, name: string, json: string}>  $pendingTools
-     * @return array<int, array{id: string, name: string, input: array<string, mixed>}>
-     */
-    private function decodeToolUses(array $pendingTools): array
-    {
-        $uses = [];
-
-        foreach ($pendingTools as $tool) {
-            // 인자 없는 도구는 델타가 아예 안 오거나 "{}" 로 온다.
-            $input = $tool['json'] === '' ? [] : json_decode($tool['json'], true);
-
-            $uses[] = [
-                'id' => $tool['id'],
-                'name' => $tool['name'],
-                'input' => is_array($input) ? $input : [],
-            ];
-        }
-
-        return $uses;
-    }
-
-    /**
-     * @param  array{turn_text: string, tool_uses: array<int, array{id: string, name: string, input: array<string, mixed>}>}  $turn
-     * @return array<int, array<string, mixed>>
-     */
-    private function assistantContent(array $turn): array
-    {
-        $content = [];
-
-        if (trim($turn['turn_text']) !== '') {
-            $content[] = ['type' => 'text', 'text' => $turn['turn_text']];
-        }
-
-        foreach ($turn['tool_uses'] as $use) {
-            $content[] = [
-                'type' => 'tool_use',
-                'id' => $use['id'],
-                'name' => $use['name'],
-                'input' => $use['input'] === [] ? (object) [] : $use['input'],
-            ];
-        }
-
-        return $content;
-    }
-
-    /**
+     * 저장된 턴을 중립 대화로 바꾼다.
+     *
      * @param  array<int, array{role: string, text: string}>  $history
      * @return array<int, array<string, mixed>>
      */
-    private function toApiMessages(array $history): array
+    private function toNeutralMessages(array $history): array
     {
         $recent = array_slice($history, -self::HISTORY_LIMIT);
 
         return array_values(array_map(
-            fn (array $m) => ['role' => $m['role'], 'content' => $m['text']],
+            fn (array $m) => ['role' => $m['role'], 'text' => $m['text']],
             array_filter(
                 $recent,
                 // 빈 말풍선(스트리밍 자리표시자)이 섞이면 API 가 400 을 낸다.
-                // 'event'(카드 실행/취소 안내)는 화면용 표시이지 대화가 아니다 — API 는 모른다.
+                // 'event'·'card' 는 화면용 표시이지 대화가 아니다 — API 는 모른다.
                 fn (array $m) => trim($m['text']) !== '' && in_array($m['role'], ['user', 'assistant'], true),
             ),
         ));
     }
 
-    /**
-     * 지금은 **읽기만** 할 수 있다. 프롬프트가 이 경계를 정확히 말하지 않으면
-     * 모델은 "껐다 켜드릴게요" 같은, 실제로는 못 하는 약속을 한다.
-     */
     /**
      * 배포 환경 지식(#17). **도구로 알 수 없는 사실**만 담는다 — 포트 포워딩 범위,
      * DNS 구성, 접속 주소 형식 같은 것들. "켜져 있는데 접속이 안 돼요"는 로그가 아니라
@@ -555,7 +403,33 @@ final class AnthropicChatService
         return $name !== '' ? $name : $code;
     }
 
-    private function systemPrompt(): string
+    /**
+     * 시스템 프롬프트는 **공급자 무관**이고 영어다(토큰 절약, #3 이슈에 명시).
+     *
+     * ⚠ 마지막 라운드에는 도구를 빼는데, **모델은 그 이유를 모른다.** 그래서 "이어서
+     *   예약을 걸어드릴게요"라고 약속해 놓고 아무것도 못 한 채 턴이 끝났다(실측).
+     *   도구가 없다는 사실과 어떻게 마무리할지를 알려준다.
+     */
+    private function systemPrompt(bool $withoutTools = false): string
+    {
+        $prompt = $this->basePrompt();
+
+        if ($withoutTools) {
+            $prompt .= "\n\n            ## Tool budget for this turn is used up\n"
+                . "            You have no tools this round. **Do not promise to do anything else** —\n"
+                . "            do not say \"I'll set that up next\" or \"let me just add that\".\n"
+                . "            Summarise what you actually did, say plainly what is still left, and ask the\n"
+                . "            user to say the word so you can carry on in the next message.\n";
+        }
+
+        return $prompt;
+    }
+
+    /**
+     * 지금은 **읽기만** 할 수 있다. 프롬프트가 이 경계를 정확히 말하지 않으면
+     * 모델은 "껐다 켜드릴게요" 같은, 실제로는 못 하는 약속을 한다.
+     */
+    private function basePrompt(): string
     {
         $games = Egg::query()->orderBy('name')->pluck('name')->implode(', ');
         $knowledge = $this->deploymentKnowledge();
@@ -583,6 +457,15 @@ final class AnthropicChatService
             {$register}{$context}
             ⚠ The tool list you were given **overrides** the "What you can do" sections below.
             If a tool is not in your list, you cannot use it — never promise a capability you lack.
+
+            ## 🔴 Announcing an action is not doing it — act in the same turn
+            Never end your turn with only a statement of intent. If your reply says you are about
+            to do something — "I'll turn it off", "let me check", "restarting it now" — the tool
+            call must happen **in this same turn**, before you finish. A turn that announces an
+            action without calling the tool looks like success to the user, but nothing happened.
+            Before ending your turn, check your last sentence: if it promises an action you have
+            not called a tool for, call that tool now. (Tools with a confirmation card count as
+            acting — calling them is what makes the card appear.)
 
             ## What you can do — check things yourself
             You can **read directly**: the server list, live status (power, CPU, memory, disk),
