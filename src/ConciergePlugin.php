@@ -252,8 +252,12 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                                         Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
                                     }
                                 }),
-                        ])->grow(false),
-                    ])->verticalAlignment(VerticalAlignment::End)->columnSpanFull(),
+                        ])
+                            ->grow(false)
+                            // 하단 정렬은 input 아래 helperText 높이까지 끌려 내려간다 —
+                            // 상단 정렬 + label 높이만큼의 빈 라벨로 input 본체와 나란히 맞춘다.
+                            ->label("\u{00A0}"),
+                    ])->verticalAlignment(VerticalAlignment::Start)->columnSpanFull(),
 
                     // 확인 통과의 지문 — 무엇을(공급자·키·주소) 확인했는지까지 담아,
                     // 확인 후 값을 바꾸는 우회를 막는다.
