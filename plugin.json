@@ -2,7 +2,7 @@
     "id": "concierge",
     "name": "Concierge",
     "author": "WisdomIT",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "Chat to create, run and diagnose game servers — an AI assistant for Pelican Panel.",
     "category": "plugin",
     "url": "https://github.com/WisdomIT/pelican-concierge",
