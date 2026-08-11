@@ -86,6 +86,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'idle_minutes' => $settings->idle_minutes,
             'idle_stop_enabled' => $settings->idle_stop_enabled,
             'idle_grace_minutes' => $settings->idle_grace_minutes,
+            'allow_conversation_delete' => $settings->allow_conversation_delete,
         ];
     }
 
@@ -162,6 +163,14 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->minValue(0)
                         ->default(fn () => ConciergeSettings::current()->daily_message_limit)
                         ->required(),
+
+                    // 기본 꺼짐(#8) — 삭제는 soft 라 관리자 기록은 남지만,
+                    // 사용자에게 지우기를 줄지 자체가 운영자의 결정이다.
+                    Toggle::make('allow_conversation_delete')
+                        ->label(trans('concierge::strings.field_allow_conversation_delete'))
+                        ->helperText(trans('concierge::strings.help_allow_conversation_delete'))
+                        ->default(fn () => ConciergeSettings::current()->allow_conversation_delete)
+                        ->columnSpanFull(),
                 ]),
 
             Section::make(trans('concierge::strings.section_search'))

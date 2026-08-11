@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $idle_minutes
  * @property bool $idle_stop_enabled
  * @property int $idle_grace_minutes
+ * @property bool $allow_conversation_delete
  */
 class ConciergeSettings extends Model
 {
@@ -43,6 +44,7 @@ class ConciergeSettings extends Model
         'idle_minutes',
         'idle_stop_enabled',
         'idle_grace_minutes',
+        'allow_conversation_delete',
     ];
 
     private static ?self $cached = null;
@@ -60,6 +62,7 @@ class ConciergeSettings extends Model
             'idle_minutes' => 'integer',
             'idle_stop_enabled' => 'boolean',
             'idle_grace_minutes' => 'integer',
+            'allow_conversation_delete' => 'boolean',
         ];
     }
 

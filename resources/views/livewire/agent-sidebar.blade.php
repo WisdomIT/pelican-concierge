@@ -357,6 +357,24 @@
     }
     .cg-history-empty { padding: .45rem .6rem; font-size: .8125rem; color: var(--gray-500, #6b7280); }
 
+    /* 삭제 버튼(#8) — 항상 보이되 흐리게. hover 로만 드러내면 터치 화면에서 누를 수 없다. */
+    .cg-history-row { display: flex; align-items: stretch; gap: .1rem; }
+    .cg-history-row > .cg-history-item { flex: 1 1 auto; min-width: 0; }
+    .cg-history-del {
+        flex: 0 0 auto;
+        display: inline-flex; align-items: center;
+        padding: 0 .4rem;
+        border-radius: .45rem;
+        color: var(--gray-400, #9ca3af);
+        opacity: .45;
+    }
+    .cg-history-del:hover {
+        opacity: 1;
+        color: var(--danger-500, #ef4444);
+        background: color-mix(in oklab, var(--danger-500, #ef4444) 10%, transparent);
+    }
+    .cg-history-del-icon { width: 1rem; height: 1rem; }
+
     /* ── 진행 중 카드 ── */
     .cg-watch {
         border: 1px solid var(--gray-200, #e5e7eb);
@@ -441,13 +459,24 @@
 
             <div class="cg-history" x-show="history" x-cloak>
                 @forelse ($this->conversations as $conversation)
+                    <div class="cg-history-row" wire:key="conv-{{ $conversation['id'] }}">
                     <button
                         type="button"
-                        wire:key="conv-{{ $conversation['id'] }}"
                         wire:click="openConversation('{{ $conversation['id'] }}')"
                         x-on:click="history = false"
                         @class(['cg-history-item', 'is-active' => $conversation['id'] === $this->conversationId])
                     ><span class="cg-history-name">{{ $conversation['title'] }}</span>@if ($conversation['unread'] ?? false)<span class="cg-history-dot"></span>@endif<span class="cg-history-when">{{ $conversation['when'] ?? '' }}</span></button>
+                    {{-- 삭제(#8) — soft. 설정이 켜졌을 때만 그리고, 서버 쪽에서 한 번 더 검사한다. --}}
+                    @if ($this->canDeleteConversations())
+                        <button
+                            type="button"
+                            class="cg-history-del"
+                            wire:click="deleteConversation('{{ $conversation['id'] }}')"
+                            wire:confirm="{{ trans('concierge::strings.confirm_delete_conversation') }}"
+                            title="{{ trans('concierge::strings.delete_conversation') }}"
+                        ><x-filament::icon icon="tabler-trash" class="cg-history-del-icon" /></button>
+                    @endif
+                    </div>
                 @empty
                     <div class="cg-history-empty">{{ trans('concierge::strings.empty') }}</div>
                 @endforelse
