@@ -21,6 +21,9 @@ use Closure;
  *   ['role' => 'user', 'tool_results' => [
  *       ['id' => string, 'content' => string, 'is_error' => bool], …]]   — 도구 결과 회신
  *
+ * tool_uses 항목에는 어댑터가 자기만 아는 여분 키를 얹어도 된다(예: Gemini 의
+ * 'thought_signature') — 다른 어댑터는 모르는 키를 무시한다.
+ *
  * ## 중립 도구 정의
  *
  * `['name' => …, 'description' => …, 'input_schema' => JSON Schema]`.

@@ -18,6 +18,7 @@ use WisdomIT\Concierge\Models\ConciergeIdleWatch;
 use WisdomIT\Concierge\Models\ConciergeInstallCheck;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Models\ConciergeToolCall;
+use WisdomIT\Concierge\Llm\ProviderError;
 use WisdomIT\Concierge\Models\ConciergeUsage;
 use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
@@ -1251,13 +1252,14 @@ class AgentSidebar extends Component
         try {
             $result = $call(new ChatService($settings, $user));
         } catch (Throwable $exception) {
-            // 원문은 로그(관리자만 봄)에만 남긴다. 친구들에게 API 오류 문자열을 보여줄 이유가 없다.
+            // 원문은 로그(관리자만 봄)에만 남긴다. 친구들에게 API 오류 문자열을 보여줄
+            // 이유가 없다 — 대신 아는 유형(쿼터·모델 없음·키 거부…)이면 이유를 말해준다.
             report($exception);
 
             $this->finish(
                 $settings, $userId, $userMessage, $previousState,
                 ConciergeUsage::STATUS_ERROR,
-                trans('concierge::strings.error'),
+                ProviderError::userMessage($exception) ?? trans('concierge::strings.error'),
                 0, 0, [],
                 $exception->getMessage(),
             );

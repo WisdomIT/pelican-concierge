@@ -85,9 +85,9 @@ player query it counts players; otherwise it watches network traffic.
 
 - Pelican Panel `v1.0.0-beta35` or newer
 - An **LLM provider**. [Anthropic (Claude)](https://console.anthropic.com/) is the
-  default and what this plugin is tuned for; **OpenAI** and **local OpenAI-compatible
-  endpoints** (Ollama, vLLM, llama.cpp) are also supported. API usage is billed to your
-  key. See *Cost* below.
+  default and what this plugin is tuned for; **OpenAI**, **Google (Gemini)** and
+  **local OpenAI-compatible endpoints** (Ollama, vLLM, llama.cpp) are also supported.
+  API usage is billed to your key. See *Cost* below.
 - A working queue worker (server creation and install checks run as background jobs)
 
 The `anthropic-ai/sdk` composer package is installed automatically by the panel.
@@ -119,7 +119,7 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 
 | Setting | Default | Notes |
 |---|---|---|
-| LLM provider | Anthropic | OpenAI and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
+| LLM provider | Anthropic | OpenAI, Google (Gemini) and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
 | API key | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
 | Model | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
 | Effort | `medium` | How hard the model thinks. Higher costs more |
