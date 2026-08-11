@@ -168,6 +168,19 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->required()
                         ->columnSpanFull(),
 
+                    // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
+                    // 키보다 먼저 — 연결 대상(주소)을 정한 뒤 자격(키)을 묻는 순서가 자연스럽다.
+                    TextInput::make('base_url')
+                        ->label(trans('concierge::strings.field_base_url'))
+                        ->helperText(trans('concierge::strings.help_base_url'))
+                        ->placeholder('http://localhost:11434/v1')
+                        ->url()
+                        // 주소를 치고 벗어나면 아래 모델 드롭다운이 그 엔드포인트의 목록으로 채워진다.
+                        ->live(onBlur: true)
+                        ->default(fn () => ConciergeSettings::current()->base_url)
+                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
+                        ->columnSpanFull(),
+
                     TextInput::make('api_key')
                         // 키 라벨은 선택된 공급자를 따른다 — 전부 "Anthropic API 키"면 오해를 부른다.
                         ->label(function (Get $get) {
@@ -216,18 +229,6 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->label(trans('concierge::strings.field_clear_api_key'))
                         ->default(false)
                         ->visible(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider')))
-                        ->columnSpanFull(),
-
-                    // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
-                    TextInput::make('base_url')
-                        ->label(trans('concierge::strings.field_base_url'))
-                        ->helperText(trans('concierge::strings.help_base_url'))
-                        ->placeholder('http://localhost:11434/v1')
-                        ->url()
-                        // 주소를 치고 벗어나면 아래 모델 드롭다운이 그 엔드포인트의 목록으로 채워진다.
-                        ->live(onBlur: true)
-                        ->default(fn () => ConciergeSettings::current()->base_url)
-                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
                         ->columnSpanFull(),
 
                     // 선택지가 정의된 공급자는 드롭다운으로 —
