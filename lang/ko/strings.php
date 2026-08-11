@@ -61,6 +61,9 @@ return [
     'confirm_delete_conversation' => '이 대화를 삭제할까요?',
     'field_deleted' => '삭제',
     'conversation_deleted_badge' => '사용자가 삭제함',
+
+    // 폭 조절 손잡이(#9)의 접근성 이름.
+    'resize_sidebar' => '어시스턴트 사이드바 너비 조절 (화살표 키, Shift 는 큰 단위, Home 은 기본값)',
     'card_title_install_mod' => '설치할까요?',
     'card_confirm_install_mod' => '설치하기',
     'card_mod' => '모드·플러그인',

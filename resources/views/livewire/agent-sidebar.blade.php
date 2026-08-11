@@ -71,6 +71,11 @@
     /* 좁은 화면에서는 밀 자리가 없다 → 덮는다. */
     @media (max-width: 1023px) { html.cg-open body { padding-right: 0; } }
 
+    /* 드래그로 폭 조절 중(#9) — 여닫이용 padding transition 이 켜져 있으면 페이지가
+       손잡이보다 늦게 따라와 출렁인다. 조절하는 동안만 끈다. 텍스트 선택도 막는다. */
+    html.cg-resizing body { transition: none; }
+    html.cg-resizing { user-select: none; }
+
 
     .cg-panel {
         position: fixed; inset: 0 0 0 auto; z-index: 30;
@@ -85,6 +90,23 @@
         background: var(--gray-950, #030712);
         border-color: var(--gray-800, #1f2937);
     }
+
+    /* 폭 조절 손잡이(#9) — 패널 왼쪽 가장자리 전체. VS Code 채팅 독과 같은 조작감. */
+    .cg-resize {
+        position: absolute; inset: 0 auto 0 0;
+        width: .5rem;
+        cursor: col-resize;
+        /* 포인터 드래그가 스크롤 제스처로 새면 안 된다. */
+        touch-action: none;
+    }
+    .cg-resize:hover,
+    .cg-resize:focus-visible,
+    .cg-resize.is-dragging {
+        background: color-mix(in oklab, var(--primary-600, #4f46e5) 35%, transparent);
+    }
+    .cg-resize:focus-visible { outline: none; }
+    /* 1024px 아래는 오버레이 모드(위 media) — 밀어낼 본문이 없으니 조절 자체를 없앤다. */
+    @media (max-width: 1023px) { .cg-resize { display: none; } }
 
     /* 대화 로그만 늘어나고 머리말·입력은 제자리에 있어야 한다. */
     .cg-chat { display: flex; flex-direction: column; gap: 1rem; min-height: 0; flex: 1 1 auto; }
@@ -422,6 +444,17 @@
     </style>
 
     <aside class="cg-panel" x-show="open" x-cloak>
+        {{-- 폭 조절(#9). 드래그 + 키보드(화살표 = 1rem, Shift+화살표 = 4rem, Home = 기본).
+             separator 역할과 이름을 줘서 마우스 없이도 닿는다. --}}
+        <div
+            class="cg-resize"
+            x-data
+            x-init="window.cgResize($el)"
+            role="separator"
+            aria-orientation="vertical"
+            tabindex="0"
+            aria-label="{{ trans('concierge::strings.resize_sidebar') }}"
+        ></div>
         <div class="cg-chat">
             {{-- 기록 오버레이의 기준점. 바깥을 누르면 닫힌다. --}}
             <div class="cg-head-wrap" x-on:click.outside="history = false">
@@ -748,6 +781,85 @@
                     timer = setInterval(tick, 33);
                 }
             }).observe(src, { childList: true, characterData: true, subtree: true });
+        };
+
+        // 사이드바 폭 조절(#9). 폭은 :root 의 --cg-w 하나다 — 패널과 본문 밀어내기가
+        // 같은 변수를 읽으므로 여기만 쓰면 페이지가 알아서 따라온다.
+        //  ⚠ documentElement 에 써야 한다(.cg-root 는 body 의 조상이 아니다 — 상단 주석).
+        //  저장은 localStorage — 열림 상태(cg-open)와 같은 곳이다. 폭은 "이 화면에서 얼마가
+        //  편한가"라 모니터(브라우저)마다 다른 것이 맞고, 계정 동기화가 오히려 어색하다.
+        window.cgResize ??= function (handle) {
+            const MIN = 384;                                                 // 24rem — 기존 기본값
+            const KEY = 'cg-w';
+            const max = () => Math.min(Math.round(window.innerWidth * 0.6), 800);
+            const clamp = (px) => Math.min(max(), Math.max(MIN, Math.round(px)));
+            const width = () => Math.round(handle.parentElement.getBoundingClientRect().width);
+
+            const apply = (px) => {
+                document.documentElement.style.setProperty('--cg-w', px + 'px');
+                handle.setAttribute('aria-valuenow', px);
+                handle.setAttribute('aria-valuemin', MIN);
+                handle.setAttribute('aria-valuemax', max());
+            };
+
+            const set = (px) => {
+                px = clamp(px);
+                apply(px);
+                localStorage.setItem(KEY, px);
+            };
+
+            // 저장된 폭 복원 — @persist 는 이동만 버티고 전체 리로드는 여기로 돌아온다.
+            // 저장값이 없어도 apply 한다: 기본값과 같은 384px 라 화면은 그대로고,
+            // aria-value* 가 처음부터 채워진다.
+            const restore = () => {
+                const saved = parseInt(localStorage.getItem(KEY), 10);
+
+                apply(Number.isNaN(saved) ? MIN : clamp(saved));
+            };
+
+            restore();
+
+            // ⚠ wire:navigate 는 <html> 속성을 통째로 갈아치운다 — cg-open 클래스와 같은
+            //   함정. documentElement 의 인라인 --cg-w 도 날아가므로 이동마다 다시 쓴다.
+            document.addEventListener('livewire:navigated', restore);
+
+            let dragging = false;
+
+            handle.addEventListener('pointerdown', (event) => {
+                if (window.innerWidth < 1024) return; // 오버레이 모드 — 조절 없음
+
+                dragging = true;
+                handle.setPointerCapture(event.pointerId);
+                handle.classList.add('is-dragging');
+                document.documentElement.classList.add('cg-resizing');
+                event.preventDefault();
+            });
+
+            handle.addEventListener('pointermove', (event) => {
+                if (dragging) set(window.innerWidth - event.clientX);
+            });
+
+            const end = () => {
+                if (!dragging) return;
+
+                dragging = false;
+                handle.classList.remove('is-dragging');
+                document.documentElement.classList.remove('cg-resizing');
+            };
+
+            handle.addEventListener('pointerup', end);
+            handle.addEventListener('pointercancel', end);
+
+            // 키보드 경로 — 드래그 전용이면 마우스 없는 사용자는 못 닿는다.
+            handle.addEventListener('keydown', (event) => {
+                if (window.innerWidth < 1024) return;
+
+                const step = event.shiftKey ? 64 : 16; // 1rem, Shift 는 4rem
+
+                if (event.key === 'ArrowLeft') { set(width() + step); event.preventDefault(); }
+                else if (event.key === 'ArrowRight') { set(width() - step); event.preventDefault(); }
+                else if (event.key === 'Home') { set(MIN); event.preventDefault(); }
+            });
         };
     </script>
 </div>

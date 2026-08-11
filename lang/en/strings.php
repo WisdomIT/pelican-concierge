@@ -61,6 +61,9 @@ return [
     'confirm_delete_conversation' => 'Delete this conversation?',
     'field_deleted' => 'Deleted',
     'conversation_deleted_badge' => 'Deleted by user',
+
+    // 폭 조절 손잡이(#9)의 접근성 이름.
+    'resize_sidebar' => 'Resize the assistant sidebar (arrow keys; Shift for bigger steps; Home resets)',
     'card_title_install_mod' => 'Install this?',
     'card_confirm_install_mod' => 'Install',
     'card_mod' => 'Mod / plugin',
