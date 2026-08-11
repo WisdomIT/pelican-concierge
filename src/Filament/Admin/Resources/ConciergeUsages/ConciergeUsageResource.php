@@ -69,7 +69,8 @@ class ConciergeUsageResource extends Resource
             ->selectSub($sub('count(*)'), 'messages_count')
             ->selectSub($sub('coalesce(sum(input_tokens), 0)'), 'total_input_tokens')
             ->selectSub($sub('coalesce(sum(output_tokens), 0)'), 'total_output_tokens')
-            ->selectSub($sub("count(case when status <> 'ok' then 1 end)"), 'problem_count')
+            // 카드 결정 행(#6)은 문제가 아니다 — 버튼을 누른 기록일 뿐이다.
+            ->selectSub($sub("count(case when status not in ('ok', 'card_resolved') then 1 end)"), 'problem_count')
             ->selectSub(fn ($query) => $query
                 ->from('concierge_tool_calls as tc')
                 ->whereColumn('tc.conversation_id', 'concierge_usages.conversation_id')
@@ -149,7 +150,7 @@ class ConciergeUsageResource extends Resource
                     ->query(fn (Builder $query) => $query->whereExists(fn ($sub) => $sub
                         ->from('concierge_usages as p')
                         ->whereColumn('p.conversation_id', 'concierge_usages.conversation_id')
-                        ->where('p.status', '<>', ConciergeUsage::STATUS_OK))),
+                        ->whereNotIn('p.status', [ConciergeUsage::STATUS_OK, ConciergeUsage::STATUS_CARD]))),
             ])
             ->recordActions([
                 ViewAction::make()

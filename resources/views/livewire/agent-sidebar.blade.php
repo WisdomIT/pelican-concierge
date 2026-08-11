@@ -247,6 +247,31 @@
         color: var(--gray-500, #6b7280);
     }
 
+    /* ── 확정된 카드(#6) ──
+       버튼 없이 결과 배지를 단 채 대화에 남는다 — 카드가 보여준 요약이 곧
+       "무엇이 실행됐는가"의 기록이다. 살짝 가라앉혀 진행 중 카드와 구분한다. */
+    .cg-card.is-resolved { opacity: .8; }
+    .cg-card-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+    .cg-card-head .cg-card-title { margin-bottom: 0; flex: 1 1 auto; }
+    .cg-card-outcome {
+        flex: 0 0 auto;
+        font-size: .6875rem; font-weight: 600;
+        padding: .1rem .5rem; border-radius: 999px;
+        color: var(--gray-500, #6b7280);
+        background: color-mix(in oklab, currentColor 12%, transparent);
+    }
+    .cg-card-outcome.is-approved {
+        color: var(--success-600, #16a34a);
+        background: color-mix(in oklab, var(--success-600, #16a34a) 12%, transparent);
+    }
+
+    /* 실행된 액션 뒤의 구간 경계(#6) — 기록 패널의 구간 항목이 여기로 이동한다. */
+    .cg-boundary {
+        align-self: stretch;
+        border-top: 1px dashed color-mix(in oklab, currentColor 30%, transparent);
+        margin: .4rem 0;
+    }
+
     /* ── 대화 목록 ──
        ⚠ 기록 패널은 **흐름 안에 두지 않는다.** flex 컬럼의 자식으로 두면 채팅이 길 때
        flex 축소가 max-height 보다 먼저 걸려 찌그러지고, 축소된 높이에서는 overflow 도
@@ -440,6 +465,38 @@
                     <div class="cg-bubble cg-user">{{ $message['text'] }}</div>
                 @elseif ($message['role'] === 'event')
                     <div class="cg-event">{{ $message['text'] }}</div>
+                @elseif ($message['role'] === 'card')
+                    {{-- 확정된 카드(#6). 버튼 없이 결과 배지만 — 무엇이 결정됐는지가 기록으로 남는다. --}}
+                    @php($card = $message['card'] ?? [])
+                    <div class="cg-card is-resolved">
+                        <div class="cg-card-head">
+                            <span class="cg-card-title">{{ $card['title'] ?? '' }}</span>
+                            <span class="cg-card-outcome is-{{ $card['outcome'] ?? 'cancelled' }}">
+                                {{ trans('concierge::strings.card_outcome_' . ($card['outcome'] ?? 'cancelled')) }}
+                            </span>
+                        </div>
+
+                        @if ($card['lines'] ?? [])
+                            <dl>
+                                @foreach ($card['lines'] as $line)
+                                    <dt>{{ $line['label'] ?? '' }}</dt>
+                                    <dd>{{ $line['value'] ?? '' }}</dd>
+                                @endforeach
+                            </dl>
+                        @endif
+
+                        @if ($card['diff'] ?? null)
+                            <div class="cg-diff">
+                                <div class="cg-diff-del">- {{ $card['diff']['before'] }}</div>
+                                <div class="cg-diff-add">+ {{ $card['diff']['after'] }}</div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- 승인된 액션이 구간 경계다(#6) — 실행 전후의 대화가 눈으로 나뉜다. --}}
+                    @if ($card['anchor'] ?? null)
+                        <div class="cg-boundary"></div>
+                    @endif
                 @else
                     <div class="cg-bubble cg-agent cg-md">{!! $this->markdown($message['text']) !!}</div>
 

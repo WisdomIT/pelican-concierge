@@ -691,6 +691,14 @@ class AgentSidebar extends Component
                     'links' => ServerLinks::forToolCalls($usage->toolCalls),
                 ];
             }
+
+            // 이 턴에서 결정된 카드(#6) — 턴의 끝, 구간 경계 자리에 선다.
+            //  ⚠ 실황과 순서가 조금 다르다: 실황은 [사전 설명][카드][실행 결과]지만 저장된
+            //    본문은 하나로 합쳐져 있어 [본문 전체][카드]로 그린다. 카드가 경계 표시를
+            //    겸하므로 턴 끝이 맞는 자리다.
+            foreach ($usage->resolved_cards ?? [] as $card) {
+                $messages[] = ['role' => 'card', 'text' => '', 'card' => $card];
+            }
         }
 
         return $this->mergeConsecutive($messages);
@@ -713,9 +721,9 @@ class AgentSidebar extends Component
         foreach ($messages as $message) {
             $previous = array_key_last($merged);
 
-            // 'event' 는 API 로 나가지 않는 화면 표시라 합치기 대상이 아니다.
+            // 'event'·'card' 는 API 로 나가지 않는 화면 표시라 합치기 대상이 아니다.
             if ($previous !== null
-                && $message['role'] !== 'event'
+                && !in_array($message['role'], ['event', 'card'], true)
                 && $merged[$previous]['role'] === $message['role']
             ) {
                 $merged[$previous]['text'] .= "\n\n" . $message['text'];
@@ -758,8 +766,18 @@ class AgentSidebar extends Component
         }
 
         if (!Cache::store(self::PENDING_STORE)->has('concierge:pending:' . $conversation->pending_token)) {
+            $card = $conversation->pending_card ?? [];
             $conversation->clearPending();
-            $this->messages[] = ['role' => 'event', 'text' => trans('concierge::strings.card_expired')];
+
+            // 방치돼 만료된 카드도 만료 상태로 남긴다(#6) — 실행되지 않았다는 사실의 기록이다.
+            $this->keepResolvedCard(
+                $this->resolvedCardData($card, 'expired'),
+                ConciergeUsage::query()
+                    ->where('conversation_id', $conversation->id)
+                    ->where('status', ConciergeUsage::STATUS_AWAITING)
+                    ->latest('id')
+                    ->first(),
+            );
 
             return;
         }
@@ -780,6 +798,11 @@ class AgentSidebar extends Component
         return trans('concierge::strings.new_conversation');
     }
 
+    /**
+     * 기록 목록. 대화당 **한 항목**이다 — 구간(#6)은 대화 안의 경계(카드·구분선)로만
+     * 보이고 목록에는 나열하지 않는다(구간마다 항목을 만들었더니 목록이 조각으로
+     * 찼다 — 사용자 결정으로 되돌림). 구간 번호는 행에 남아 있어 언제든 다시 쓸 수 있다.
+     */
     private function refreshConversations(): void
     {
         $this->conversations = ConciergeConversation::listFor((int) auth()->id())
@@ -891,10 +914,11 @@ class AgentSidebar extends Component
         $this->pendingToken = '';
 
         // 새로고침용 표시도 같이 걷는다. 안 걷으면 다음에 열 때 이미 처리한 카드가 되살아난다.
-        ConciergeConversation::find($this->conversationId)?->clearPending();
+        $conversation = ConciergeConversation::find($this->conversationId);
+        $conversation?->clearPending();
 
         if (isset($card['standalone'])) {
-            $this->resolveStandalone((string) $card['standalone'], $approved, (string) ($card['title'] ?? ''));
+            $this->resolveStandalone($card, $approved);
 
             return;
         }
@@ -902,25 +926,37 @@ class AgentSidebar extends Component
         // 카드의 편집 필드(#59): 사용자가 고친 이름을 **실행될 입력에 주입**한다.
         //  ⚠ 카드가 보여준 값과 실행되는 값이 같아야 한다는 원칙의 연장 — 편집 필드는
         //    "보여준 값"이 곧 입력창의 현재 값이다. 비우면 기본 이름으로 되돌아간다(plan 이 생성).
+        $finalName = mb_substr(trim($this->cardName), 0, 40);
+
         if ($approved && is_array($state) && isset($card['name_input']) && isset($state['pending']['input'])) {
-            $state['pending']['input']['name'] = mb_substr(trim($this->cardName), 0, 40);
+            $state['pending']['input']['name'] = $finalName;
         }
 
         $this->cardName = '';
 
         if (!is_array($state)) {
-            // 캐시가 만료됐거나 서버가 재시작됐다. 명령을 보내지 않은 것이 확실하므로 그렇게 알린다.
-            $this->messages[] = ['role' => 'event', 'text' => trans('concierge::strings.card_expired')];
+            // 캐시가 만료됐거나 서버가 재시작됐다. 명령을 보내지 않은 것이 확실하므로 그렇게
+            // 알린다 — 카드 자체를 만료 상태로 남긴다(#6): 무엇이 실행되지 **않았는지**도 기록이다.
+            $this->keepResolvedCard(
+                $this->resolvedCardData($card, 'expired'),
+                ConciergeUsage::query()
+                    ->where('conversation_id', $this->conversationId)
+                    ->where('status', ConciergeUsage::STATUS_AWAITING)
+                    ->latest('id')
+                    ->first(),
+            );
 
             return;
         }
 
-        $this->messages[] = [
-            'role' => 'event',
-            'text' => trans($approved ? 'concierge::strings.card_approved' : 'concierge::strings.card_cancelled', [
-                'action' => $card['title'] ?? '',
-            ]),
-        ];
+        // 승인된 액션이 구간의 경계다(#6) — 다음 턴부터 새 구간. 이번 턴의 행은 카드 대기
+        // 때 이미 옛 구간 번호로 만들어져 있고, 재개의 persist 는 update 라 번호를 안 바꾼다.
+        $anchor = $approved ? $conversation?->bumpSegment() : null;
+
+        $this->keepResolvedCard(
+            $this->resolvedCardData($card, $approved ? 'approved' : 'cancelled', $anchor, $finalName),
+            ConciergeUsage::find($state['usage_id'] ?? 0),
+        );
 
         $settings = ConciergeSettings::current();
 
@@ -934,18 +970,85 @@ class AgentSidebar extends Component
     }
 
     /**
-     * 모델 루프 밖에서 띄운 카드의 처리. 지금은 재설치 하나뿐이다.
+     * 확정된 카드를 화면과 기록 양쪽에 남긴다 (#6).
+     *
+     * 카드가 보여준 요약(이름·게임·자원·diff)이 곧 "무엇이 실행됐는가"의 기록이다 —
+     * 한 줄 이벤트로 바꾸면 스크롤을 되짚어도 제목과 "실행됨"만 남는다. 붙일 행이 없으면
+     * (표시 전용 경로) 화면에만 남는다.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function keepResolvedCard(array $data, ?ConciergeUsage $usage): void
+    {
+        // 'card' 는 'event' 처럼 화면 전용이다 — toApiMessages 가 text 를 보고 거른다.
+        $this->messages[] = ['role' => 'card', 'text' => '', 'card' => $data];
+
+        $usage?->appendResolvedCard($data);
+    }
+
+    /**
+     * 저장·표시용 카드. 결정을 도운 문구(note·버튼 라벨)는 걷고 **결정된 사실**만 남긴다.
+     * 편집 필드(#59)는 실행에 들어간 최종 이름을 줄로 굳힌다 — 입력창은 결정과 함께 끝났다.
+     *
+     * @param  array<string, mixed>  $card
+     * @return array<string, mixed>
+     */
+    private function resolvedCardData(array $card, string $outcome, ?int $anchor = null, ?string $name = null): array
+    {
+        $lines = $card['lines'] ?? [];
+
+        if (isset($card['name_input'])) {
+            $lines[] = [
+                'label' => (string) ($card['name_input']['label'] ?? ''),
+                'value' => filled($name) ? $name : (string) ($card['name_input']['value'] ?? ''),
+            ];
+        }
+
+        return array_filter([
+            'title' => (string) ($card['title'] ?? ''),
+            'lines' => $lines,
+            'diff' => $card['diff'] ?? null,
+            'outcome' => $outcome,
+            // 승인이면 이 카드가 구간 경계다 — 새 구간 번호가 앵커(기록 패널의 이동 목적지)가 된다.
+            'anchor' => $anchor,
+        ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * 모델 루프 밖에서 띄운 카드의 처리(유휴 정지·재설치).
      *
      * ⚠ **소유자를 여기서 다시 확인한다.** 카드 내용은 브라우저를 거쳐 돌아온다.
+     *
+     * 재개할 모델 상태가 없으므로 사용량 행도 없다 — 카드 전용 행(STATUS_CARD)을 만들어
+     * 결정 지점을 기록에 남긴다(#6). 결과 알림(deliverNotice)은 그 뒤에 오므로 순서도 맞는다.
+     *
+     * @param array<string, mixed> $card
      */
-    private function resolveStandalone(string $action, bool $approved, string $title): void
+    private function resolveStandalone(array $card, bool $approved): void
     {
-        $this->messages[] = [
-            'role' => 'event',
-            'text' => trans($approved ? 'concierge::strings.card_approved' : 'concierge::strings.card_cancelled', [
-                'action' => $title,
-            ]),
-        ];
+        $action = (string) ($card['standalone'] ?? '');
+        $conversation = ConciergeConversation::find($this->conversationId);
+        $segment = (int) ($conversation?->active_segment ?? 0);
+
+        // 실행이 서버를 바꾸기 전에 실패할 수도 있지만(권한 회수 등) 경계는 여기서 긋는다 —
+        // 실패 알림까지 새 구간에 담겨야 "그 결정 이후의 일"로 읽힌다.
+        $anchor = $approved ? $conversation?->bumpSegment() : null;
+
+        $data = $this->resolvedCardData($card, $approved ? 'approved' : 'cancelled', $anchor);
+
+        $this->messages[] = ['role' => 'card', 'text' => '', 'card' => $data];
+
+        // 카드 행 자체는 옛 구간의 끝이다 — record() 의 기본값(현재 구간)이 아니라 명시한다.
+        ConciergeUsage::record((int) auth()->id(), ConciergeSettings::current(), [
+            'conversation_id' => $this->conversationId,
+            'status' => ConciergeUsage::STATUS_CARD,
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'user_message' => null,
+            'assistant_message' => null,
+            'segment' => $segment,
+            'resolved_cards' => [$data],
+        ]);
 
         if (str_starts_with($action, 'idle:')) {
             $this->resolveIdle((int) substr($action, strlen('idle:')), $approved);

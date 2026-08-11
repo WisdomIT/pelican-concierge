@@ -56,6 +56,11 @@ Write actions do not happen when the model decides they should. They produce a
 tool call is suspended until the user presses it. Nothing is executed on the model's word
 alone.
 
+A resolved card stays in the transcript as a card — the summary it showed (name, game,
+resources, the exact file change) is the record of what was decided, marked approved,
+cancelled or expired. An approved action also draws a visible boundary in the
+conversation, separating the talk that led up to it from what happened after.
+
 ### Secrets are masked
 
 Install logs and config files routinely contain passwords and license keys. Values that

@@ -117,6 +117,41 @@
             background: color-mix(in oklab, currentColor 8%, transparent);
         }
         .wac-tool dt { font-size: .6875rem; color: var(--gray-500, #6b7280); margin-top: .4rem; }
+
+        /* ── 확정된 카드(#6) — 채팅 화면과 같은 정보를 같은 모양으로 ── */
+        .wac-card {
+            max-width: 40rem;
+            border: 1px solid var(--gray-300, #d1d5db);
+            border-radius: .75rem;
+            padding: .7rem .9rem;
+            font-size: .8125rem;
+        }
+        :where(.dark) .wac-card { border-color: var(--gray-700, #374151); }
+        .wac-card-head { display: flex; align-items: center; gap: .5rem; }
+        .wac-card-title { font-weight: 600; flex: 1 1 auto; }
+        .wac-card-outcome {
+            flex: 0 0 auto;
+            font-size: .6875rem; font-weight: 600;
+            padding: .1rem .5rem; border-radius: 999px;
+            color: var(--gray-500, #6b7280);
+            background: color-mix(in oklab, currentColor 12%, transparent);
+        }
+        .wac-card-outcome.is-approved {
+            color: var(--success-600, #16a34a);
+            background: color-mix(in oklab, var(--success-600, #16a34a) 12%, transparent);
+        }
+        .wac-card dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem .8rem; margin: .5rem 0 0; }
+        .wac-card dt { color: var(--gray-500, #6b7280); }
+        .wac-card dd { margin: 0; }
+        .wac-card-diff {
+            margin: .5rem 0 0; border-radius: .5rem; overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: .6875rem; line-height: 1.6;
+            background: color-mix(in oklab, currentColor 6%, transparent);
+        }
+        .wac-card-diff > div { padding: .15rem .6rem; white-space: pre; }
+        .wac-card-diff .is-del { color: var(--danger-600, #dc2626); }
+        .wac-card-diff .is-add { color: var(--success-600, #16a34a); }
     </style>
 
     <div class="wac-total">
@@ -179,9 +214,38 @@
             <div class="wac-row is-agent">
                 @if (filled($message->assistant_message))
                     <div class="wac-bubble wac-agent wac-md">{!! Markdown::render($message->assistant_message) !!}</div>
-                @else
+                @elseif (empty($message->resolved_cards))
+                    {{-- 카드 전용 행(#6)은 본문이 없는 것이 정상이다 — 안내문을 띄우지 않는다. --}}
                     <div class="wac-bubble wac-agent">{{ trans('concierge::strings.content_not_logged') }}</div>
                 @endif
+
+                {{-- 이 턴에서 결정된 확인 카드(#6) — 채팅 화면이 남기는 것과 같은 기록이다. --}}
+                @foreach ($message->resolved_cards ?? [] as $card)
+                    <div class="wac-card">
+                        <div class="wac-card-head">
+                            <span class="wac-card-title">{{ $card['title'] ?? '' }}</span>
+                            <span class="wac-card-outcome is-{{ $card['outcome'] ?? 'cancelled' }}">
+                                {{ trans('concierge::strings.card_outcome_' . ($card['outcome'] ?? 'cancelled')) }}
+                            </span>
+                        </div>
+
+                        @if ($card['lines'] ?? [])
+                            <dl>
+                                @foreach ($card['lines'] as $line)
+                                    <dt>{{ $line['label'] ?? '' }}</dt>
+                                    <dd>{{ $line['value'] ?? '' }}</dd>
+                                @endforeach
+                            </dl>
+                        @endif
+
+                        @if ($card['diff'] ?? null)
+                            <div class="wac-card-diff">
+                                <div class="is-del">- {{ $card['diff']['before'] }}</div>
+                                <div class="is-add">+ {{ $card['diff']['after'] }}</div>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
 
                 <div class="wac-meta">
                     <span>{{ $message->created_at->format('H:i:s') }}</span>
