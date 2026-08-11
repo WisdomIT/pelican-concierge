@@ -58,7 +58,7 @@ return [
     'field_allow_conversation_delete' => '사용자가 자기 대화를 삭제할 수 있음',
     'help_allow_conversation_delete' => '삭제해도 목록에서만 사라집니다 — 관리자의 기록과 사용량 집계는 그대로 남습니다.',
     'delete_conversation' => '대화 삭제',
-    'confirm_delete_conversation' => '이 대화를 삭제할까요? 내 목록에서 사라집니다. 관리자 기록에는 남습니다.',
+    'confirm_delete_conversation' => '이 대화를 삭제할까요?',
     'field_deleted' => '삭제',
     'conversation_deleted_badge' => '사용자가 삭제함',
     'card_title_install_mod' => '설치할까요?',
