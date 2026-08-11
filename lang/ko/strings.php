@@ -359,7 +359,7 @@ return [
     'help_max_tokens' => '한 번의 답변이 쓸 수 있는 상한입니다.',
 
     'section_limits' => '사용 한도',
-    'section_limits_help' => '기준(메시지·토큰) × 범위(사용자별·패널 전체) × 주기(시·일·주·월)로 규칙을 조합합니다. 여러 개면 먼저 걸린 것이 막습니다. 규칙이 없으면 무제한입니다. 한도에 걸려 거절된 요청은 한도에 세지 않습니다.',
+    'section_limits_help' => '기준(메시지 수 또는 토큰) × 범위(사용자별·패널 전체) × 주기(시·일·주·월)로 정합니다. 한도에 걸려 거절된 요청은 한도에 세지 않습니다.',
     'limit_metric' => '기준',
     'limit_metric_messages' => '메시지 수',
     'limit_metric_tokens' => '토큰',
@@ -372,7 +372,7 @@ return [
     'limit_period_week' => '주',
     'limit_period_month' => '월',
     'limit_amount' => '한도',
-    'add_limit' => '한도 추가',
+    'help_limit_amount' => '0 = 무제한',
 
     // ── 관리자 · 사용량 ──
     'usage_title' => 'AI 도우미 사용량',
@@ -417,7 +417,7 @@ return [
     'stat_today_users' => '오늘 사용한 사람',
     'stat_month_tokens' => '이번 달 토큰',
     'stat_month_tokens_hint' => '입력 + 출력 합계',
-    'stat_limits_active' => '한도 규칙 :count개 적용 중',
+    'stat_limit_summary' => '한도: :scope · :period · :metric :amount',
     'stat_no_limit' => '한도 없음',
     'stat_panel_limit' => ':metric 한도 (패널 전체 · :period)',
     'stat_limit_resets' => '초기화: :reset',

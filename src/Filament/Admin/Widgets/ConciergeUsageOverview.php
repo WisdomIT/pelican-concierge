@@ -26,7 +26,12 @@ class ConciergeUsageOverview extends StatsOverviewWidget
                 (string) (clone $today)->count(),
             )->description($rules === []
                 ? trans('concierge::strings.stat_no_limit')
-                : trans('concierge::strings.stat_limits_active', ['count' => count($rules)]))
+                : trans('concierge::strings.stat_limit_summary', [
+                    'scope' => trans('concierge::strings.limit_scope_' . $rules[0]['scope']),
+                    'period' => trans('concierge::strings.limit_period_' . $rules[0]['period']),
+                    'metric' => trans('concierge::strings.limit_metric_' . $rules[0]['metric']),
+                    'amount' => number_format($rules[0]['amount']),
+                ]))
                 ->icon('tabler-message-chatbot'),
 
             Stat::make(

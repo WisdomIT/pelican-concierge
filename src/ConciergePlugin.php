@@ -10,7 +10,6 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Panel;
@@ -95,7 +94,10 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'model_free' => $settings->model,
             'effort' => $settings->effort,
             'max_tokens' => $settings->max_tokens,
-            'usage_limits' => UsageLimiter::rules($settings),
+            'limit_metric' => UsageLimiter::rules($settings)[0]['metric'] ?? 'messages',
+            'limit_scope' => UsageLimiter::rules($settings)[0]['scope'] ?? 'user',
+            'limit_period' => UsageLimiter::rules($settings)[0]['period'] ?? 'day',
+            'limit_amount' => UsageLimiter::rules($settings)[0]['amount'] ?? 0,
             'search_enabled' => $settings->search_enabled,
             'search_max_uses' => $settings->search_max_uses,
             'idle_enabled' => $settings->idle_enabled,
@@ -333,55 +335,52 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
                 ]),
 
-            // 사용 한도(#4) — 기준 × 범위 × 주기의 규칙 목록. 먼저 걸린 것이 막는다.
+            // 사용 한도(#4) — 규칙 하나: 기준(메시지·토큰) × 범위 × 주기 × 한도량.
+            // 저장 형식(usage_limits 목록)과 판정(UsageLimiter)은 목록 그대로 두고,
+            // 화면은 0~1개만 쓴다. 한도량 0 = 무제한(빈 목록).
             Section::make(trans('concierge::strings.section_limits'))
                 ->description(trans('concierge::strings.section_limits_help'))
+                ->columns(4)
                 ->schema([
-                    Repeater::make('usage_limits')
-                        ->hiddenLabel()
-                        ->schema([
-                            Select::make('metric')
-                                ->label(trans('concierge::strings.limit_metric'))
-                                ->options([
-                                    'messages' => trans('concierge::strings.limit_metric_messages'),
-                                    'tokens' => trans('concierge::strings.limit_metric_tokens'),
-                                ])
-                                ->default('messages')
-                                ->native(false)
-                                ->required(),
-
-                            Select::make('scope')
-                                ->label(trans('concierge::strings.limit_scope'))
-                                ->options([
-                                    'user' => trans('concierge::strings.limit_scope_user'),
-                                    'panel' => trans('concierge::strings.limit_scope_panel'),
-                                ])
-                                ->default('user')
-                                ->native(false)
-                                ->required(),
-
-                            Select::make('period')
-                                ->label(trans('concierge::strings.limit_period'))
-                                ->options([
-                                    'hour' => trans('concierge::strings.limit_period_hour'),
-                                    'day' => trans('concierge::strings.limit_period_day'),
-                                    'week' => trans('concierge::strings.limit_period_week'),
-                                    'month' => trans('concierge::strings.limit_period_month'),
-                                ])
-                                ->default('day')
-                                ->native(false)
-                                ->required(),
-
-                            TextInput::make('amount')
-                                ->label(trans('concierge::strings.limit_amount'))
-                                ->numeric()
-                                ->minValue(1)
-                                ->required(),
+                    Select::make('limit_metric')
+                        ->label(trans('concierge::strings.limit_metric'))
+                        ->options([
+                            'messages' => trans('concierge::strings.limit_metric_messages'),
+                            'tokens' => trans('concierge::strings.limit_metric_tokens'),
                         ])
-                        ->columns(4)
-                        ->reorderable(false)
-                        ->addActionLabel(trans('concierge::strings.add_limit'))
-                        ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())),
+                        ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['metric'] ?? 'messages')
+                        ->native(false)
+                        ->required(),
+
+                    Select::make('limit_scope')
+                        ->label(trans('concierge::strings.limit_scope'))
+                        ->options([
+                            'user' => trans('concierge::strings.limit_scope_user'),
+                            'panel' => trans('concierge::strings.limit_scope_panel'),
+                        ])
+                        ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['scope'] ?? 'user')
+                        ->native(false)
+                        ->required(),
+
+                    Select::make('limit_period')
+                        ->label(trans('concierge::strings.limit_period'))
+                        ->options([
+                            'hour' => trans('concierge::strings.limit_period_hour'),
+                            'day' => trans('concierge::strings.limit_period_day'),
+                            'week' => trans('concierge::strings.limit_period_week'),
+                            'month' => trans('concierge::strings.limit_period_month'),
+                        ])
+                        ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['period'] ?? 'day')
+                        ->native(false)
+                        ->required(),
+
+                    TextInput::make('limit_amount')
+                        ->label(trans('concierge::strings.limit_amount'))
+                        ->helperText(trans('concierge::strings.help_limit_amount'))
+                        ->numeric()
+                        ->minValue(0)
+                        ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['amount'] ?? 0)
+                        ->required(),
                 ]),
 
             // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
@@ -602,8 +601,14 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
         unset($data['sidebar_color_custom']);
 
-        // 한도 규칙(#4) — 형태가 온전한 것만 저장한다. 판정(UsageLimiter)과 같은 눈.
-        $data['usage_limits'] = UsageLimiter::sanitize((array) ($data['usage_limits'] ?? []));
+        // 한도 규칙(#4) — 폼의 4개 필드를 규칙 하나로 접는다. 한도량 0 = 무제한(빈 목록).
+        $data['usage_limits'] = UsageLimiter::sanitize([[
+            'metric' => $data['limit_metric'] ?? '',
+            'scope' => $data['limit_scope'] ?? '',
+            'period' => $data['limit_period'] ?? '',
+            'amount' => (int) ($data['limit_amount'] ?? 0),
+        ]]);
+        unset($data['limit_metric'], $data['limit_scope'], $data['limit_period'], $data['limit_amount']);
 
         $settings->fill($data);
 

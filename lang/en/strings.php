@@ -357,8 +357,8 @@ return [
     'field_max_tokens' => 'Max tokens per reply',
     'help_max_tokens' => 'Ceiling for a single answer.',
 
-    'section_limits' => 'Usage limits',
-    'section_limits_help' => 'Combine metric (messages / tokens), scope (per user / panel-wide) and period (hour / day / week / month). With several rules, the first one hit blocks. No rules means unlimited. Requests rejected by a limit do not count toward it.',
+    'section_limits' => 'Usage limit',
+    'section_limits_help' => 'Metric (messages or tokens) × scope (per user / panel-wide) × period (hour / day / week / month). Requests rejected by the limit do not count toward it.',
     'limit_metric' => 'Metric',
     'limit_metric_messages' => 'Messages',
     'limit_metric_tokens' => 'Tokens',
@@ -371,7 +371,7 @@ return [
     'limit_period_week' => 'Week',
     'limit_period_month' => 'Month',
     'limit_amount' => 'Amount',
-    'add_limit' => 'Add limit',
+    'help_limit_amount' => '0 = unlimited',
 
     // ── Admin · usage ──
     'usage_title' => 'AI Assistant Usage',
@@ -416,7 +416,7 @@ return [
     'stat_today_users' => 'Users today',
     'stat_month_tokens' => 'Tokens this month',
     'stat_month_tokens_hint' => 'Input + output',
-    'stat_limits_active' => ':count limit rule(s) active',
+    'stat_limit_summary' => 'Limit: :scope · :period · :metric :amount',
     'stat_no_limit' => 'No limit',
     'stat_panel_limit' => ':metric limit (panel-wide · :period)',
     'stat_limit_resets' => 'Resets: :reset',
