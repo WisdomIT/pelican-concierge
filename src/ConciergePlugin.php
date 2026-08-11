@@ -15,10 +15,12 @@ use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
+use Filament\Actions\Action;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
+use WisdomIT\Concierge\Llm\ProviderProbe;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Support\OptionalPlugins;
 
@@ -105,6 +107,33 @@ class ConciergePlugin implements Plugin, HasPluginSettings
      *
      * @return Component[]
      */
+    /** @var array<string, array<string, string>> 폼 렌더 한 번에 엔드포인트를 여러 번 찌르지 않게 */
+    private static array $localModels = [];
+
+    /**
+     * 로컬 엔드포인트의 모델 목록 (#3 후속). 폼 렌더 경로라 요청당 한 번만 조회하고,
+     * 실패는 [] — 그러면 자유 입력 필드가 대신 보인다.
+     *
+     * @return array<string, string>
+     */
+    private function localModelOptions(Get $get): array
+    {
+        if ((string) $get('provider') !== 'openai-compatible') {
+            return [];
+        }
+
+        $baseUrl = (string) ($get('base_url') ?: (ConciergeSettings::current()->base_url ?? ''));
+
+        if ($baseUrl === '') {
+            return [];
+        }
+
+        return self::$localModels[$baseUrl] ??= ProviderProbe::localModels(
+            $baseUrl,
+            ConciergeSettings::current()->apiKeyValueFor('openai-compatible'),
+        );
+    }
+
     /** 폼 표시용 — 마이그레이션 전(설치 직후) 구간에도 죽지 않는다. */
     private function hasApiKeyFor(string $provider): bool
     {
@@ -158,6 +187,27 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                             ? trans('concierge::strings.api_key_set')
                             : trans('concierge::strings.api_key_unset'))
                         ->helperText(trans('concierge::strings.help_api_key'))
+                        // 키(와 연결)를 저장 전에 확인한다 — GET /models 는 토큰을 안 쓰는
+                        // 가장 싼 인증 검사다. 폼에 친 키가 있으면 그걸, 없으면 저장된 키를 쓴다.
+                        ->suffixAction(
+                            Action::make('verify_key')
+                                ->label(trans('concierge::strings.verify_key'))
+                                ->icon('tabler-plug-connected')
+                                ->action(function (Get $get, ?string $state): void {
+                                    $provider = (string) $get('provider');
+                                    $key = filled($state)
+                                        ? trim((string) $state)
+                                        : ConciergeSettings::current()->apiKeyValueFor($provider);
+
+                                    $error = ProviderProbe::verify($provider, $key, (string) $get('base_url'));
+
+                                    $notification = $error === null
+                                        ? Notification::make()->success()->title(trans('concierge::strings.verify_ok'))
+                                        : Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error);
+
+                                    $notification->send();
+                                }),
+                        )
                         ->columnSpanFull(),
 
                     // 전용 페이지 시절의 "키 삭제" 버튼을 대신한다 — 플러그인 설정 모달에는
@@ -174,6 +224,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->helperText(trans('concierge::strings.help_base_url'))
                         ->placeholder('http://localhost:11434/v1')
                         ->url()
+                        // 주소를 치고 벗어나면 아래 모델 드롭다운이 그 엔드포인트의 목록으로 채워진다.
+                        ->live(onBlur: true)
                         ->default(fn () => ConciergeSettings::current()->base_url)
                         ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
                         ->columnSpanFull(),
@@ -188,13 +240,25 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== [])
                         ->required(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== []),
 
-                    // — 로컬 엔드포인트는 모델 이름이 설치마다 달라 자유 입력이다.
+                    // — 로컬 엔드포인트는 `GET /models` 로 목록을 받아 고른다. 엔드포인트가
+                    //   안 닿으면(주소 미입력·서버 꺼짐) 자유 입력으로 물러난다.
+                    Select::make('model_free')
+                        ->label(trans('concierge::strings.field_model'))
+                        ->options(fn (Get $get) => $this->localModelOptions($get))
+                        ->helperText(trans('concierge::strings.help_model_local'))
+                        ->native(false)
+                        ->searchable()
+                        ->default(fn () => ConciergeSettings::current()->model)
+                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []
+                            && $this->localModelOptions($get) !== []),
+
                     TextInput::make('model_free')
                         ->label(trans('concierge::strings.field_model'))
                         ->helperText(trans('concierge::strings.help_model_free'))
                         ->placeholder('llama3.3:70b')
                         ->default(fn () => ConciergeSettings::current()->model)
-                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []),
+                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []
+                            && $this->localModelOptions($get) === []),
 
                     Select::make('effort')
                         ->label(trans('concierge::strings.field_effort'))

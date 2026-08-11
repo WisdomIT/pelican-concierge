@@ -74,6 +74,15 @@ return [
     'help_base_url' => 'The OpenAI-compatible endpoint, including /v1 — e.g. http://localhost:11434/v1 for Ollama. No API key is needed for most local servers.',
     'help_model_free' => 'The model name as your endpoint knows it (e.g. an Ollama tag). Pick one that supports tool calling — the assistant is built on tools.',
     'search_unsupported' => 'This provider has no web search. The assistant will say so when a question needs current information.',
+    'verify_key' => 'Verify',
+    'verify_ok' => 'Connected — the key is valid.',
+    'verify_failed' => 'Verification failed',
+    'verify_no_key' => 'Nothing to verify — enter or save a key first.',
+    'verify_no_base_url' => 'Enter the endpoint URL first.',
+    'verify_bad_key' => 'The key was rejected (401/403) — double-check the value.',
+    'verify_http' => 'The endpoint returned HTTP :code.',
+    'verify_unreachable' => 'Could not reach the endpoint — check the URL and that the server is running.',
+    'help_model_local' => 'Picked from the endpoint\'s /models list. The model must support tool calling.',
 
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => 'Appearance',

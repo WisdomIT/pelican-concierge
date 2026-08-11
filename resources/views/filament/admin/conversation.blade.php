@@ -160,6 +160,12 @@
         <div><span>{{ trans('concierge::strings.field_output_tokens') }}</span> <b>{{ number_format($totalOut) }}</b></div>
         <div><span>{{ trans('concierge::strings.total_tokens') }}</span> <b>{{ number_format($totalIn + $totalOut) }}</b></div>
         <div><span>{{ trans('concierge::strings.field_model') }}</span> <b>{{ $messages->first()?->model }}</b></div>
+        {{-- 공급자(#3) — 대화 중간에 바뀌었을 수 있어 전부 나열한다. --}}
+        <div><span>{{ trans('concierge::strings.field_provider') }}</span> <b>{{
+            $messages->pluck('provider')->filter()->unique()
+                ->map(fn ($p) => config("concierge.providers.{$p}.badge") ?: $p)
+                ->implode(', ') ?: 'Anthropic'
+        }}</b></div>
     </div>
 
     <div class="wac-log">

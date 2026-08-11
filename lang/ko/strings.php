@@ -74,6 +74,15 @@ return [
     'help_base_url' => 'OpenAI 호환 엔드포인트를 /v1 까지 포함해 입력합니다 — Ollama 는 http://localhost:11434/v1. 로컬 서버는 보통 API 키가 필요 없습니다.',
     'help_model_free' => '엔드포인트가 아는 모델 이름(예: Ollama 태그). 이 어시스턴트는 도구 위에 서 있으므로 도구 호출을 지원하는 모델이어야 합니다.',
     'search_unsupported' => '이 공급자는 웹 검색이 없습니다. 최신 정보가 필요한 질문에는 어시스턴트가 그 사실을 말합니다.',
+    'verify_key' => '키 확인',
+    'verify_ok' => '연결 정상 — 키가 유효합니다.',
+    'verify_failed' => '연결 확인 실패',
+    'verify_no_key' => '확인할 키가 없습니다 — 키를 입력하거나 저장한 뒤 다시 시도하세요.',
+    'verify_no_base_url' => '엔드포인트 주소를 먼저 입력하세요.',
+    'verify_bad_key' => '키가 거부되었습니다(401/403) — 값을 다시 확인하세요.',
+    'verify_http' => '엔드포인트가 HTTP :code 를 돌려줬습니다.',
+    'verify_unreachable' => '엔드포인트에 연결할 수 없습니다 — 주소와 서버 상태를 확인하세요.',
+    'help_model_local' => '엔드포인트의 /models 목록에서 골랐습니다. 도구 호출을 지원하는 모델이어야 합니다.',
 
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
     'section_appearance' => '모양',

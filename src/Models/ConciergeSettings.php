@@ -146,6 +146,20 @@ class ConciergeSettings extends Model
         }
     }
 
+    /** 그 공급자의 저장된 키 값 — 키 검증 버튼이 폼에 새 키가 없을 때 쓴다(#3). 서버 밖으로 내보내지 말 것. */
+    public function apiKeyValueFor(string $provider): ?string
+    {
+        if ($provider === ($this->provider ?? 'anthropic')) {
+            return $this->apiKey();
+        }
+
+        try {
+            return ($this->provider_settings ?? [])[$provider]['api_key'] ?? null;
+        } catch (DecryptException) {
+            return null;
+        }
+    }
+
     /**
      * 활성 값(키·주소·모델·effort)을 **현재 공급자**의 스냅샷으로 저장한다 (#3).
      * 전환 직전마다 불린다 — 그래서 공급자를 오가도 각자의 키·모델 선택이 남는다.

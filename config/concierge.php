@@ -22,6 +22,7 @@ return [
         'anthropic' => [
             'label' => 'Anthropic (Claude)',
             'short' => 'Anthropic',
+            'badge' => 'Anthropic',
             'default_model' => 'claude-opus-5',
             'default_effort' => 'medium',
             'models' => [
@@ -41,6 +42,7 @@ return [
         'openai' => [
             'label' => 'OpenAI (ChatGPT)',
             'short' => 'OpenAI',
+            'badge' => 'OpenAI',
             'default_model' => 'gpt-5.1',
             'default_effort' => 'medium',
             'models' => [
@@ -61,6 +63,7 @@ return [
         'openai-compatible' => [
             'label' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',
             'short' => '',
+            'badge' => '로컬',
             'default_model' => '',
             'default_effort' => null,
             // 로컬 엔드포인트의 모델 이름은 설치마다 다르다 — 자유 입력.
