@@ -75,6 +75,12 @@ class ConciergeUsageResource extends Resource
                 ->from('concierge_tool_calls as tc')
                 ->whereColumn('tc.conversation_id', 'concierge_usages.conversation_id')
                 ->selectRaw('count(*)'), 'tool_calls_count')
+            // 사용자가 지운 대화(#8) — 기록은 그대로 남지만, 지워졌다는 사실이 보여야 한다.
+            // 이 화면은 대화 테이블을 읽지 않으므로(집계는 usages 기준) 따로 묻는다.
+            ->selectSub(fn ($query) => $query
+                ->from('concierge_conversations as cc')
+                ->whereColumn('cc.id', 'concierge_usages.conversation_id')
+                ->selectRaw('count(case when cc.deleted_at is not null then 1 end)'), 'conversation_deleted')
             ->whereIn('concierge_usages.id', fn ($query) => $query
                 ->from('concierge_usages')
                 ->selectRaw('min(id)')
@@ -104,6 +110,14 @@ class ConciergeUsageResource extends Resource
                     ->limit(60)
                     ->placeholder(trans('concierge::strings.content_not_logged'))
                     ->searchable(),
+
+                // 사용자가 지운 대화 표시(#8). 지워도 이 화면의 기록·집계는 그대로다.
+                TextColumn::make('conversation_deleted')
+                    ->label(trans('concierge::strings.field_deleted'))
+                    ->badge()
+                    ->color('warning')
+                    ->formatStateUsing(fn ($state) => $state ? trans('concierge::strings.conversation_deleted_badge') : '')
+                    ->placeholder(''),
 
                 TextColumn::make('messages_count')
                     ->label(trans('concierge::strings.field_messages'))
@@ -156,9 +170,13 @@ class ConciergeUsageResource extends Resource
                 ViewAction::make()
                     ->label(trans('concierge::strings.view_conversation'))
                     ->modalHeading(fn (ConciergeUsage $record) => sprintf(
-                        '%s · %s',
+                        '%s · %s%s',
                         $record->user?->username ?? '-',
                         $record->created_at->format('Y-m-d H:i'),
+                        // 목록 쿼리의 selectSub 값 — 모달에서도 지워진 대화임이 보여야 한다(#8).
+                        ($record->conversation_deleted ?? 0)
+                            ? ' · ' . trans('concierge::strings.conversation_deleted_badge')
+                            : '',
                     ))
                     ->modalContent(fn (ConciergeUsage $record) => view(
                         'concierge::filament.admin.conversation',

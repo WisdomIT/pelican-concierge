@@ -53,6 +53,14 @@ return [
     'card_outcome_approved' => '실행됨',
     'card_outcome_cancelled' => '취소됨',
     'card_outcome_expired' => '만료됨 — 실행되지 않음',
+
+    // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'field_allow_conversation_delete' => '사용자가 자기 대화를 삭제할 수 있음',
+    'help_allow_conversation_delete' => '삭제해도 목록에서만 사라집니다 — 관리자의 기록과 사용량 집계는 그대로 남습니다.',
+    'delete_conversation' => '대화 삭제',
+    'confirm_delete_conversation' => '이 대화를 삭제할까요?',
+    'field_deleted' => '삭제',
+    'conversation_deleted_badge' => '사용자가 삭제함',
     'card_title_install_mod' => '설치할까요?',
     'card_confirm_install_mod' => '설치하기',
     'card_mod' => '모드·플러그인',

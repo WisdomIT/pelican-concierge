@@ -53,6 +53,14 @@ return [
     'card_outcome_approved' => 'Ran',
     'card_outcome_cancelled' => 'Cancelled',
     'card_outcome_expired' => 'Expired — nothing ran',
+
+    // 대화 삭제(#8) — soft: 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+    'field_allow_conversation_delete' => 'Let users delete their own conversations',
+    'help_allow_conversation_delete' => 'Deletion is soft: the conversation disappears from the user\'s history, while administrators keep the full record and usage totals.',
+    'delete_conversation' => 'Delete conversation',
+    'confirm_delete_conversation' => 'Delete this conversation?',
+    'field_deleted' => 'Deleted',
+    'conversation_deleted_badge' => 'Deleted by user',
     'card_title_install_mod' => 'Install this?',
     'card_confirm_install_mod' => 'Install',
     'card_mod' => 'Mod / plugin',

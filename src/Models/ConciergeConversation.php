@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
@@ -28,6 +29,12 @@ use Illuminate\Support\Str;
  */
 class ConciergeConversation extends Model
 {
+    /**
+     * 삭제는 soft 다(#8) — 사용자 목록에서는 사라지고 관리자 기록에는 남는다.
+     * usages·tool_calls 로는 연쇄하지 않는다(사용량 집계가 소급 왜곡된다).
+     */
+    use SoftDeletes;
+
     /** 목록에 보여줄 제목 길이. 넘으면 자른다. */
     private const TITLE_LENGTH = 60;
 
@@ -91,10 +98,17 @@ class ConciergeConversation extends Model
      */
     public static function ensure(string $id, int $userId, string $firstMessage): self
     {
-        $conversation = static::query()->find($id) ?? new static([
+        // ⚠ withTrashed 로 찾는다(#8). 지워진 id 를 못 보면 같은 PK 로 insert 를 시도해
+        //   터진다 — 다른 탭에서 대화를 지우는 사이 이쪽에서 발화가 끝나는 경합이 실제로
+        //   가능하다. 그 대화에 새 메시지가 왔다는 것은 쓰고 있다는 뜻이므로 되살린다.
+        $conversation = static::withTrashed()->find($id) ?? new static([
             'id' => $id,
             'user_id' => $userId,
         ]);
+
+        if ($conversation->trashed()) {
+            $conversation->restore();
+        }
 
         if (blank($conversation->title)) {
             // ⚠ 알림 텍스트가 제목이 되는 경우가 있다 — 마크다운(**, `)과 줄바꿈을 걷어내고

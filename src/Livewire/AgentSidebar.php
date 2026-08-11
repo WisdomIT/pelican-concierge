@@ -786,6 +786,51 @@ class AgentSidebar extends Component
         $this->pendingCard = $conversation->pending_card ?? [];
     }
 
+    /** 기록 목록에 삭제 버튼을 그릴지 — 설정이며 기본 꺼짐(#8). */
+    public function canDeleteConversations(): bool
+    {
+        return ConciergeSettings::current()->allow_conversation_delete;
+    }
+
+    /**
+     * 자기 대화 지우기 (#8). **soft** — 사용자 목록에서만 사라지고 관리자 기록은 남는다.
+     *
+     * ⚠ 설정은 여기서 **다시** 확인한다. 버튼이 안 보이는 것은 표시일 뿐이고,
+     *   Livewire 메서드는 브라우저에서 직접 부를 수 있다. 소유자 검사도 같은 이유다.
+     */
+    public function deleteConversation(string $id): void
+    {
+        if (!$this->canDeleteConversations()) {
+            return;
+        }
+
+        $conversation = ConciergeConversation::query()
+            ->where('user_id', (int) auth()->id())
+            ->find($id);
+
+        if ($conversation === null) {
+            return;
+        }
+
+        // 대기 중 카드의 재개 상태가 주인 없이 캐시에 남으면 안 된다(#8 요구) —
+        // 행 표시와 캐시 양쪽을 걷는다. standalone 카드는 캐시 항목이 없어 forget 이 공회전한다.
+        if ($conversation->pending_token !== null) {
+            Cache::store(self::PENDING_STORE)->forget('concierge:pending:' . $conversation->pending_token);
+            $conversation->clearPending();
+        }
+
+        $conversation->delete();
+
+        // 열려 있던 대화를 지웠으면 새 대화로 — 지워진 기록에 이어 쓰게 두지 않는다.
+        if ($id === $this->conversationId) {
+            $this->startConversation(); // 목록 갱신 포함
+
+            return;
+        }
+
+        $this->refreshConversations();
+    }
+
     /** 헤더에 띄울 현재 대화 이름. 첫 발화 전이면 아직 목록에 없다. */
     public function currentTitle(): string
     {
