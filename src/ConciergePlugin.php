@@ -230,6 +230,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                             // 있으면 그걸, 없으면 그 공급자의 저장된 키로 확인한다.
                             Action::make('verify_key')
                                 ->label(trans('concierge::strings.verify_key'))
+                                // 명시하지 않으면 아이콘 버튼으로 렌더된다 — 아이콘이 없어
+                                // 투명한 클릭 영역만 남으므로 라벨 버튼을 강제한다.
+                                ->button()
                                 ->color('gray')
                                 ->action(function (Get $get, Set $set): void {
                                     $provider = (string) $get('provider');
