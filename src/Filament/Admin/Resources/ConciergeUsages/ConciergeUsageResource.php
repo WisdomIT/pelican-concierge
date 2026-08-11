@@ -105,13 +105,6 @@ class ConciergeUsageResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                // 어느 공급자의 지출인지(#3) — 대화 첫 행 기준. 단가가 공급자마다 다르다.
-                TextColumn::make('provider')
-                    ->label(trans('concierge::strings.field_provider'))
-                    ->badge()
-                    ->color('gray')
-                    ->formatStateUsing(fn (?string $state) => (string) (config("concierge.providers.{$state}.badge") ?: $state ?: 'Anthropic')),
-
                 TextColumn::make('user_message')
                     ->label(trans('concierge::strings.field_first_message'))
                     ->limit(60)
