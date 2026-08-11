@@ -33,19 +33,17 @@ class ConciergeUsageOverview extends StatsOverviewWidget
                     'period' => trans('concierge::strings.limit_period_' . $rules[0]['period']),
                     'metric' => trans('concierge::strings.limit_metric_' . $rules[0]['metric']),
                     'amount' => number_format($rules[0]['amount']),
-                ]))
-                ->icon('tabler-message-chatbot'),
+                ])),
 
             Stat::make(
                 trans('concierge::strings.stat_today_users'),
                 (string) (clone $today)->distinct('user_id')->count('user_id'),
-            )->icon('tabler-users'),
+            ),
 
             Stat::make(
                 trans('concierge::strings.stat_month_tokens'),
                 number_format((int) (clone $month)->sum('input_tokens') + (int) (clone $month)->sum('output_tokens')),
-            )->description(trans('concierge::strings.stat_month_tokens_hint'))
-                ->icon('tabler-coin'),
+            )->description(trans('concierge::strings.stat_month_tokens_hint')),
         ];
 
         // 패널 전체 한도(#4)는 한 사용자가 다 써버릴 수 있다 — 의도된 동작이지만,
@@ -65,8 +63,7 @@ class ConciergeUsageOverview extends StatsOverviewWidget
                 number_format($used) . ' / ' . number_format($rule['amount']),
             )->description(trans('concierge::strings.stat_limit_resets', [
                 'reset' => UsageLimiter::resetsAt($rule['period'])->format('Y-m-d H:i'),
-            ]))->icon('tabler-gauge')
-                ->color($used >= $rule['amount'] ? 'danger' : ($used >= $rule['amount'] * 0.8 ? 'warning' : 'gray'));
+            ]))->color($used >= $rule['amount'] ? 'danger' : ($used >= $rule['amount'] * 0.8 ? 'warning' : 'gray'));
         }
 
         return $stats;
