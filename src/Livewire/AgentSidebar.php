@@ -19,7 +19,7 @@ use WisdomIT\Concierge\Models\ConciergeInstallCheck;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Models\ConciergeToolCall;
 use WisdomIT\Concierge\Models\ConciergeUsage;
-use WisdomIT\Concierge\Services\AnthropicChatService;
+use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
@@ -968,7 +968,7 @@ class AgentSidebar extends Component
         $this->streamTo('live-assistant', trans('concierge::strings.thinking'));
 
         $this->run(
-            fn (AnthropicChatService $service) => $service->start($this->messages, ...$this->callbacks()),
+            fn (ChatService $service) => $service->start($this->messages, ...$this->callbacks()),
             $settings,
             $userId,
             $text,
@@ -1055,7 +1055,7 @@ class AgentSidebar extends Component
         $settings = ConciergeSettings::current();
 
         $this->run(
-            fn (AnthropicChatService $service) => $service->resume($state, $approved, ...$this->callbacks()),
+            fn (ChatService $service) => $service->resume($state, $approved, ...$this->callbacks()),
             $settings,
             (int) auth()->id(),
             (string) ($state['user_message'] ?? ''),
@@ -1240,7 +1240,7 @@ class AgentSidebar extends Component
     /**
      * 모델 호출을 감싸고, 결과가 "카드 대기"인지 "완료"인지에 따라 뒤처리한다.
      *
-     * @param  Closure(AnthropicChatService): ChatResult  $call
+     * @param  Closure(ChatService): ChatResult  $call
      * @param  array<string, mixed>  $previousState  재개일 때만 채워진다
      */
     private function run(callable $call, ConciergeSettings $settings, int $userId, string $userMessage, array $previousState = []): void
@@ -1249,7 +1249,7 @@ class AgentSidebar extends Component
         $user = auth()->user();
 
         try {
-            $result = $call(new AnthropicChatService($settings, $user));
+            $result = $call(new ChatService($settings, $user));
         } catch (Throwable $exception) {
             // 원문은 로그(관리자만 봄)에만 남긴다. 친구들에게 API 오류 문자열을 보여줄 이유가 없다.
             report($exception);

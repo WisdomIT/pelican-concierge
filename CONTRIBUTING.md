@@ -14,7 +14,9 @@ Parts of this codebase were written with AI assistance.
 ```
 src/
   Livewire/AgentSidebar.php      chat UI, one Livewire component on every page
-  Services/AnthropicChatService  prompt assembly, streaming, tool loop
+  Services/ChatService           prompt assembly + provider-agnostic tool loop
+  Llm/                           provider adapters (Anthropic today; the neutral
+                                 message/tool contract lives in LlmProvider)
   Tools/AgentToolbox.php         the 37 tools the model can call
   Services/ServerProvisioner     server creation
   Catalog/GameCatalog.php        reads resources/catalog/games.yaml
