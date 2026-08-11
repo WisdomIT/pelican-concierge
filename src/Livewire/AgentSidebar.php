@@ -22,6 +22,7 @@ use WisdomIT\Concierge\Llm\ProviderError;
 use WisdomIT\Concierge\Models\ConciergeUsage;
 use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
+use WisdomIT\Concierge\Services\UsageLimiter;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
@@ -958,10 +959,9 @@ class AgentSidebar extends Component
             return;
         }
 
-        $limit = $settings->daily_message_limit;
-
-        if ($limit > 0 && ConciergeUsage::todayCountFor($userId) >= $limit) {
-            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_RATE_LIMITED, trans('concierge::strings.rate_limited', ['limit' => $limit]));
+        // 3축 한도(#4) — 어느 규칙에 왜 막혔고 언제 풀리는지까지 말해준다.
+        if (($hit = UsageLimiter::firstHit($settings, $userId)) !== null) {
+            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_RATE_LIMITED, UsageLimiter::message($hit));
 
             return;
         }

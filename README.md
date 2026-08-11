@@ -124,7 +124,7 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 | Model | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
 | Effort | `medium` | How hard the model thinks. Higher costs more |
 | Max tokens | `8192` | Per reply |
-| Daily message limit | `50` | Per user |
+| Usage limits | 50 messages / user / day | Any combination of metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). Several rules can coexist; the first one hit blocks, and the block message names the limit and its reset time. No rules = unlimited |
 | Idle watch | off | Interval, and whether to stop the server or only ask |
 | Web search | off | Adds a per-search fee on top of tokens |
 | Conversation deletion | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
@@ -139,7 +139,10 @@ Every message costs money on your Anthropic key. Two things keep it visible and 
 
 - **Usage tracking** — *Admin → Advanced → AI Assistant Usage* shows tokens and estimated
   cost per user and per conversation, with the full message and tool log.
-- **A per-user daily message limit**, on by default.
+- **Configurable usage limits**, on by default (50 messages per user per day). Token
+  limits and panel-wide caps put a real ceiling on the bill — e.g. a per-user daily
+  cap *and* a panel-wide monthly token budget. Panel-wide consumption is shown on the
+  usage screen.
 
 The system prompt and all tool descriptions are written in English regardless of the
 user's language — the same content costs roughly 40% fewer tokens that way. The assistant

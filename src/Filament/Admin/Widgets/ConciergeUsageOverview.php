@@ -7,6 +7,7 @@ use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Models\ConciergeUsage;
+use WisdomIT\Concierge\Services\UsageLimiter;
 
 class ConciergeUsageOverview extends StatsOverviewWidget
 {
@@ -17,15 +18,15 @@ class ConciergeUsageOverview extends StatsOverviewWidget
         $today = ConciergeUsage::query()->where('created_at', '>=', Carbon::today());
         $month = ConciergeUsage::query()->where('created_at', '>=', Carbon::now()->startOfMonth());
 
-        $limit = $settings->daily_message_limit;
+        $rules = UsageLimiter::rules($settings);
 
-        return [
+        $stats = [
             Stat::make(
                 trans('concierge::strings.stat_today_messages'),
                 (string) (clone $today)->count(),
-            )->description($limit > 0
-                ? trans('concierge::strings.stat_limit_per_user', ['limit' => $limit])
-                : trans('concierge::strings.stat_no_limit'))
+            )->description($rules === []
+                ? trans('concierge::strings.stat_no_limit')
+                : trans('concierge::strings.stat_limits_active', ['count' => count($rules)]))
                 ->icon('tabler-message-chatbot'),
 
             Stat::make(
@@ -39,5 +40,28 @@ class ConciergeUsageOverview extends StatsOverviewWidget
             )->description(trans('concierge::strings.stat_month_tokens_hint'))
                 ->icon('tabler-coin'),
         ];
+
+        // 패널 전체 한도(#4)는 한 사용자가 다 써버릴 수 있다 — 의도된 동작이지만,
+        // 관리자는 여기서 그 사실을 봐야 한다. 규칙별 소비량과 리셋 시각을 붙인다.
+        foreach ($rules as $rule) {
+            if ($rule['scope'] !== 'panel') {
+                continue;
+            }
+
+            $used = UsageLimiter::usedIn($rule, 0);
+
+            $stats[] = Stat::make(
+                trans('concierge::strings.stat_panel_limit', [
+                    'period' => trans('concierge::strings.limit_period_' . $rule['period']),
+                    'metric' => trans('concierge::strings.limit_metric_' . $rule['metric']),
+                ]),
+                number_format($used) . ' / ' . number_format($rule['amount']),
+            )->description(trans('concierge::strings.stat_limit_resets', [
+                'reset' => UsageLimiter::resetsAt($rule['period'])->format('Y-m-d H:i'),
+            ]))->icon('tabler-gauge')
+                ->color($used >= $rule['amount'] ? 'danger' : ($used >= $rule['amount'] * 0.8 ? 'warning' : 'gray'));
+        }
+
+        return $stats;
     }
 }
