@@ -84,7 +84,6 @@
         padding: 1rem;
         background: var(--gray-50, #fff);
         border-left: 1px solid var(--gray-200, #e5e7eb);
-        box-shadow: -2px 0 12px rgb(0 0 0 / .08);
     }
     :where(.dark) .cg-panel {
         background: var(--gray-950, #030712);
