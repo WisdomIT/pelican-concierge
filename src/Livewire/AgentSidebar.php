@@ -8,6 +8,7 @@ use App\Repositories\Daemon\DaemonServerRepository;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Illuminate\Support\Str;
 use Throwable;
@@ -22,6 +23,7 @@ use WisdomIT\Concierge\Llm\ProviderError;
 use WisdomIT\Concierge\Models\ConciergeUsage;
 use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
+use WisdomIT\Concierge\Services\UsageLimiter;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
@@ -912,6 +914,39 @@ class AgentSidebar extends Component
             ->all();
     }
 
+    /**
+     * 보내기 버튼 위 한도 게이지(#4) — 내가 한도의 몇 %를 썼는지.
+     * 규칙이 없거나 **70% 미만이면 null** — 여유가 있을 때는 눈에 걸릴 이유가 없다.
+     *
+     * 매 렌더마다 계산된다(메시지 후·30초 폴링마다 갱신). 사용자 범위는 인덱스 타는
+     * 싼 조회고, 패널 범위는 UsageLimiter 의 60초 캐시를 그대로 탄다.
+     *
+     * @return ?array{percent: int, scope: string, period: string, metric: string}
+     */
+    #[Computed]
+    public function limitStatus(): ?array
+    {
+        $rule = UsageLimiter::rules(ConciergeSettings::current())[0] ?? null;
+
+        if ($rule === null) {
+            return null;
+        }
+
+        $used = UsageLimiter::usedIn($rule, (int) auth()->id());
+        $percent = min(100, (int) floor($used / $rule['amount'] * 100));
+
+        if ($percent < 70) {
+            return null;
+        }
+
+        return [
+            'percent' => $percent,
+            'scope' => $rule['scope'],
+            'period' => $rule['period'],
+            'metric' => $rule['metric'],
+        ];
+    }
+
     public function render(): View
     {
         return view('concierge::livewire.agent-sidebar');
@@ -958,10 +993,9 @@ class AgentSidebar extends Component
             return;
         }
 
-        $limit = $settings->daily_message_limit;
-
-        if ($limit > 0 && ConciergeUsage::todayCountFor($userId) >= $limit) {
-            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_RATE_LIMITED, trans('concierge::strings.rate_limited', ['limit' => $limit]));
+        // 3축 한도(#4) — 어느 규칙에 왜 막혔고 언제 풀리는지까지 말해준다.
+        if (($hit = UsageLimiter::firstHit($settings, $userId)) !== null) {
+            $this->reply($settings, $userId, $text, ConciergeUsage::STATUS_RATE_LIMITED, UsageLimiter::message($hit));
 
             return;
         }

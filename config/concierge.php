@@ -13,7 +13,11 @@ return [
     'model' => 'claude-opus-5',
     'effort' => 'medium',
     'max_tokens' => 8192,
-    'daily_message_limit' => 50,
+    // 사용 한도 규칙(#4): 기준(messages|tokens) × 범위(user|panel) × 주기(hour|day|week|month).
+    // 여러 개면 먼저 걸린 것이 막는다. 빈 목록 = 무제한.
+    'usage_limits' => [
+        ['metric' => 'messages', 'scope' => 'user', 'period' => 'day', 'amount' => 50],
+    ],
 
     // ── LLM 공급자별 선택지 (#3) ─────────────────────────────────
     //  모델이 새로 나오면 여기만 고치면 된다. 없는 id 를 고르면 API 가 404 를 낸다.

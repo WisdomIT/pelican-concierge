@@ -44,7 +44,7 @@ class ConciergeUsage extends Model
     /**
      * 모델 루프 밖(standalone) 카드의 결정만 담는 행 (#6). 토큰 0, 본문 없음 —
      * 카드가 대화 어느 지점에서 결정됐는지를 기록이 남기기 위한 자리다.
-     * ⚠ `todayCountFor` 가 세지 않는다 — 버튼 하나 누른 것이 일일 한도를 깎으면 안 된다.
+     * ⚠ 메시지 한도(UsageLimiter)가 세지 않는다 — 버튼 하나 누른 것이 한도를 깎으면 안 된다.
      */
     public const STATUS_CARD = 'card_resolved';
 
@@ -94,20 +94,6 @@ class ConciergeUsage extends Model
     public function toolCalls(): HasMany
     {
         return $this->hasMany(ConciergeToolCall::class, 'usage_id');
-    }
-
-    /**
-     * 일일 한도 검사용. 한도에 세는 것은 실제로 모델을 부른 건(ok/error)뿐이다 —
-     * 한도에 걸려 거절된 요청까지 세면 한 번 막힌 사용자가 영원히 못 풀린다.
-     */
-    public static function todayCountFor(int $userId): int
-    {
-        return static::query()
-            ->where('user_id', $userId)
-            // 카드 대기 중인 것도 센다 — 이미 토큰을 썼고, 한 발화가 한 행이라 중복도 없다.
-            ->whereIn('status', [self::STATUS_OK, self::STATUS_ERROR, self::STATUS_AWAITING])
-            ->where('created_at', '>=', Carbon::today())
-            ->count();
     }
 
     /**
