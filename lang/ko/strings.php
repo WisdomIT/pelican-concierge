@@ -236,6 +236,12 @@ return [
     'help_model_local' => '엔드포인트의 /models 목록에서 골랐습니다. 도구 호출을 지원하는 모델이어야 합니다.',
 
     // 사이드바 색(#10) — 기본은 패널의 primary 를 따른다.
+    // 배포 지식(#59) — 도구로 알 수 없는 사실을 관리자가 직접 적는다.
+    'section_knowledge' => '이 서버 환경 정보',
+    'section_knowledge_help' => '도구로는 알 수 없는 사실을 적어두면 에이전트가 진단에 씁니다 — 접속 주소 형식, 공유기가 열어 둔 포트 범위, DNS 구성 같은 것들. "켜져 있는데 접속이 안 돼요"는 로그가 아니라 이 정보가 있어야 답할 수 있습니다.',
+    'help_knowledge' => '매 메시지에 함께 보내지므로 길수록 토큰 비용이 늘어납니다 — 사실만 짧게. 비워두면 이 항목 자체를 보내지 않습니다. 영어로 적으면 같은 내용이 토큰을 약 40% 덜 씁니다(답변 언어와는 무관합니다).',
+    'placeholder_knowledge' => "예:\n- Players connect to gs.example.com; the router forwards ports 27500-27599 only.\n- Port 25565 is reserved for the legacy Minecraft server.\n- Backups run nightly at 04:00 KST to a NAS.",
+
     'section_appearance' => '모양',
     'section_appearance_help' => '기본값은 패널의 primary 색을 그대로 따릅니다(활성 테마 포함).',
     'field_sidebar_color_custom' => '커스텀 색 사용',

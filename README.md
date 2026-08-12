@@ -179,10 +179,11 @@ assistant offers when someone asks for a server. Edit it to match the eggs on yo
 `resources/catalog/README.md` documents the format, and `scripts/validate-catalog.py`
 checks a catalog against your panel's actual eggs.
 
-**`resources/knowledge/agent.md`** *(optional, not shipped)* — free-form text appended to
-the system prompt. This is where deployment facts go: the hostname players connect to,
-which port range your router forwards, anything the assistant cannot discover through a
-tool. Without it the assistant works but will not know your network.
+**About this deployment** *(settings screen, optional)* — free-form text appended to the
+system prompt. This is where deployment facts go: the hostname players connect to, which
+port range your router forwards, anything the assistant cannot discover through a tool.
+Without it the assistant works but will not know your network. It is stored in the database,
+so it survives plugin updates, and it is sent with every message — keep it to short facts.
 
 ## What the assistant can do depends on who is asking
 

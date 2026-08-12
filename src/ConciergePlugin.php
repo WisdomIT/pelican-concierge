@@ -10,6 +10,7 @@ use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Panel;
@@ -107,6 +108,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'allow_conversation_delete' => $settings->allow_conversation_delete,
             'sidebar_color_custom' => filled($settings->sidebar_color),
             'sidebar_color' => $settings->sidebar_color,
+            'deployment_knowledge' => $settings->deployment_knowledge,
         ];
     }
 
@@ -381,6 +383,18 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->minValue(0)
                         ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['amount'] ?? 0)
                         ->required(),
+                ]),
+
+            // 배포 지식(#59) — 도구로 알 수 없는 사실. 매 요청에 실려 가므로 길이가 곧 비용이다.
+            Section::make(trans('concierge::strings.section_knowledge'))
+                ->description(trans('concierge::strings.section_knowledge_help'))
+                ->schema([
+                    Textarea::make('deployment_knowledge')
+                        ->hiddenLabel()
+                        ->rows(10)
+                        ->placeholder(trans('concierge::strings.placeholder_knowledge'))
+                        ->helperText(trans('concierge::strings.help_knowledge'))
+                        ->default(fn () => ConciergeSettings::current()->deployment_knowledge),
                 ]),
 
             // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
