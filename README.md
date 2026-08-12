@@ -1,8 +1,15 @@
 # Concierge
 
-An AI assistant for **Pelican Panel**. Your users describe what they want in plain
-language — *"make me a Minecraft server for six friends"*, *"why can nobody join?"* —
-and the assistant does it, or explains what is wrong.
+An AI assistant for **Pelican Panel**, built for the two people who use one:
+
+- **Administrators** run the panel by asking — *"is the node healthy?"*, *"why can't this
+  user start their server?"*, *"open ports 27600-27610"*.
+- **Players** get their own server without learning the panel — *"make me a Minecraft
+  server for six friends"*, *"why can nobody join?"* — creating within the quota you gave
+  them through [User Creatable Servers](https://hub.pelican.dev/plugins).
+
+Both talk to the same assistant. What it will do for each of them is decided by their own
+panel permissions, and nothing else.
 
 It runs as a sidebar on every panel page, so nobody has to leave what they were doing.
 
@@ -25,21 +32,26 @@ If you don't run a Pelican Panel, this repository won't be useful to you on its 
 
 ## Why
 
-Pelican's own forms are excellent, but they assume you know what an egg is, which port a
-game listens on, and what a Docker image tag means. Plenty of people who want to run a
-server for their friends do not, and never will.
+**For players.** Pelican's own forms are excellent, but they assume you know what an egg
+is, which port a game listens on, and what a Docker image tag means. Plenty of people who
+want to run a server for their friends do not, and never will. Give them a quota with User
+Creatable Servers and they can describe what they want instead — the assistant sizes it,
+picks the port, installs it, and later tells them why nobody can join.
 
-This plugin is aimed squarely at them. It does not replace the panel — every action it
-takes is one the panel already supports, performed through the panel's own services.
+**For administrators.** The answer to an operational question is usually spread across
+several screens: the node, its allocations, the user, their role, the activity log. Asking
+for it is faster than assembling it, and the assistant reads all of those — then makes the
+change too, if your role allows it.
 
-It grew a second audience since: the person running the panel. Ask why a node is unhealthy,
-who owns what, why someone cannot do something, or hand out ports and roles — the same
-assistant, with whatever authority your own account has and nothing beyond it.
+It does not replace the panel. Every action it takes is one the panel already supports,
+performed through the panel's own services and permissions.
 
 ## What it can do
 
 Around 70 tools. **Nobody gets all of them** — the list handed to the model is assembled
 from the requester's own permissions, so it differs per person.
+
+### Running a game server — for whoever owns or was invited to it
 
 | Area | Examples |
 |---|---|
@@ -56,7 +68,7 @@ from the requester's own permissions, so it differs per person.
 | Repair | reinstall a server whose game files are broken |
 | Web | search the web when a question needs current information |
 
-For administrators, on top of the above:
+### Running the panel — for administrators, as far as their role reaches
 
 | Area | Examples |
 |---|---|
@@ -74,9 +86,9 @@ permissions, and every change still goes through a confirmation card.
 
 | Requester | What the assistant offers |
 |---|---|
-| Administrator | Everything above, **plus** the admin side — nodes, users, roles, allocations, eggs, mounts, hosts, health and activity, and the changes their role permits (maintenance mode, ports, suspension, accounts, roles, ownership, node and mount creation, deletions) |
-| User with User Creatable Servers | Creating servers within their quota, and full care of the servers they own or are invited to |
-| User without it | **Care only** — their existing servers: start/stop, logs and diagnosis, files, backups, schedules, mods, inviting friends. Creation is not offered at all; the assistant says an administrator has to do it |
+| **Administrator** | Both tables above — the panel side as far as their role reaches (a node-only admin gets node tools and nothing else), and the servers they can touch |
+| **Player, with User Creatable Servers** | Creating servers within the quota you gave them, and full care of the servers they own or were invited to |
+| **Player, without it** | **Care only.** Creation is not offered at all — the assistant says an administrator has to make the server, and gets on with running the ones they have |
 
 Permissions are checked twice — when deciding which tools to hand the model, and again when a
 tool runs — so a conversation cannot reach past what the person could do on their own screens.
@@ -182,10 +194,12 @@ ships a new model you can add it there without touching code.
 
 ## Cost
 
-Every message costs money on your Anthropic key. Two things keep it visible and bounded:
+Every message costs money on whichever provider key you configured. Two things keep it
+visible and bounded:
 
-- **Usage tracking** — *Admin → Advanced → AI Agent Usage* shows tokens and estimated
-  cost per user and per conversation, with the full message and tool log.
+- **Usage tracking** — *Admin → Advanced → AI Agent Usage*: the full log of every
+  conversation with its messages and tool calls, per-user statistics (total, last day,
+  last 7 and 30 days, and how much of their limit is spent), and charts of daily use.
 - **A configurable usage limit**, on by default (50 messages per user per day). Count
   messages or tokens, per user or panel-wide, per hour/day/week/month — a panel-wide
   token budget puts a real ceiling on the bill, and its consumption is shown on the
@@ -218,7 +232,7 @@ UCS keeps the port protection while turning off its features.
 
 ## Tuning it for your panel
 
-Two files decide what the assistant knows.
+Two things decide what the assistant knows beyond what its tools return.
 
 **`resources/catalog/games.yaml`** — 18 games, mapped to the eggs they need, with query
 type, ports, which variables are secret, and post-install steps. This is what the
