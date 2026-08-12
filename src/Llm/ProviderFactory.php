@@ -39,7 +39,7 @@ final class ProviderFactory
         return match ($id) {
             'openai' => new Capabilities(true, true, true, false),
             'openai-compatible' => new Capabilities(true, false, false, true),
-            'gemini' => new Capabilities(true, false, false, false),
+            'gemini' => new Capabilities(true, true, false, false),
             default => new Capabilities(true, true, true, false),
         };
     }
