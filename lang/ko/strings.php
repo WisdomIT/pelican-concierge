@@ -437,6 +437,8 @@ return [
     'stats_tokens' => '토큰',
     'chart_daily_messages' => '일별 메시지 (최근 30일)',
     'chart_daily_tokens' => '일별 토큰 (최근 30일)',
+    'chart_user_cumulative' => '사용자별 누적 토큰 (최근 30일)',
+    'chart_others' => '기타',
     'stat_no_limit' => '한도 없음',
     'stat_panel_limit' => ':metric 한도 (패널 전체 · :period)',
     'stat_limit_resets' => '초기화: :reset',

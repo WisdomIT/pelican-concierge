@@ -436,6 +436,8 @@ return [
     'stats_tokens' => 'tokens',
     'chart_daily_messages' => 'Messages per day (last 30 days)',
     'chart_daily_tokens' => 'Tokens per day (last 30 days)',
+    'chart_user_cumulative' => 'Cumulative tokens per user (last 30 days)',
+    'chart_others' => 'Others',
     'stat_no_limit' => 'No limit',
     'stat_panel_limit' => ':metric limit (panel-wide · :period)',
     'stat_limit_resets' => 'Resets: :reset',

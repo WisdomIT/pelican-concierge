@@ -6,6 +6,7 @@ use Filament\Resources\Pages\Page;
 use WisdomIT\Concierge\Filament\Admin\Resources\ConciergeUsages\ConciergeUsageResource;
 use WisdomIT\Concierge\Filament\Admin\Widgets\ConciergeDailyMessagesChart;
 use WisdomIT\Concierge\Filament\Admin\Widgets\ConciergeDailyTokensChart;
+use WisdomIT\Concierge\Filament\Admin\Widgets\ConciergeUserCumulativeChart;
 use WisdomIT\Concierge\Filament\Admin\Widgets\UsageTabs;
 
 /**
@@ -32,6 +33,7 @@ class UsageCharts extends Page
             UsageTabs::class,
             ConciergeDailyMessagesChart::class,
             ConciergeDailyTokensChart::class,
+            ConciergeUserCumulativeChart::class,
         ];
     }
 }

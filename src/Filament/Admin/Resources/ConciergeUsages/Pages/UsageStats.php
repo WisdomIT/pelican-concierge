@@ -54,6 +54,10 @@ class UsageStats extends Page implements HasTable
             ->query(fn (): Builder => $this->statsQuery($userRule))
             ->defaultSort('m_total', 'desc')
             ->paginated([25, 50])
+            // 행을 누르면 사용 로그 탭을 그 사용자로 필터해서 연다.
+            ->recordUrl(fn ($record) => ConciergeUsageResource::getUrl('index', [
+                'tableFilters' => ['user_id' => ['value' => $record->id]],
+            ]))
             ->columns(array_values(array_filter([
                 TextColumn::make('username')
                     ->label(trans('concierge::strings.field_user'))
