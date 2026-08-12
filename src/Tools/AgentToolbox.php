@@ -79,9 +79,13 @@ final class AgentToolbox
 
     private readonly GameCatalog $catalog;
 
+    /** 요청자가 어느 갈래를 받는가 (#45) — 도구 노출과 프롬프트가 같은 판정을 본다. */
+    public readonly RequesterScope $scope;
+
     public function __construct(private readonly User $user)
     {
         $this->catalog = new GameCatalog();
+        $this->scope = new RequesterScope($user);
     }
 
     /**
@@ -102,12 +106,36 @@ final class AgentToolbox
     /** 모드·플러그인 도구. 쓸 수 있는 서버가 하나도 없으면 뺀다. */
     private const MOD_TOOLS = ['search_mods', 'install_mod', 'list_installed_mods', 'uninstall_mod', 'update_mod'];
 
+    /** 서버를 새로 만드는 도구 (#45). */
+    private const CREATE_TOOLS = ['list_available_games', 'create_server'];
+
+    /** 패널 관리 도구 (#45) — #46 에서 채운다. */
+    private const ADMIN_TOOLS = [];
+
     public function definitions(): array
     {
+        $groups = $this->scope->groups();
+
         return array_values(array_filter(
             $this->allDefinitions(),
-            fn (array $tool) => $this->isRelevant((string) $tool['name']),
+            fn (array $tool) => in_array(self::groupOf((string) $tool['name']), $groups, true)
+                && $this->isRelevant((string) $tool['name']),
         ));
+    }
+
+    /**
+     * 도구가 속한 갈래 (#45).
+     *
+     * 목록을 두 개만 둔다 — 나머지는 전부 서버를 돌보는 도구다. 도구가 늘어도
+     * 여기에 안 적으면 자동으로 care 로 잡히므로, 빠뜨려서 없는 갈래로 새는 일이 없다.
+     */
+    public static function groupOf(string $name): ToolGroup
+    {
+        return match (true) {
+            in_array($name, self::CREATE_TOOLS, true) => ToolGroup::Create,
+            in_array($name, self::ADMIN_TOOLS, true) => ToolGroup::Admin,
+            default => ToolGroup::Care,
+        };
     }
 
     /**

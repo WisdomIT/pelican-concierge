@@ -11,6 +11,7 @@ use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Llm\StopKind;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Tools\AgentToolbox;
+use WisdomIT\Concierge\Tools\ToolGroup;
 use WisdomIT\Concierge\Tools\ToolCallResult;
 use WisdomIT\Concierge\Tools\ToolException;
 
@@ -478,6 +479,25 @@ final class ChatService
         $note = $this->toolbox()->contextNote();
         $context = $note === null ? '' : "\n            ## This user's situation right now\n            {$note}\n";
 
+        // 갈래별 절(#45) — 도구 노출과 **같은 판정**(RequesterScope)을 본다. 도구는 줬는데
+        // 설명이 없거나, 설명만 있고 도구가 없는 어긋남을 구조적으로 막는다.
+        $scope = $this->toolbox()->scope;
+
+        $createSection = $scope->has(ToolGroup::Create) ? <<<'SECTION'
+            ## What you can do — create servers
+            When someone wants a server, look at list_available_games, settle **only the game and
+            the number of players** in conversation, then call create_server.
+
+            - **Never ask about memory, disk, CPU or ports.** Picking a size sets them.
+              Users choose with phrases like "about 4 of us", "maybe 8 people".
+            - Ask only what that game's `questions` list contains. Everything else is filled in for you.
+            - Do not ask for a name and do not invent one — **omit it** unless the user chose one.
+              A spec-based default ("Paper 26.2") is generated, and the card lets them edit it in place.
+            - Installing takes a while. Tell them **it takes time and starts by itself** when done.
+
+
+            SECTION : '';
+
         // 한국어는 존댓말 수위가 답변 인상을 좌우한다. 그 언어일 때만 한 줄 얹는다.
         $register = str_starts_with((string) $this->user->language, 'ko')
             ? "\n            In Korean, use 해요체 — polite but warm. Not 하십시오체 (too stiff), not 반말.\n"
@@ -554,18 +574,7 @@ final class ChatService
               will not find it.
             - If you do not know a path, find it with list_server_files first.
 
-            ## What you can do — create servers
-            When someone wants a server, look at list_available_games, settle **only the game and
-            the number of players** in conversation, then call create_server.
-
-            - **Never ask about memory, disk, CPU or ports.** Picking a size sets them.
-              Users choose with phrases like "about 4 of us", "maybe 8 people".
-            - Ask only what that game's `questions` list contains. Everything else is filled in for you.
-            - Do not ask for a name and do not invent one — **omit it** unless the user chose one.
-              A spec-based default ("Paper 26.2") is generated, and the card lets them edit it in place.
-            - Installing takes a while. Tell them **it takes time and starts by itself** when done.
-
-            ## What you can do — find and install mods/plugins
+            {$createSection}## What you can do — find and install mods/plugins
             **For Minecraft (Paper, Fabric, Forge) and Rust (oxide) you can install them yourself.**
             When you hear "what mods are there?", "recommend a map plugin", call search_mods first —
             results are already filtered to **that server's version and loader**, so compatibility is
