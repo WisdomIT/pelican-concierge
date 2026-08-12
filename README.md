@@ -184,6 +184,21 @@ the system prompt. This is where deployment facts go: the hostname players conne
 which port range your router forwards, anything the assistant cannot discover through a
 tool. Without it the assistant works but will not know your network.
 
+## What the assistant can do depends on who is asking
+
+The agent mirrors the requester's own authority: whatever they can see and do in the panel
+themselves is what it can help with, never more. The tool list is assembled from their real
+permissions, and every change still goes through a confirmation card.
+
+| Requester | What the assistant offers |
+|---|---|
+| Administrator | Everything below, **plus** the admin side — nodes, users, roles, allocations, eggs, mounts, hosts, health and activity, and the changes their role permits (maintenance mode, ports, suspension, accounts, roles, ownership, node and mount creation, deletions) |
+| User with User Creatable Servers | Creating servers within their quota, and full care of the servers they own or are invited to |
+| User without it | **Care only** — their existing servers: start/stop, logs and diagnosis, files, backups, schedules, mods, inviting friends. Creation is not offered at all; the assistant says an administrator has to do it |
+
+Permissions are checked twice — when deciding which tools to hand the model, and again when a
+tool runs — so a conversation cannot reach past what the person could do on their own screens.
+
 ## Limitations
 
 - Everything the assistant does happens as the **panel user**, inside their permissions

@@ -5,6 +5,7 @@ namespace WisdomIT\Concierge\Tools;
 use App\Enums\RolePermissionModels;
 use App\Enums\RolePermissionPrefixes;
 use App\Models\User;
+use WisdomIT\Concierge\Services\ServerProvisioner;
 
 /**
  * 이 요청자가 어느 갈래의 도구를 받는가 (#45).
@@ -21,6 +22,8 @@ final class RequesterScope
     /** @var array<string, bool> 권한 문자열 → 허용 여부. 한 요청에서 여러 번 묻는다. */
     private array $checked = [];
 
+    private ?bool $canCreate = null;
+
     public function __construct(private readonly User $user) {}
 
     /**
@@ -30,13 +33,26 @@ final class RequesterScope
      */
     public function groups(): array
     {
-        $groups = [ToolGroup::Care, ToolGroup::Create];
+        $groups = [ToolGroup::Care];
+
+        // 개설은 UCS 가 있거나 패널의 create server 권한이 있어야 한다(#17). 못 하는
+        // 사람에게 개설 도구를 쥐여 주면 불러 보고 실패한다 — 왕복이 낭비되고, 그보다
+        // 나쁘게는 에이전트가 해 줄 수 있는 일처럼 말하게 된다(#48).
+        if ($this->canCreateServers()) {
+            $groups[] = ToolGroup::Create;
+        }
 
         if ($this->isPanelAdmin()) {
             $groups[] = ToolGroup::Admin;
         }
 
         return $groups;
+    }
+
+    /** 이 사람이 서버를 만들 수 있는가 — 판정은 ServerProvisioner 가 이미 갖고 있다. */
+    public function canCreateServers(): bool
+    {
+        return $this->canCreate ??= ServerProvisioner::creationGate($this->user) === null;
     }
 
     public function has(ToolGroup $group): bool

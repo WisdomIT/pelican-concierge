@@ -532,6 +532,18 @@ final class AgentToolbox
      */
     public function contextNote(): ?string
     {
+        // ⚠ 개설을 못 하는 사람에게 "만들어 보세요"는 막다른 길이다(#48). 이 두 경우가
+        //   먼저 걸러져야 한다 — 아래의 "서버가 없다" 안내가 개설을 전제하기 때문이다.
+        if (!$this->scope->canCreateServers()) {
+            return $this->serverCount() === 0
+                ? 'This user **cannot create servers on this panel and has none yet**, so there is nothing for you '
+                    . 'to work on. Do not suggest creating one — tell them an administrator has to create a server '
+                    . 'for them (or give them access to one), and offer to help the moment they have one.'
+                : 'This user **cannot create servers on this panel** — only administrators can here. Never suggest '
+                    . 'making a new one; if they ask, say plainly that an admin has to do it. Everything else about '
+                    . 'the servers they already have is yours to help with.';
+        }
+
         if ($this->serverCount() === 0) {
             return 'This user has **no servers at all**, so the server tools were not given to you — '
                 . 'focus on helping them create one, and do not talk about touching an existing server.';
