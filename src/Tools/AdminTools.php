@@ -13,6 +13,10 @@ use App\Services\Allocations\AssignmentService;
 use App\Services\Servers\DetailsModificationService;
 use App\Services\Servers\SuspensionService;
 use App\Services\Users\UserCreationService;
+use App\Services\Users\UserUpdateService;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Password;
+use Spatie\Permission\Models\Permission;
 
 /**
  * 패널 관리 화면을 **읽는** 도구들 (#46).
@@ -366,6 +370,193 @@ final class AdminTools
 
         return "Server {$server->name} now belongs to {$newOwner->username} (was {$previous}). "
             . 'The previous owner lost access unless they are a subuser.';
+    }
+
+    /**
+     * 계정 정보 수정 (#63) — **비밀번호는 다루지 않는다.**
+     *
+     * 바꿀 수 있는 것은 아이디·이메일·언어·시간대뿐이다. 비밀번호가 필요하면
+     * send_password_reset 이 링크를 보낸다 — 채팅에 비밀번호가 오갈 자리를 만들지 않는다.
+     */
+    public function updatePanelUser(array $input): string
+    {
+        $user = $this->targetableUser((string) ($input['user'] ?? ''));
+
+        $changes = [];
+
+        foreach (['username', 'email', 'language', 'timezone'] as $field) {
+            $value = trim((string) ($input[$field] ?? ''));
+
+            if ($value === '' || $value === (string) $user->{$field}) {
+                continue;
+            }
+
+            $changes[$field] = $value;
+        }
+
+        if ($changes === []) {
+            throw new ToolInputException('Nothing to change — pass at least one of username, email, language, timezone.');
+        }
+
+        if (isset($changes['email'])) {
+            if (!filter_var($changes['email'], FILTER_VALIDATE_EMAIL)) {
+                throw new ToolInputException('That email is not valid.');
+            }
+
+            if (User::query()->whereRaw('lower(email) = ?', [mb_strtolower($changes['email'])])->whereKeyNot($user->id)->exists()) {
+                throw new ToolInputException('Another account already uses that email.');
+            }
+        }
+
+        if (isset($changes['username'])
+            && User::query()->whereRaw('lower(username) = ?', [mb_strtolower($changes['username'])])->whereKeyNot($user->id)->exists()) {
+            throw new ToolInputException('That username is taken.');
+        }
+
+        $before = collect($changes)->keys()->mapWithKeys(fn (string $f) => [$f => (string) $user->{$f}])->all();
+
+        app(UserUpdateService::class)->handle($user, $changes);
+
+        $summary = collect($changes)
+            ->map(fn (string $value, string $field) => "{$field}: " . ($before[$field] ?: '(empty)') . " → {$value}")
+            ->implode(', ');
+
+        return "Updated {$user->username} — {$summary}.";
+    }
+
+    /** 비밀번호 재설정 링크 — 비밀번호를 대신 정해 주는 대신 본인이 정하게 한다. */
+    public function sendPasswordReset(array $input): string
+    {
+        $user = $this->targetableUser((string) ($input['user'] ?? ''));
+
+        $status = Password::broker(Filament::getPanel('app')->getAuthPasswordBroker())
+            ->sendResetLink(['email' => $user->email]);
+
+        if ($status !== Password::RESET_LINK_SENT) {
+            throw new ToolInputException("Could not send the reset link ({$status}). Check the panel's mail settings.");
+        }
+
+        return "A password reset link was emailed to {$user->username}. The link expires, and nobody else can read it — "
+            . 'you never see or set their password.';
+    }
+
+    /** 2단계 인증 해제 — 잠긴 사람을 들여보내는 대신 계정은 그만큼 약해진다. */
+    public function clearUserMfa(array $input): string
+    {
+        $user = $this->targetableUser((string) ($input['user'] ?? ''));
+
+        if (blank($user->mfa_app_secret) && !$user->mfa_email_enabled) {
+            throw new ToolInputException("{$user->username} has no two-factor set up — nothing to clear.");
+        }
+
+        $user->forceFill([
+            'mfa_app_secret' => null,
+            'mfa_app_recovery_codes' => null,
+            'mfa_email_enabled' => false,
+        ])->saveOrFail();
+
+        return "Two-factor authentication was removed for {$user->username}. They can sign in with their password alone "
+            . 'until they set it up again — tell them to turn it back on.';
+    }
+
+    /**
+     * 역할 만들기·권한 편집 (#63).
+     *
+     * 넘긴 목록이 **그 역할의 권한 전부**가 된다 — 빠진 것은 회수된다. 패널의 역할
+     * 화면과 같은 규칙이고, 카드가 전체 목록을 그대로 보여준다.
+     */
+    public function setRolePermissions(array $input): string
+    {
+        $name = trim((string) ($input['role'] ?? ''));
+        $permissions = $this->rolePermissions($input);
+
+        if ($name === '') {
+            throw new ToolInputException('role is required — the name of a role to edit, or a new name to create.');
+        }
+
+        $role = Role::query()->whereRaw('lower(name) = ?', [mb_strtolower($name)])->first();
+        $created = $role === null;
+
+        if ($role !== null && $role->name === Role::ROOT_ADMIN) {
+            throw new ToolInputException('Root Admin holds everything implicitly — its permissions cannot be edited.');
+        }
+
+        if ($created) {
+            $role = Role::query()->create(['name' => $name, 'guard_name' => Role::DEFAULT_GUARD_NAME]);
+        }
+
+        // ⚠ Spatie 는 **이미 존재하는 권한만** 붙일 수 있다 — 패널의 역할 화면도 같은 이유로
+        //   firstOrCreate 를 쓴다. 없는 이름을 그냥 넘기면 "no permission named …" 로 죽는다.
+        $models = collect($permissions)->map(fn (string $name) => Permission::firstOrCreate([
+            'name' => $name,
+            'guard_name' => Role::DEFAULT_GUARD_NAME,
+        ]));
+
+        $role->syncPermissions($models);
+
+        return sprintf(
+            '%s the role "%s" with %d permissions: %s',
+            $created ? 'Created' : 'Updated',
+            $role->name,
+            count($permissions),
+            implode(', ', $permissions),
+        );
+    }
+
+    /**
+     * 역할이 받을 권한 목록을 검사한다 — 패널이 아는 이름만, 그리고 **자기가 가진 것만**.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<int, string>
+     */
+    public function rolePermissions(array $input): array
+    {
+        $given = array_values(array_unique(array_map('trim', (array) ($input['permissions'] ?? []))));
+
+        if ($given === []) {
+            throw new ToolInputException(
+                'permissions is required — a list like ["viewList node", "view node"]. '
+                . 'An empty list would strip the role instead; say so explicitly if that is the intent.',
+            );
+        }
+
+        $valid = [];
+
+        foreach (Role::getPermissionList() as $model => $prefixes) {
+            foreach ($prefixes as $prefix) {
+                $valid[] = "{$prefix} {$model}";
+            }
+        }
+
+        $unknown = array_diff($given, $valid);
+
+        if ($unknown !== []) {
+            throw new ToolInputException('Unknown permissions: ' . implode(', ', $unknown));
+        }
+
+        // ⚠ 자기가 못 하는 일을 남에게 줄 수 없다 — 서브유저 초대와 같은 규칙(#62).
+        //   루트 관리자는 전부 통과하므로 이 검사에 걸리지 않는다.
+        $beyond = array_values(array_filter($given, fn (string $p) => !$this->user->can($p)));
+
+        if ($beyond !== []) {
+            throw new ToolInputException(
+                'You cannot grant permissions you do not hold yourself: ' . implode(', ', $beyond),
+            );
+        }
+
+        return $given;
+    }
+
+    /** 손댈 수 있는 사용자인가 — 루트 관리자는 대상이 될 수 없다. */
+    public function targetableUser(string $reference): User
+    {
+        $user = $this->resolveUser($reference);
+
+        if (!$this->user->canTarget($user)) {
+            throw new ToolInputException("You cannot change {$user->username}'s account.");
+        }
+
+        return $user;
     }
 
     /** @return array{0: User, 1: Role} */

@@ -16,6 +16,7 @@ use App\Enums\ServerState;
 use App\Models\Allocation;
 use App\Models\Backup;
 use App\Helpers\Utilities;
+use App\Models\Role;
 use App\Models\Schedule;
 use App\Models\Subuser;
 use App\Services\Servers\ReinstallServerService;
@@ -214,6 +215,74 @@ final class AgentToolbox
                 ]);
             })(),
 
+            'update_panel_user' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                $lines = [['label' => trans('concierge::strings.card_user'), 'value' => $user->username]];
+
+                foreach (['username', 'email', 'language', 'timezone'] as $field) {
+                    $value = trim((string) ($input[$field] ?? ''));
+
+                    if ($value !== '' && $value !== (string) $user->{$field}) {
+                        $lines[] = [
+                            'label' => trans('concierge::strings.card_field_' . $field),
+                            // 바뀌는 값은 **지금 값과 함께** 보여준다 — 무엇이 사라지는지 보여야 한다.
+                            'value' => ((string) $user->{$field} ?: '(없음)') . ' → ' . $value,
+                        ];
+                    }
+                }
+
+                return array_merge($common, ['lines' => $lines, 'note' => null, 'danger' => false]);
+            })(),
+
+            'send_password_reset' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        ['label' => trans('concierge::strings.card_email'), 'value' => $user->email],
+                    ],
+                    'note' => trans('concierge::strings.card_note_password_reset'),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'clear_user_mfa' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        [
+                            'label' => trans('concierge::strings.card_mfa_now'),
+                            'value' => trans('concierge::strings.card_mfa_' . (filled($user->mfa_app_secret) ? 'app' : ($user->mfa_email_enabled ? 'email' : 'none'))),
+                        ],
+                    ],
+                    'note' => trans('concierge::strings.card_note_clear_mfa'),
+                    'danger' => true,
+                ]);
+            })(),
+
+            'set_role_permissions' => (function () use ($common, $input) {
+                $name = trim((string) ($input['role'] ?? ''));
+                $role = Role::query()->whereRaw('lower(name) = ?', [mb_strtolower($name)])->first();
+                // 권한 검사를 카드 전에 돌린다 — 승인 뒤에 실패하지 않는다.
+                $permissions = $this->admin()->rolePermissions($input);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_role_' . ($role === null ? 'create' : 'edit')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_role'), 'value' => $name],
+                        ['label' => trans('concierge::strings.card_role_users'), 'value' => (string) ($role?->users()->count() ?? 0)],
+                        // 🔴 개수가 아니라 **전문**을 보여준다 — 잘못된 권한 하나가 관리 화면 전체를 넘긴다.
+                        ['label' => trans('concierge::strings.card_permissions'), 'value' => implode(', ', $permissions)],
+                    ],
+                    'note' => trans('concierge::strings.card_note_role_permissions'),
+                    'danger' => true,
+                ]);
+            })(),
+
             default => (function () use ($common, $input) {
                 $server = $this->admin()->serverFacts($input);
                 $suspend = (bool) ($input['suspended'] ?? true);
@@ -258,6 +327,8 @@ final class AgentToolbox
         'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        // 사용자·역할 2차 (#63)
+        'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
         // 읽기 2차 (#61)
         'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
         'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
@@ -297,6 +368,12 @@ final class AgentToolbox
         // 헬스·활동 로그는 전용 리소스가 없다 — 노드를 볼 수 있는 사람이 보는 화면이다.
         'get_panel_health' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
         'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        // 사용자·역할 2차 (#63)
+        'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'clear_user_mfa' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        // 역할 편집은 역할을 고치는 권한이다. 새로 만드는 경우까지 이 한 도구가 덮는다.
+        'set_role_permissions' => [RolePermissionPrefixes::Update, RolePermissionModels::Role],
     ];
 
     public function definitions(): array
@@ -1074,6 +1151,60 @@ final class AgentToolbox
                 ],
             ],
             [
+                'name' => 'update_panel_user',
+                'description' => 'Change an account\'s username, email, language or timezone. **Passwords are not handled '
+                    . 'here** — use send_password_reset instead. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Username, email or id of the account to change.'],
+                        'username' => ['type' => 'string', 'description' => 'New username.'],
+                        'email' => ['type' => 'string', 'description' => 'New email address.'],
+                        'language' => ['type' => 'string', 'description' => 'Language code, e.g. ko or en.'],
+                        'timezone' => ['type' => 'string', 'description' => 'IANA timezone, e.g. Asia/Seoul.'],
+                    ],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'send_password_reset',
+                'description' => 'Email someone a link to set a new password themselves. This is the answer to "reset '
+                    . 'their password for me" — **you never see or choose a password.** Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'clear_user_mfa',
+                'description' => 'Remove two-factor authentication from an account that is locked out of it. '
+                    . 'Their account is weaker until they set it up again — say so. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'set_role_permissions',
+                'description' => 'Create a role or replace what an existing one grants. The list you pass becomes the '
+                    . 'role\'s **complete** set — anything missing is revoked from everyone holding it. Permission names '
+                    . 'look like "viewList node" or "update user"; check list_roles first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'role' => ['type' => 'string', 'description' => 'Existing role name to edit, or a new name to create.'],
+                        'permissions' => [
+                            'type' => 'array',
+                            'items' => ['type' => 'string'],
+                            'description' => 'Complete permission list, e.g. ["viewList node", "view node", "update node"].',
+                        ],
+                    ],
+                    'required' => ['role', 'permissions'],
+                ],
+            ],
+            [
                 'name' => 'transfer_server_owner',
                 'description' => 'Hand a server over to another user. **The previous owner loses access** unless they '
                     . 'are also a subuser. Confirmation card runs first.',
@@ -1126,6 +1257,7 @@ final class AgentToolbox
         // 관리 변경 (#47) — 남의 서버·노드·계정을 건드리므로 예외 없이 카드를 거친다.
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
     ];
 
     /**
@@ -1226,6 +1358,7 @@ final class AgentToolbox
         if (in_array($name, [
             'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
             'create_panel_user', 'set_user_role', 'transfer_server_owner',
+            'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
         ], true)) {
             return $this->adminCard($name, $input);
         }
@@ -1709,6 +1842,11 @@ final class AgentToolbox
                 'create_panel_user' => new ToolCallResult($name, $input, $this->admin()->createPanelUser($input)),
                 'set_user_role' => new ToolCallResult($name, $input, $this->admin()->setUserRole($input)),
                 'transfer_server_owner' => new ToolCallResult($name, $input, $this->admin()->transferServerOwner($input)),
+                // 사용자·역할 2차 (#63)
+                'update_panel_user' => new ToolCallResult($name, $input, $this->admin()->updatePanelUser($input)),
+                'send_password_reset' => new ToolCallResult($name, $input, $this->admin()->sendPasswordReset($input)),
+                'clear_user_mfa' => new ToolCallResult($name, $input, $this->admin()->clearUserMfa($input)),
+                'set_role_permissions' => new ToolCallResult($name, $input, $this->admin()->setRolePermissions($input)),
                 // 관리 화면 읽기 2차 (#61)
                 'list_eggs' => new ToolCallResult($name, $input, $this->adminRead()->listEggs()),
                 'get_egg_details' => new ToolCallResult($name, $input, $this->adminRead()->getEggDetails($input)),
