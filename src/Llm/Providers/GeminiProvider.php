@@ -226,7 +226,10 @@ final class GeminiProvider implements LlmProvider
      * 중립 대화 → Gemini contents.
      *
      * 결과(functionResponse)는 이름으로 짝을 맞춰야 해서, 지나온 tool_uses 의
-     * id → 이름·서명을 기억해 두었다가 결과를 만나면 되찾는다.
+     * id → 이름을 기억해 두었다가 결과를 만나면 되찾는다.
+     *
+     * 서명 없는 호출(다른 공급자에서 만들어진 이력)은 호출·결과를 짝지어 **글로 풀어
+     * 쓴다** — 그래야 공급자를 바꿔 카드를 재개해도 대화가 끊기지 않는다(#53).
      *
      * @param  array<int, array<string, mixed>>  $messages
      * @return array<int, array<string, mixed>>
@@ -236,20 +239,40 @@ final class GeminiProvider implements LlmProvider
         $contents = [];
         /** @var array<string, string> $names id → 함수 이름 */
         $names = [];
+        /** @var array<string, true> $narrated 서명이 없어 글로 풀어 쓴 호출의 id */
+        $narrated = [];
 
         foreach ($messages as $message) {
             if (isset($message['tool_results'])) {
-                $contents[] = [
-                    'role' => 'user',
-                    'parts' => array_map(fn (array $result) => [
+                $parts = [];
+
+                foreach ($message['tool_results'] as $result) {
+                    $name = $names[$result['id']] ?? 'unknown';
+
+                    // 짝이 되는 호출을 글로 풀어 썼으면 결과도 글이어야 한다 —
+                    // 짝 없는 functionResponse 는 Gemini 가 거부한다.
+                    if (isset($narrated[$result['id']])) {
+                        $parts[] = ['text' => sprintf(
+                            "[Result of the earlier %s call%s]\n%s",
+                            $name,
+                            $result['is_error'] ? ' (it failed)' : '',
+                            $result['content'],
+                        )];
+
+                        continue;
+                    }
+
+                    $parts[] = [
                         'functionResponse' => [
-                            'name' => $names[$result['id']] ?? 'unknown',
+                            'name' => $name,
                             'response' => $result['is_error']
                                 ? ['error' => $result['content']]
                                 : ['result' => $result['content']],
                         ],
-                    ], $message['tool_results']),
-                ];
+                    ];
+                }
+
+                $contents[] = ['role' => 'user', 'parts' => $parts];
 
                 continue;
             }
@@ -264,19 +287,30 @@ final class GeminiProvider implements LlmProvider
                 foreach ($message['tool_uses'] as $use) {
                     $names[$use['id']] = $use['name'];
 
-                    $part = [
+                    // ⚠ Gemini 는 **서명 없는 functionCall 이력을 400 으로 거부한다.**
+                    //   다른 공급자에서 연 카드를 Gemini 로 재개하면 그 이력에는 서명이
+                    //   없다(서명은 Gemini 전용 개념) — 그대로 보내면 재개 자체가 실패한다.
+                    //   그런 호출은 **글로 풀어 써서** 사실만 전달한다(#53).
+                    if (($use['thought_signature'] ?? '') === '') {
+                        $narrated[$use['id']] = true;
+
+                        $parts[] = ['text' => sprintf(
+                            '[Earlier in this conversation you called %s with %s]',
+                            $use['name'],
+                            json_encode($use['input'] === [] ? (object) [] : $use['input'], JSON_UNESCAPED_UNICODE),
+                        )];
+
+                        continue;
+                    }
+
+                    $parts[] = [
                         'functionCall' => [
                             'name' => $use['name'],
                             'args' => $use['input'] === [] ? (object) [] : $use['input'],
                         ],
+                        // Gemini 3 의 사고 서명 — 받은 그대로 돌려줘야 한다.
+                        'thoughtSignature' => $use['thought_signature'],
                     ];
-
-                    // Gemini 3 의 사고 서명 — 받은 그대로 돌려줘야 한다.
-                    if (($use['thought_signature'] ?? '') !== '') {
-                        $part['thoughtSignature'] = $use['thought_signature'];
-                    }
-
-                    $parts[] = $part;
                 }
 
                 $contents[] = ['role' => 'model', 'parts' => $parts];

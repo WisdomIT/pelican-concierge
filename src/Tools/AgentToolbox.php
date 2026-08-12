@@ -2,6 +2,8 @@
 
 namespace WisdomIT\Concierge\Tools;
 
+use App\Enums\RolePermissionModels;
+use App\Enums\RolePermissionPrefixes;
 use App\Enums\SubuserPermission;
 use App\Models\Server;
 use App\Models\User;
@@ -9,12 +11,19 @@ use App\Repositories\Daemon\DaemonFileRepository;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Throwable;
 use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 use WisdomIT\Concierge\Models\ConciergeInstallCheck;
 use App\Enums\ServerState;
 use App\Models\Allocation;
 use App\Models\Backup;
 use App\Helpers\Utilities;
+use App\Models\Role;
 use App\Models\Schedule;
+use App\Models\Subuser;
+use App\Services\Servers\ReinstallServerService;
+use App\Services\Subusers\SubuserCreationService;
+use App\Services\Subusers\SubuserDeletionService;
+use App\Services\Subusers\SubuserUpdateService;
 use App\Models\ServerVariable;
 use App\Models\Task;
 use App\Repositories\Daemon\DaemonBackupRepository;
@@ -79,9 +88,271 @@ final class AgentToolbox
 
     private readonly GameCatalog $catalog;
 
+    /** 요청자가 어느 갈래를 받는가 (#45) — 도구 노출과 프롬프트가 같은 판정을 본다. */
+    public readonly RequesterScope $scope;
+
+    private ?AdminTools $admin = null;
+
+    private ?AdminReadTools $adminRead = null;
+
     public function __construct(private readonly User $user)
     {
         $this->catalog = new GameCatalog();
+        $this->scope = new RequesterScope($user);
+    }
+
+    /** 관리 화면 조회 도구 (#46) — 실제로 부를 때만 만든다. */
+    private function admin(): AdminTools
+    {
+        return $this->admin ??= new AdminTools($this->user);
+    }
+
+    /** 관리 화면 읽기 2차 (#61). */
+    private function adminRead(): AdminReadTools
+    {
+        return $this->adminRead ??= new AdminReadTools($this->user);
+    }
+
+    /**
+     * 관리 변경의 확인 카드 (#47).
+     *
+     * 카드에 적히는 값은 **우리가 조회한 사실**이다 — 모델이 "안전합니다" 같은 말로
+     * 승인을 유도할 수 없어야 한다(기존 카드와 같은 원칙).
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function adminCard(string $name, array $input): array
+    {
+        $common = [
+            'tool' => $name,
+            'server_id' => null,
+            'title' => trans('concierge::strings.card_title_' . $name),
+            'confirm' => trans('concierge::strings.card_confirm_' . $name),
+        ];
+
+        return match ($name) {
+            'set_node_maintenance' => (function () use ($common, $input) {
+                $node = $this->admin()->nodeFacts($input);
+                $on = (bool) ($input['enabled'] ?? true);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_maintenance_' . ($on ? 'on' : 'off')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $node->name],
+                        ['label' => trans('concierge::strings.card_servers_on_node'), 'value' => (string) $node->servers()->count()],
+                    ],
+                    'note' => trans('concierge::strings.card_note_maintenance_' . ($on ? 'on' : 'off')),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'add_node_allocations' => (function () use ($common, $input) {
+                $node = $this->admin()->nodeFacts($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $node->name],
+                        ['label' => trans('concierge::strings.card_ports'), 'value' => implode(', ', (array) ($input['ports'] ?? []))],
+                        ['label' => trans('concierge::strings.card_ip'), 'value' => trim((string) ($input['ip'] ?? '0.0.0.0'))],
+                    ],
+                    'note' => null,
+                    'danger' => false,
+                ]);
+            })(),
+
+            'remove_node_allocation' => (function () use ($common, $input) {
+                // 해석 자체가 검사다 — 서버가 쓰는 포트면 여기서 막힌다.
+                $allocation = $this->admin()->allocationFacts($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $allocation->node->name],
+                        ['label' => trans('concierge::strings.card_ports'), 'value' => $allocation->ip . ':' . $allocation->port],
+                    ],
+                    'note' => null,
+                    'danger' => true,
+                ]);
+            })(),
+
+            'create_panel_user' => array_merge($common, [
+                'lines' => [
+                    ['label' => trans('concierge::strings.card_email'), 'value' => trim((string) ($input['email'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_username'), 'value' => trim((string) ($input['username'] ?? '')) ?: trans('concierge::strings.card_username_auto')],
+                ],
+                'note' => trans('concierge::strings.card_note_create_user'),
+                'danger' => false,
+            ]),
+
+            'set_user_role' => (function () use ($common, $input) {
+                // 해석이 곧 검사다 — 손댈 수 없는 계정이면 카드 단계에서 막힌다.
+                [$user, $role] = $this->admin()->userRoleFacts($input);
+                $grant = (bool) ($input['granted'] ?? true);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_role_' . ($grant ? 'grant' : 'revoke')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        ['label' => trans('concierge::strings.card_role'), 'value' => $role->name],
+                    ],
+                    'note' => trans('concierge::strings.card_note_role_' . ($grant ? 'grant' : 'revoke')),
+                    'danger' => !$grant,
+                ]);
+            })(),
+
+            'transfer_server_owner' => (function () use ($common, $input) {
+                $server = $this->admin()->serverFacts($input);
+                $newOwner = $this->admin()->userFacts((string) ($input['owner'] ?? ''));
+
+                return array_merge($common, [
+                    'server_id' => $server->id,
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                        ['label' => trans('concierge::strings.card_owner'), 'value' => $server->user?->username ?? '-'],
+                        ['label' => trans('concierge::strings.card_new_owner'), 'value' => $newOwner->username],
+                    ],
+                    'note' => trans('concierge::strings.card_note_transfer'),
+                    'danger' => true,
+                ]);
+            })(),
+
+            // 삭제 (#65) — 카드가 **무엇이 사라지는지 숫자로** 말한다. 전부 danger.
+            'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount'
+                => (function () use ($common, $input, $name) {
+                    $plan = $this->admin()->deletionPlan($name, $input);
+
+                    return array_merge($common, [
+                        'lines' => array_merge(
+                            [['label' => trans('concierge::strings.card_delete_target'), 'value' => $plan['label']]],
+                            array_map(
+                                fn (array $loss) => ['label' => trans('concierge::strings.' . $loss[0]), 'value' => $loss[1]],
+                                $plan['losses'],
+                            ),
+                        ),
+                        'note' => trans('concierge::strings.card_note_' . $name),
+                        'danger' => true,
+                    ]);
+                })(),
+
+            'create_node' => (function () use ($common, $input) {
+                // 계획을 카드 전에 세운다 — 검사가 여기서 끝나고, 카드가 그 값을 그대로 보여준다.
+                $plan = $this->admin()->nodePlan($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $plan['name']],
+                        ['label' => trans('concierge::strings.card_node_address'), 'value' => "{$plan['scheme']}://{$plan['fqdn']}:{$plan['daemon_listen']}"],
+                        ['label' => trans('concierge::strings.card_resources'), 'value' => sprintf(
+                            '%s / %s%s',
+                            $plan['memory'] >= 1024 ? round($plan['memory'] / 1024, 1) . 'GB' : $plan['memory'] . 'MB',
+                            $plan['disk'] >= 1024 ? round($plan['disk'] / 1024, 1) . 'GB' : $plan['disk'] . 'MB',
+                            $plan['cpu'] > 0 ? ", CPU {$plan['cpu']}%" : '',
+                        )],
+                    ],
+                    'note' => trans('concierge::strings.card_note_create_node'),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'create_mount' => (function () use ($common, $input) {
+                $plan = $this->admin()->mountPlan($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_mount_name'), 'value' => $plan['name']],
+                        ['label' => trans('concierge::strings.card_mount_source'), 'value' => $plan['source']],
+                        ['label' => trans('concierge::strings.card_mount_target'), 'value' => $plan['target']],
+                        ['label' => trans('concierge::strings.card_mount_mode'), 'value' => trans('concierge::strings.card_mount_' . ($plan['read_only'] ? 'ro' : 'rw'))],
+                    ],
+                    'note' => trans('concierge::strings.card_note_create_mount'),
+                    'danger' => !$plan['read_only'],
+                ]);
+            })(),
+
+            'update_panel_user' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                $lines = [['label' => trans('concierge::strings.card_user'), 'value' => $user->username]];
+
+                foreach (['username', 'email', 'language', 'timezone'] as $field) {
+                    $value = trim((string) ($input[$field] ?? ''));
+
+                    if ($value !== '' && $value !== (string) $user->{$field}) {
+                        $lines[] = [
+                            'label' => trans('concierge::strings.card_field_' . $field),
+                            // 바뀌는 값은 **지금 값과 함께** 보여준다 — 무엇이 사라지는지 보여야 한다.
+                            'value' => ((string) $user->{$field} ?: '(없음)') . ' → ' . $value,
+                        ];
+                    }
+                }
+
+                return array_merge($common, ['lines' => $lines, 'note' => null, 'danger' => false]);
+            })(),
+
+            'send_password_reset' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        ['label' => trans('concierge::strings.card_email'), 'value' => $user->email],
+                    ],
+                    'note' => trans('concierge::strings.card_note_password_reset'),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'clear_user_mfa' => (function () use ($common, $input) {
+                $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        [
+                            'label' => trans('concierge::strings.card_mfa_now'),
+                            'value' => trans('concierge::strings.card_mfa_' . (filled($user->mfa_app_secret) ? 'app' : ($user->mfa_email_enabled ? 'email' : 'none'))),
+                        ],
+                    ],
+                    'note' => trans('concierge::strings.card_note_clear_mfa'),
+                    'danger' => true,
+                ]);
+            })(),
+
+            'set_role_permissions' => (function () use ($common, $input) {
+                $name = trim((string) ($input['role'] ?? ''));
+                $role = Role::query()->whereRaw('lower(name) = ?', [mb_strtolower($name)])->first();
+                // 권한 검사를 카드 전에 돌린다 — 승인 뒤에 실패하지 않는다.
+                $permissions = $this->admin()->rolePermissions($input);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_role_' . ($role === null ? 'create' : 'edit')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_role'), 'value' => $name],
+                        ['label' => trans('concierge::strings.card_role_users'), 'value' => (string) ($role?->users()->count() ?? 0)],
+                        // 🔴 개수가 아니라 **전문**을 보여준다 — 잘못된 권한 하나가 관리 화면 전체를 넘긴다.
+                        ['label' => trans('concierge::strings.card_permissions'), 'value' => implode(', ', $permissions)],
+                    ],
+                    'note' => trans('concierge::strings.card_note_role_permissions'),
+                    'danger' => true,
+                ]);
+            })(),
+
+            default => (function () use ($common, $input) {
+                $server = $this->admin()->serverFacts($input);
+                $suspend = (bool) ($input['suspended'] ?? true);
+
+                return array_merge($common, [
+                    'server_id' => $server->id,
+                    'title' => trans('concierge::strings.card_title_suspend_' . ($suspend ? 'on' : 'off')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                        ['label' => trans('concierge::strings.card_owner'), 'value' => $server->user?->username ?? '-'],
+                    ],
+                    'note' => trans('concierge::strings.card_note_suspend_' . ($suspend ? 'on' : 'off')),
+                    'danger' => $suspend,
+                ]);
+            })(),
+        };
     }
 
     /**
@@ -102,12 +373,100 @@ final class AgentToolbox
     /** 모드·플러그인 도구. 쓸 수 있는 서버가 하나도 없으면 뺀다. */
     private const MOD_TOOLS = ['search_mods', 'install_mod', 'list_installed_mods', 'uninstall_mod', 'update_mod'];
 
+    /** 서버를 새로 만드는 도구 (#45). */
+    private const CREATE_TOOLS = ['list_available_games', 'create_server'];
+
+    /** 패널 관리 도구 — 읽기(#46) + 운영 변경(#47). 변경은 전부 확인 카드를 거친다. */
+    private const ADMIN_TOOLS = [
+        'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
+        'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+        'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        // 사용자·역할 2차 (#63)
+        'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+        // 인프라 생성 (#64)
+        'create_node', 'create_mount',
+        // 삭제 (#65) — 되돌릴 수 없다
+        'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
+        // 읽기 2차 (#61)
+        'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
+        'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
+    ];
+
+    /**
+     * 어드민 도구별로 요구하는 **리소스 권한** (#46).
+     *
+     * 서버 도구가 서브유저 권한을 그대로 따르듯(TOOL_PERMISSIONS), 관리 도구는 관리
+     * 화면의 권한을 그대로 따른다. "노드만 보는 관리자"는 노드 도구만 받는다.
+     *
+     * @var array<string, array{0: RolePermissionPrefixes, 1: RolePermissionModels}>
+     */
+    private const ADMIN_TOOL_PERMISSIONS = [
+        'list_nodes' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'get_node_status' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'list_node_allocations' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Allocation],
+        'list_panel_users' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        'list_roles' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Role],
+        // 바꾸는 도구는 **그 리소스를 고칠 수 있는 사람**에게만 (#47).
+        'set_node_maintenance' => [RolePermissionPrefixes::Update, RolePermissionModels::Node],
+        'add_node_allocations' => [RolePermissionPrefixes::Create, RolePermissionModels::Allocation],
+        'remove_node_allocation' => [RolePermissionPrefixes::Delete, RolePermissionModels::Allocation],
+        'set_server_suspended' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
+        'create_panel_user' => [RolePermissionPrefixes::Create, RolePermissionModels::User],
+        // 역할 부여는 사용자를 고치는 일이다 — 역할 자체를 만드는 권한과 다르다.
+        'set_user_role' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'transfer_server_owner' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
+        // 읽기 2차 (#61) — 각자 자기 리소스의 목록 권한을 본다.
+        'list_eggs' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'get_egg_details' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'list_mounts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Mount],
+        'list_database_hosts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::DatabaseHost],
+        'list_backup_hosts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::BackupHost],
+        'list_webhooks' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Webhook],
+        'list_api_keys' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::ApiKey],
+        // 헬스·활동 로그는 전용 리소스가 없다 — 노드를 볼 수 있는 사람이 보는 화면이다.
+        'get_panel_health' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        // 사용자·역할 2차 (#63)
+        'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'clear_user_mfa' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        // 역할 편집은 역할을 고치는 권한이다. 새로 만드는 경우까지 이 한 도구가 덮는다.
+        'set_role_permissions' => [RolePermissionPrefixes::Update, RolePermissionModels::Role],
+        // 인프라 생성 (#64)
+        'create_node' => [RolePermissionPrefixes::Create, RolePermissionModels::Node],
+        'create_mount' => [RolePermissionPrefixes::Create, RolePermissionModels::Mount],
+        // 삭제 (#65) — 각 리소스의 delete 권한을 그대로 본다.
+        'delete_server' => [RolePermissionPrefixes::Delete, RolePermissionModels::Server],
+        'delete_panel_user' => [RolePermissionPrefixes::Delete, RolePermissionModels::User],
+        'delete_role' => [RolePermissionPrefixes::Delete, RolePermissionModels::Role],
+        'delete_node' => [RolePermissionPrefixes::Delete, RolePermissionModels::Node],
+        'delete_mount' => [RolePermissionPrefixes::Delete, RolePermissionModels::Mount],
+    ];
+
     public function definitions(): array
     {
+        $groups = $this->scope->groups();
+
         return array_values(array_filter(
             $this->allDefinitions(),
-            fn (array $tool) => $this->isRelevant((string) $tool['name']),
+            fn (array $tool) => in_array(self::groupOf((string) $tool['name']), $groups, true)
+                && $this->isRelevant((string) $tool['name']),
         ));
+    }
+
+    /**
+     * 도구가 속한 갈래 (#45).
+     *
+     * 목록을 두 개만 둔다 — 나머지는 전부 서버를 돌보는 도구다. 도구가 늘어도
+     * 여기에 안 적으면 자동으로 care 로 잡히므로, 빠뜨려서 없는 갈래로 새는 일이 없다.
+     */
+    public static function groupOf(string $name): ToolGroup
+    {
+        return match (true) {
+            in_array($name, self::CREATE_TOOLS, true) => ToolGroup::Create,
+            in_array($name, self::ADMIN_TOOLS, true) => ToolGroup::Admin,
+            default => ToolGroup::Care,
+        };
     }
 
     /**
@@ -118,6 +477,13 @@ final class AgentToolbox
      */
     private function isRelevant(string $name): bool
     {
+        // 관리 도구는 서버 유무와 무관하고, 리소스 권한 하나하나로 갈린다 (#46).
+        if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
+            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
+
+            return $this->scope->can($prefix, $model);
+        }
+
         if ($this->serverCount() === 0) {
             return in_array($name, self::NO_SERVER_TOOLS, true);
         }
@@ -167,6 +533,18 @@ final class AgentToolbox
      */
     public function contextNote(): ?string
     {
+        // ⚠ 개설을 못 하는 사람에게 "만들어 보세요"는 막다른 길이다(#48). 이 두 경우가
+        //   먼저 걸러져야 한다 — 아래의 "서버가 없다" 안내가 개설을 전제하기 때문이다.
+        if (!$this->scope->canCreateServers()) {
+            return $this->serverCount() === 0
+                ? 'This user **cannot create servers on this panel and has none yet**, so there is nothing for you '
+                    . 'to work on. Do not suggest creating one — tell them an administrator has to create a server '
+                    . 'for them (or give them access to one), and offer to help the moment they have one.'
+                : 'This user **cannot create servers on this panel** — only administrators can here. Never suggest '
+                    . 'making a new one; if they ask, say plainly that an admin has to do it. Everything else about '
+                    . 'the servers they already have is yours to help with.';
+        }
+
         if ($this->serverCount() === 0) {
             return 'This user has **no servers at all**, so the server tools were not given to you — '
                 . 'focus on helping them create one, and do not talk about touching an existing server.';
@@ -601,6 +979,411 @@ final class AgentToolbox
                     'required' => ['server', 'mod'],
                 ],
             ],
+            // ── 패널 관리 화면 읽기 (#46). 노출은 리소스 권한이 가른다. 바꾸지 않는다. ──
+            [
+                'name' => 'list_nodes',
+                'description' => 'Every node on this panel: which are in maintenance, how many servers each holds, '
+                    . 'allocated vs configured memory/disk, and whether wings is answering. '
+                    . 'Call this first for anything about node health or "where do servers go".',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_node_status',
+                'description' => 'One node in depth: wings version and reachability, live host usage (memory, disk, cpu, load), '
+                    . 'free allocations, and the servers on it. Use it when a node looks unhealthy or a server will not deploy.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'list_node_allocations',
+                'description' => 'Ports on a node: how many are free, which ranges, and which server holds each used one. '
+                    . '**A node with no free ports cannot take new servers** — check this when creation fails.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'list_panel_users',
+                'description' => 'Panel users with their roles, how many servers they own, and when they were last active. '
+                    . 'Pass search to narrow by username or email. Use it to answer "who is this", "who owns what".',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['search' => ['type' => 'string', 'description' => 'Optional: match part of a username or email.']],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'list_roles',
+                'description' => 'Roles on this panel with the permissions each grants and how many users hold it. '
+                    . 'This is the answer to "why can this person not do X" — check their role here.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+
+            // ── 관리 운영 변경 (#47). 전부 확인 카드가 먼저 뜬다 — 바로 부르면 된다. ──
+            [
+                'name' => 'set_node_maintenance',
+                'description' => 'Put a node into maintenance mode or take it out. In maintenance no new server '
+                    . 'lands on it; servers already there keep running. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'enabled' => ['type' => 'boolean', 'description' => 'true = go into maintenance, false = come out.'],
+                    ],
+                    'required' => ['node', 'enabled'],
+                ],
+            ],
+            [
+                'name' => 'add_node_allocations',
+                'description' => 'Add ports to a node so servers can be deployed on them. Ports may be single values '
+                    . 'or ranges ("27600", "27700-27709"). Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'ports' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Ports or ranges, e.g. ["27600", "27700-27709"].'],
+                        'ip' => ['type' => 'string', 'description' => 'IP to bind, default 0.0.0.0.'],
+                    ],
+                    'required' => ['node', 'ports'],
+                ],
+            ],
+            [
+                'name' => 'remove_node_allocation',
+                'description' => 'Remove a free port from a node. **A port a server is using cannot be removed** — '
+                    . 'free it on that server first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'port' => ['type' => 'integer', 'description' => 'Port number to remove.'],
+                        'ip' => ['type' => 'string', 'description' => 'Only when the node has the same port on several IPs.'],
+                    ],
+                    'required' => ['node', 'port'],
+                ],
+            ],
+            [
+                'name' => 'set_server_suspended',
+                'description' => 'Suspend a server (it is stopped and its owner cannot start it) or lift the suspension. '
+                    . 'Admin authority — works on any server you administer, not just your own. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'server' => ['type' => 'string', 'description' => 'Server name, id or uuid.'],
+                        'suspended' => ['type' => 'boolean', 'description' => 'true = suspend, false = lift.'],
+                    ],
+                    'required' => ['server', 'suspended'],
+                ],
+            ],
+
+            // ── 친구 관리·재설치 (#62). 서버 주인이 화면에서 하는 일과 같다. ──
+            [
+                'name' => 'list_server_subusers',
+                'description' => 'Who else is invited to a server and what each of them may do. '
+                    . 'Read this first when someone says a friend cannot start the server or see the files.',
+                'inputSchema' => ['type' => 'object', 'properties' => $serverProperty, 'required' => ['server']],
+            ],
+            [
+                'name' => 'invite_server_subuser',
+                'description' => 'Invite someone to a server by email and give them permissions. If they have no panel '
+                    . 'account, one is created and they are emailed a link. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'email' => ['type' => 'string', 'description' => 'Email address of the person to invite.'],
+                        'permissions' => [
+                            'type' => 'array',
+                            'items' => ['type' => 'string'],
+                            'description' => 'Permission values, e.g. ["control.console", "control.start", "control.stop", "file.read"]. '
+                                . 'Give only what they asked for — you cannot grant more than you hold yourself.',
+                        ],
+                    ],
+                    'required' => ['server', 'email', 'permissions'],
+                ],
+            ],
+            [
+                'name' => 'set_subuser_permissions',
+                'description' => 'Replace what an already-invited person may do on a server. The list you pass becomes '
+                    . 'their full set — include everything they should keep. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'user' => ['type' => 'string', 'description' => 'Username or email of the invited person.'],
+                        'permissions' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The complete new permission list.'],
+                    ],
+                    'required' => ['server', 'user', 'permissions'],
+                ],
+            ],
+            [
+                'name' => 'remove_server_subuser',
+                'description' => 'Take away someone\'s access to a server entirely. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'user' => ['type' => 'string', 'description' => 'Username or email of the invited person.'],
+                    ],
+                    'required' => ['server', 'user'],
+                ],
+            ],
+            [
+                'name' => 'reinstall_server',
+                'description' => 'Reinstall a server: the game files are downloaded again from scratch. Use it when an '
+                    . 'install failed or the files are broken. **Back up first** — worlds usually survive but this cannot '
+                    . 'be undone. Confirmation card runs first.',
+                'inputSchema' => ['type' => 'object', 'properties' => $serverProperty, 'required' => ['server']],
+            ],
+
+            // ── 관리 화면 읽기 2차 (#61). 전부 조회만 한다. ──
+            [
+                'name' => 'list_eggs',
+                'description' => 'Eggs imported on this panel — what can be created here at all, how many servers use each. '
+                    . 'Check this before telling someone "an admin has to add that game".',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_egg_details',
+                'description' => 'One egg in depth: its variables (env name, default, whether users may see or edit them) '
+                    . 'and how many servers use it. Use it to explain what a startup setting is for.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['egg' => ['type' => 'string', 'description' => 'Egg name or id from list_eggs.']],
+                    'required' => ['egg'],
+                ],
+            ],
+            [
+                'name' => 'list_mounts',
+                'description' => 'Mounts configured on this panel — host directories attached into servers, and which nodes and eggs use them.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_database_hosts',
+                'description' => 'Database hosts servers can be given databases on. **No host without one can hand out databases** — '
+                    . 'check here when a database request fails. Passwords are never shown.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_backup_hosts',
+                'description' => 'Where backups are stored and which nodes use each host. Check here when backups fail. '
+                    . 'Access credentials are never shown.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_webhooks',
+                'description' => 'Webhooks configured on this panel and the events each one fires on.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_api_keys',
+                'description' => 'API keys: owner, memo, last use and expiry. **Key values are never returned** — '
+                    . 'if someone needs the value, send them to the panel screen with suggest_page.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_panel_health',
+                'description' => 'The panel\'s own health checks (database, cache, scheduler, queue, disk…). '
+                    . 'First thing to read when the panel itself misbehaves rather than a single server.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_activity_log',
+                'description' => 'Recent panel activity — who did what and when. Narrow it with user or server. '
+                    . 'This is the answer to "who deleted that", "when did this change".',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Optional: only this actor (username or id).'],
+                        'server' => ['type' => 'string', 'description' => 'Optional: only actions on this server.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+
+            [
+                'name' => 'create_panel_user',
+                'description' => 'Create a panel account. **Never handle a password** — the new user is emailed a link '
+                    . 'to set their own. Ask only for the email; a username is optional. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'email' => ['type' => 'string', 'description' => 'Email address for the new account.'],
+                        'username' => ['type' => 'string', 'description' => 'Optional — derived from the email when omitted.'],
+                    ],
+                    'required' => ['email'],
+                ],
+            ],
+            [
+                'name' => 'set_user_role',
+                'description' => 'Give a user a role or take it away. Roles decide what they can do in the admin area — '
+                    . 'check list_roles first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Username, email or id.'],
+                        'role' => ['type' => 'string', 'description' => 'Role name or id from list_roles.'],
+                        'granted' => ['type' => 'boolean', 'description' => 'true = give the role, false = take it away.'],
+                    ],
+                    'required' => ['user', 'role', 'granted'],
+                ],
+            ],
+            // ── 삭제 (#65). 되돌릴 수 없다 — 더 안전한 길이 있으면 그것부터 권할 것. ──
+            [
+                'name' => 'delete_server',
+                'description' => 'Delete a server: **its files and every backup go with it, permanently.** Suggest '
+                    . 'suspending it instead (set_server_suspended) unless they clearly want it gone. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['server' => ['type' => 'string', 'description' => 'Server name, id or uuid.']],
+                    'required' => ['server'],
+                ],
+            ],
+            [
+                'name' => 'delete_panel_user',
+                'description' => 'Delete a panel account permanently. Refused while they still own servers — hand those '
+                    . 'over first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'delete_role',
+                'description' => 'Delete a role. Everyone holding it loses what it granted — the card says how many that '
+                    . 'is. Taking the role off one person (set_user_role) is usually what they want instead. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['role' => ['type' => 'string', 'description' => 'Role name or id from list_roles.']],
+                    'required' => ['role'],
+                ],
+            ],
+            [
+                'name' => 'delete_node',
+                'description' => 'Remove a node from the panel. Refused while any server sits on it. wings on that machine '
+                    . 'is not touched. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'delete_mount',
+                'description' => 'Delete a mount. Servers using it lose that directory on their next restart. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['mount' => ['type' => 'string', 'description' => 'Mount name or id from list_mounts.']],
+                    'required' => ['mount'],
+                ],
+            ],
+
+            [
+                'name' => 'create_node',
+                'description' => 'Register a new node on the panel. **This does not make it work** — wings still has to be '
+                    . 'installed on that machine with this node\'s configuration, which you cannot do. Ports must be added '
+                    . 'afterwards too. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Node name shown on the panel.'],
+                        'fqdn' => ['type' => 'string', 'description' => 'Hostname wings answers on. https needs a real domain, not an IP.'],
+                        'memory' => ['type' => 'integer', 'description' => 'Memory this node may hand out, in MB.'],
+                        'disk' => ['type' => 'integer', 'description' => 'Disk this node may hand out, in MB.'],
+                        'cpu' => ['type' => 'integer', 'description' => 'CPU percent it may hand out; 0 = unlimited.'],
+                        'scheme' => ['type' => 'string', 'description' => 'https (default) or http for a private network.'],
+                        'behind_proxy' => ['type' => 'boolean', 'description' => 'true when a reverse proxy terminates TLS.'],
+                    ],
+                    'required' => ['name', 'fqdn', 'memory', 'disk'],
+                ],
+            ],
+            [
+                'name' => 'create_mount',
+                'description' => 'Register a mount: a directory on the node made visible inside servers. It does nothing '
+                    . 'until it is attached to nodes and eggs on the mount screen. Read-only unless asked otherwise. '
+                    . 'Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Mount name.'],
+                        'source' => ['type' => 'string', 'description' => 'Absolute path on the node, e.g. /srv/shared-maps.'],
+                        'target' => ['type' => 'string', 'description' => 'Absolute path inside the server, e.g. /home/container/maps.'],
+                        'read_only' => ['type' => 'boolean', 'description' => 'Default true. false lets servers write to the host directory.'],
+                        'description' => ['type' => 'string', 'description' => 'Optional note.'],
+                    ],
+                    'required' => ['name', 'source', 'target'],
+                ],
+            ],
+            [
+                'name' => 'update_panel_user',
+                'description' => 'Change an account\'s username, email, language or timezone. **Passwords are not handled '
+                    . 'here** — use send_password_reset instead. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Username, email or id of the account to change.'],
+                        'username' => ['type' => 'string', 'description' => 'New username.'],
+                        'email' => ['type' => 'string', 'description' => 'New email address.'],
+                        'language' => ['type' => 'string', 'description' => 'Language code, e.g. ko or en.'],
+                        'timezone' => ['type' => 'string', 'description' => 'IANA timezone, e.g. Asia/Seoul.'],
+                    ],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'send_password_reset',
+                'description' => 'Email someone a link to set a new password themselves. This is the answer to "reset '
+                    . 'their password for me" — **you never see or choose a password.** Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'clear_user_mfa',
+                'description' => 'Remove two-factor authentication from an account that is locked out of it. '
+                    . 'Their account is weaker until they set it up again — say so. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'set_role_permissions',
+                'description' => 'Create a role or replace what an existing one grants. The list you pass becomes the '
+                    . 'role\'s **complete** set — anything missing is revoked from everyone holding it. Permission names '
+                    . 'look like "viewList node" or "update user"; check list_roles first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'role' => ['type' => 'string', 'description' => 'Existing role name to edit, or a new name to create.'],
+                        'permissions' => [
+                            'type' => 'array',
+                            'items' => ['type' => 'string'],
+                            'description' => 'Complete permission list, e.g. ["viewList node", "view node", "update node"].',
+                        ],
+                    ],
+                    'required' => ['role', 'permissions'],
+                ],
+            ],
+            [
+                'name' => 'transfer_server_owner',
+                'description' => 'Hand a server over to another user. **The previous owner loses access** unless they '
+                    . 'are also a subuser. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'server' => ['type' => 'string', 'description' => 'Server name, id or uuid.'],
+                        'owner' => ['type' => 'string', 'description' => 'New owner: username, email or id.'],
+                    ],
+                    'required' => ['server', 'owner'],
+                ],
+            ],
+
             [
                 'name' => 'suggest_page',
                 'description' => 'Put a button to a panel screen in the chat, for things **the user must do themselves**. '
@@ -635,6 +1418,14 @@ final class AgentToolbox
         'uninstall_mod', 'update_mod',
         'write_server_file', 'create_server_directory', 'download_to_server',
         'delete_server_files', 'rename_server_file',
+        // 친구 관리·재설치 (#62) — 남의 접근 권한과 서버 파일이 걸린 일이다.
+        'invite_server_subuser', 'set_subuser_permissions', 'remove_server_subuser', 'reinstall_server',
+        // 관리 변경 (#47) — 남의 서버·노드·계정을 건드리므로 예외 없이 카드를 거친다.
+        'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+        'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+        'create_node', 'create_mount',
+        'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
     ];
 
     /**
@@ -694,6 +1485,12 @@ final class AgentToolbox
         'list_backups' => SubuserPermission::BackupRead,
         'create_backup' => SubuserPermission::BackupCreate,
         'restore_backup' => SubuserPermission::BackupRestore,
+        // 친구 관리·재설치 (#62) — 서버 주인이 화면에서 하는 일과 같은 권한을 본다.
+        'list_server_subusers' => SubuserPermission::UserRead,
+        'invite_server_subuser' => SubuserPermission::UserCreate,
+        'set_subuser_permissions' => SubuserPermission::UserUpdate,
+        'remove_server_subuser' => SubuserPermission::UserDelete,
+        'reinstall_server' => SubuserPermission::SettingsReinstall,
         'add_server_port' => SubuserPermission::AllocationCreate,
         'remove_server_port' => SubuserPermission::AllocationDelete,
     ];
@@ -725,6 +1522,17 @@ final class AgentToolbox
             return $this->createServerCard($input);
         }
 
+        // 관리 변경(#47)은 대상이 노드·할당이거나 **남의 서버**다 — serverFor 로 풀 수 없다.
+        if (in_array($name, [
+            'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+            'create_panel_user', 'set_user_role', 'transfer_server_owner',
+            'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+            'create_node', 'create_mount',
+            'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
+        ], true)) {
+            return $this->adminCard($name, $input);
+        }
+
         $server = $this->serverFor($name, $input);
 
         $common = [
@@ -743,6 +1551,38 @@ final class AgentToolbox
                 ],
                 'note' => $name === 'start_server' ? null : trans('concierge::strings.card_note_disconnect'),
                 'danger' => $name !== 'start_server',
+            ];
+        }
+
+        // 친구 관리·재설치 (#62) — 카드에 적히는 값은 우리가 조회·검증한 것이다.
+        if (in_array($name, ['invite_server_subuser', 'set_subuser_permissions', 'remove_server_subuser'], true)) {
+            $who = $name === 'invite_server_subuser'
+                ? trim((string) ($input['email'] ?? ''))
+                : ($this->subuserFor($server, (string) ($input['user'] ?? ''))->user?->username ?? '?');
+
+            return $common + [
+                'lines' => array_values(array_filter([
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_friend'), 'value' => $who],
+                    $name === 'remove_server_subuser' ? null : [
+                        'label' => trans('concierge::strings.card_permissions'),
+                        // 권한 검사를 카드 전에 돌린다 — 승인 화면까지 갔다가 실패하지 않는다.
+                        'value' => implode(', ', $this->subuserPermissions($input, $server)),
+                    ],
+                ])),
+                'note' => trans('concierge::strings.card_note_' . $name),
+                'danger' => $name === 'remove_server_subuser',
+            ];
+        }
+
+        if ($name === 'reinstall_server') {
+            return $common + [
+                'lines' => [
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
+                ],
+                'note' => trans('concierge::strings.card_note_reinstall_tool'),
+                'danger' => true,
             ];
         }
 
@@ -1105,6 +1945,17 @@ final class AgentToolbox
     {
         $this->lastServerId = null;
 
+        // ⚠ 여기도 권한 경계다 (#46). 노출에서 걸렀다고 실행을 그냥 열어 두면, 재개된
+        //   상태나 인젝션으로 도구 이름이 들어왔을 때 권한 없는 조회가 통과한다 —
+        //   서버 도구가 serverFor() 에서 다시 묻는 것과 같은 이유로 여기서 다시 묻는다.
+        if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
+            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
+
+            if (!$this->scope->can($prefix, $model)) {
+                return ToolCallResult::error($name, $input, 'You do not have permission to read that on this panel.');
+            }
+        }
+
         try {
             return match ($name) {
                 'list_my_servers' => $this->listMyServers($input),
@@ -1137,10 +1988,51 @@ final class AgentToolbox
                 'list_backups' => $this->listBackups($input),
                 'create_backup' => $this->createBackup($input),
                 'restore_backup' => $this->restoreBackup($input),
+                // 친구 관리·재설치 (#62)
+                'list_server_subusers' => $this->listServerSubusers($input),
+                'invite_server_subuser' => $this->inviteServerSubuser($input),
+                'set_subuser_permissions' => $this->setSubuserPermissions($input),
+                'remove_server_subuser' => $this->removeServerSubuser($input),
+                'reinstall_server' => $this->reinstallServer($input),
                 'update_server_resources' => $this->updateServerResources($input),
                 'add_server_port' => $this->addServerPort($input),
                 'remove_server_port' => $this->removeServerPort($input),
                 'install_mod' => $this->installMod($input),
+                // 관리 화면 읽기 (#46) — 노출은 이미 리소스 권한으로 걸렀다.
+                'list_nodes' => new ToolCallResult($name, $input, $this->admin()->listNodes()),
+                'get_node_status' => new ToolCallResult($name, $input, $this->admin()->getNodeStatus($input)),
+                'list_node_allocations' => new ToolCallResult($name, $input, $this->admin()->listNodeAllocations($input)),
+                'list_panel_users' => new ToolCallResult($name, $input, $this->admin()->listPanelUsers($input)),
+                'list_roles' => new ToolCallResult($name, $input, $this->admin()->listRoles()),
+                // 관리 운영 변경 (#47) — 카드 승인 뒤에만 여기까지 온다.
+                'set_node_maintenance' => new ToolCallResult($name, $input, $this->admin()->setNodeMaintenance($input)),
+                'add_node_allocations' => new ToolCallResult($name, $input, $this->admin()->addNodeAllocations($input)),
+                'remove_node_allocation' => new ToolCallResult($name, $input, $this->admin()->removeNodeAllocation($input)),
+                'set_server_suspended' => new ToolCallResult($name, $input, $this->admin()->setServerSuspended($input)),
+                'create_panel_user' => new ToolCallResult($name, $input, $this->admin()->createPanelUser($input)),
+                'set_user_role' => new ToolCallResult($name, $input, $this->admin()->setUserRole($input)),
+                'transfer_server_owner' => new ToolCallResult($name, $input, $this->admin()->transferServerOwner($input)),
+                // 사용자·역할 2차 (#63)
+                'update_panel_user' => new ToolCallResult($name, $input, $this->admin()->updatePanelUser($input)),
+                'send_password_reset' => new ToolCallResult($name, $input, $this->admin()->sendPasswordReset($input)),
+                'clear_user_mfa' => new ToolCallResult($name, $input, $this->admin()->clearUserMfa($input)),
+                'set_role_permissions' => new ToolCallResult($name, $input, $this->admin()->setRolePermissions($input)),
+                // 인프라 생성 (#64)
+                'create_node' => new ToolCallResult($name, $input, $this->admin()->createNode($input)),
+                'create_mount' => new ToolCallResult($name, $input, $this->admin()->createMount($input)),
+                // 삭제 (#65) — 카드 승인 뒤에만 온다. 실행이 계획을 다시 세워 검사를 한 번 더 탄다.
+                'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount'
+                    => new ToolCallResult($name, $input, $this->admin()->runDeletion($name, $input)),
+                // 관리 화면 읽기 2차 (#61)
+                'list_eggs' => new ToolCallResult($name, $input, $this->adminRead()->listEggs()),
+                'get_egg_details' => new ToolCallResult($name, $input, $this->adminRead()->getEggDetails($input)),
+                'list_mounts' => new ToolCallResult($name, $input, $this->adminRead()->listMounts()),
+                'list_database_hosts' => new ToolCallResult($name, $input, $this->adminRead()->listDatabaseHosts()),
+                'list_backup_hosts' => new ToolCallResult($name, $input, $this->adminRead()->listBackupHosts()),
+                'list_webhooks' => new ToolCallResult($name, $input, $this->adminRead()->listWebhooks()),
+                'list_api_keys' => new ToolCallResult($name, $input, $this->adminRead()->listApiKeys()),
+                'get_panel_health' => new ToolCallResult($name, $input, $this->adminRead()->getPanelHealth()),
+                'get_activity_log' => new ToolCallResult($name, $input, $this->adminRead()->getActivityLog($input)),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
@@ -1821,6 +2713,172 @@ final class AgentToolbox
         );
     }
 
+    /**
+     * 이 서버에 초대된 친구들 (#62) — "내 친구가 서버를 못 켜요"의 첫 조회.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function listServerSubusers(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('list_server_subusers', $input);
+
+        $subusers = $server->subusers()->with('user:id,username,email')->get()
+            // 주인은 서브유저 표에도 들어가 있다(패널이 그렇게 만든다) — 친구 목록에서는 뺀다.
+            ->reject(fn (Subuser $s) => $s->user_id === $server->owner_id);
+
+        if ($subusers->isEmpty()) {
+            return new ToolCallResult('list_server_subusers', $input,
+                "Nobody else is invited to {$server->name} — only its owner can touch it.", $server->id);
+        }
+
+        $lines = $subusers->map(fn (Subuser $s) => sprintf(
+            '- %s — %s',
+            $s->user?->username ?? '?',
+            $s->permissions === [] ? 'no permissions yet' : implode(', ', $s->permissions),
+        ))->implode("\n");
+
+        return new ToolCallResult('list_server_subusers', $input,
+            "People invited to {$server->name}:\n{$lines}", $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function inviteServerSubuser(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('invite_server_subuser', $input);
+        $email = trim((string) ($input['email'] ?? ''));
+        $permissions = $this->subuserPermissions($input, $server);
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new ToolInputException('A valid email is required — the address of the person you are inviting.');
+        }
+
+        app(SubuserCreationService::class)->handle($server, $email, $permissions);
+
+        return new ToolCallResult('invite_server_subuser', $input, sprintf(
+            '%s can now access %s with: %s. If they had no panel account, one was created and they were emailed a link.',
+            $email,
+            $server->name,
+            implode(', ', $permissions),
+        ), $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function setSubuserPermissions(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('set_subuser_permissions', $input);
+        $subuser = $this->subuserFor($server, (string) ($input['user'] ?? ''));
+        $permissions = $this->subuserPermissions($input, $server);
+
+        app(SubuserUpdateService::class)->handle($subuser, $server, $permissions);
+
+        return new ToolCallResult('set_subuser_permissions', $input, sprintf(
+            '%s now has these permissions on %s: %s',
+            $subuser->user?->username ?? '?',
+            $server->name,
+            implode(', ', $permissions),
+        ), $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function removeServerSubuser(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('remove_server_subuser', $input);
+        $subuser = $this->subuserFor($server, (string) ($input['user'] ?? ''));
+        $name = $subuser->user?->username ?? '?';
+
+        app(SubuserDeletionService::class)->handle($subuser, $server);
+
+        return new ToolCallResult('remove_server_subuser', $input,
+            "{$name} can no longer access {$server->name}.", $server->id);
+    }
+
+    /**
+     * 재설치 (#62) — 게임 파일을 다시 받는다. 월드 파일은 남지만 되돌릴 수 없는 일이다.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function reinstallServer(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('reinstall_server', $input);
+
+        app(ReinstallServerService::class)->handle($server);
+
+        return new ToolCallResult('reinstall_server', $input, sprintf(
+            'Reinstall started for %s. It downloads the game files again and starts by itself when done — '
+            . 'this takes a few minutes. Do not check completion now; just say you will report back.',
+            $server->name,
+        ), $server->id);
+    }
+
+    /**
+     * 서브유저 권한 목록을 검사한다 — **자기가 못 하는 권한은 남에게 줄 수 없다.**
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<int, string>
+     */
+    private function subuserPermissions(array $input, Server $server): array
+    {
+        $given = array_values(array_unique(array_map('trim', (array) ($input['permissions'] ?? []))));
+
+        if ($given === []) {
+            throw new ToolInputException(
+                'permissions is required — a list like ["control.console", "control.start", "control.stop"].',
+            );
+        }
+
+        $valid = array_column(SubuserPermission::cases(), 'value');
+        $unknown = array_diff($given, $valid);
+
+        if ($unknown !== []) {
+            throw new ToolInputException(
+                'Unknown permissions: ' . implode(', ', $unknown) . '. Valid values are: ' . implode(', ', $valid),
+            );
+        }
+
+        // ⚠ 권한 상승 방지: 초대하는 사람이 가진 것보다 큰 권한은 넘기지 못한다.
+        //   패널의 서브유저 화면과 같은 규칙이다.
+        $beyond = array_filter($given, fn (string $p) => !$this->user->can($p, $server));
+
+        if ($beyond !== []) {
+            throw new ToolInputException(
+                'You cannot grant permissions you do not hold yourself: ' . implode(', ', $beyond),
+            );
+        }
+
+        // 웹소켓 연결 권한이 없으면 콘솔 화면 자체가 열리지 않는다 — 패널이 항상 함께 준다.
+        if (!in_array(SubuserPermission::WebsocketConnect->value, $given, true)) {
+            $given[] = SubuserPermission::WebsocketConnect->value;
+        }
+
+        return $given;
+    }
+
+    private function subuserFor(Server $server, string $reference): Subuser
+    {
+        $reference = trim($reference);
+
+        if ($reference === '') {
+            throw new ToolInputException('user is required — the username or email of the invited person.');
+        }
+
+        $subuser = $server->subusers()->with('user')->get()
+            ->first(fn (Subuser $s) => $s->user !== null && (
+                mb_strtolower($s->user->username) === mb_strtolower($reference)
+                || mb_strtolower($s->user->email) === mb_strtolower($reference)
+                || (string) $s->user->id === $reference
+            ));
+
+        if ($subuser === null) {
+            throw new ToolInputException("\"{$reference}\" is not invited to {$server->name}. Check list_server_subusers.");
+        }
+
+        if ($subuser->user_id === $server->owner_id) {
+            throw new ToolInputException('That is the server owner — their access cannot be changed here.');
+        }
+
+        return $subuser;
+    }
+
     /** @param array<string, mixed> $input */
     private function restoreBackup(array $input): ToolCallResult
     {
@@ -2233,14 +3291,74 @@ final class AgentToolbox
             'memory_mb' => $server->memory,
             'disk_mb' => $server->disk,
             'cpu_percent' => $server->cpu,
+            // ⚠ 이 목록은 **접근 가능한** 서버다 — 친구로 초대된 서버도, 관리자라면 패널의
+            //   모든 서버도 들어온다. 소유 여부를 안 적으면 모델이 전부 자기 것으로 보고
+            //   할당량을 남의 서버까지 합산한다(실측).
+            'owned_by_you' => $server->owner_id === $this->user->id,
             // 설치 중이면 데몬 상태를 물어봐야 소용없다 — 모델이 먼저 알아야 한다.
             'install_state' => $server->status?->value ?? 'installed',
         ])->all();
 
-        return new ToolCallResult('list_my_servers', $input, $this->json([
+        return new ToolCallResult('list_my_servers', $input, $this->json(array_filter([
             'count' => count($rows),
             'servers' => $rows,
-        ]));
+            // 한도는 **세어서 짐작하지 말고** 여기 값을 쓰라는 뜻으로 함께 준다.
+            'your_allowance' => $this->ownAllowance(),
+        ], fn ($value) => $value !== null)));
+    }
+
+    /**
+     * 이 사용자의 개인 할당량 — **자기가 소유한 서버만** 센다.
+     *
+     * 목록(list_my_servers)은 접근 가능한 서버를 전부 보여주므로, 모델이 그걸 합산하면
+     * 친구 서버·패널 전체가 섞여 실제보다 크게 나온다. 계산을 모델에게 맡기지 않고
+     * 소유 기준 수치를 직접 준다.
+     *
+     * UCS 가 없으면 개인 할당량이라는 개념 자체가 없다 → null (키가 아예 빠진다).
+     *
+     * @return ?array<string, mixed>
+     */
+    private function ownAllowance(): ?array
+    {
+        $class = 'Boy132\\UserCreatableServers\\Models\\UserResourceLimits';
+
+        if (!OptionalPlugins::usable('user-creatable-servers') || !class_exists($class)) {
+            return null;
+        }
+
+        $limits = $class::query()->where('user_id', $this->user->id)->first();
+
+        if ($limits === null) {
+            return ['note' => 'No personal allowance is configured for this account — an admin has to grant one.'];
+        }
+
+        $owned = $this->user->servers();
+
+        $used = [
+            'cpu_percent' => (int) $owned->clone()->sum('cpu'),
+            'memory_mb' => (int) $owned->clone()->sum('memory'),
+            'disk_mb' => (int) $owned->clone()->sum('disk'),
+            'servers' => (int) $owned->clone()->count(),
+        ];
+
+        return [
+            'note' => 'Counts only servers this user owns — servers they were merely invited to, '
+                . 'and (for admins) other people\'s servers in the list above, do not count. '
+                . 'Use these numbers instead of adding the list up.',
+            'limit' => [
+                'cpu_percent' => (int) $limits->cpu,
+                'memory_mb' => (int) $limits->memory,
+                'disk_mb' => (int) $limits->disk,
+                'servers' => (int) $limits->server_limit,
+            ],
+            'used_by_owned_servers' => $used,
+            'remaining' => [
+                'cpu_percent' => max(0, (int) $limits->cpu - $used['cpu_percent']),
+                'memory_mb' => max(0, (int) $limits->memory - $used['memory_mb']),
+                'disk_mb' => max(0, (int) $limits->disk - $used['disk_mb']),
+                'servers' => max(0, (int) $limits->server_limit - $used['servers']),
+            ],
+        ];
     }
 
     /** @param array<string, mixed> $input */

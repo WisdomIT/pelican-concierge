@@ -539,7 +539,7 @@
                     @endif
                     </div>
                 @empty
-                    <div class="cg-history-empty">{{ trans('concierge::strings.empty') }}</div>
+                    <div class="cg-history-empty">{{ trans('concierge::strings.' . ($this->canCreateServers ? 'empty' : 'empty_no_create')) }}</div>
                 @endforelse
             </div>
             </div>
@@ -603,7 +603,8 @@
                     @endif
                 @endif
             @empty
-                <p class="cg-hint">{{ trans('concierge::strings.empty') }}</p>
+                {{-- 개설을 못 하는 사람에게 "서버 만들고 싶어" 예시는 막다른 길이다(#48). --}}
+                <p class="cg-hint">{{ trans('concierge::strings.' . ($this->canCreateServers ? 'empty' : 'empty_no_create')) }}</p>
             @endforelse
 
             {{--
