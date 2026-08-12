@@ -4,7 +4,7 @@
  |  이 파일은 PluginService 가 부팅 때 `config()->set('concierge', require ...)` 로 읽는다.
  |
  |  ⚠ 여기 있는 값은 **설정이 아니라 기본값·선택지**다. 실제 설정은 DB(concierge_settings)에
- |     있고 관리자 화면(Admin → 고급 → AI 도우미 설정)에서 바꾼다.
+ |     있고 관리자 화면(Admin → 고급 → AI Agent 설정)에서 바꾼다.
  |     API 키를 여기나 env 에 두지 않는 이유는 README 의 "왜 DB 인가" 절 참고.
  */
 
@@ -13,7 +13,11 @@ return [
     'model' => 'claude-opus-5',
     'effort' => 'medium',
     'max_tokens' => 8192,
-    'daily_message_limit' => 50,
+    // 사용 한도 규칙(#4): 기준(messages|tokens) × 범위(user|panel) × 주기(hour|day|week|month).
+    // 여러 개면 먼저 걸린 것이 막는다. 빈 목록 = 무제한.
+    'usage_limits' => [
+        ['metric' => 'messages', 'scope' => 'user', 'period' => 'day', 'amount' => 50],
+    ],
 
     // ── LLM 공급자별 선택지 (#3) ─────────────────────────────────
     //  모델이 새로 나오면 여기만 고치면 된다. 없는 id 를 고르면 API 가 404 를 낸다.
@@ -66,11 +70,10 @@ return [
             'badge' => 'Gemini',
             'default_model' => 'gemini-3.1-pro-preview',
             'default_effort' => null,
+            // 2.5 세대는 신규 키에 404("no longer available to new users") — 뺐다(#35 조사).
             'models' => [
                 'gemini-3.1-pro-preview' => 'Gemini 3.1 Pro (권장)',
                 'gemini-3.6-flash' => 'Gemini 3.6 Flash',
-                'gemini-2.5-pro' => 'Gemini 2.5 Pro',
-                'gemini-2.5-flash' => 'Gemini 2.5 Flash',
             ],
             // thinking 어휘가 모델 세대마다 달라(3: thinkingLevel, 2.5: thinkingBudget)
             // 기본 동작(dynamic)에 맡긴다 — 어댑터 주석 참고.

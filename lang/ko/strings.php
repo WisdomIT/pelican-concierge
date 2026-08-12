@@ -2,7 +2,8 @@
 
 return [
     // ── 사용자 채팅 화면 ──
-    'title' => 'AI 도우미',
+    // 제품명은 언어와 무관하게 "AI Agent" (#31) — 주변 단어만 번역한다.
+    'title' => 'AI Agent',
     'empty' => '무엇을 도와줄까요? 예: "마인크래프트 서버 하나 만들고 싶어"',
     'placeholder' => '하고 싶은 걸 그냥 말로 적어주세요',
     'send' => '보내기',
@@ -262,10 +263,25 @@ return [
     'state_missing' => '확인 불가',
     'state_unknown' => '알 수 없음',
 
-    'not_configured' => 'AI 도우미가 아직 설정되지 않았습니다. 관리자에게 알려주세요.',
+    'not_configured' => 'AI Agent가 아직 설정되지 않았습니다. 관리자에게 알려주세요.',
     'not_implemented' => '아직 준비 중입니다. 지금은 서버 목록의 "서버 만들기" 버튼을 이용해 주세요.',
-    'disabled' => 'AI 도우미가 꺼져 있습니다.',
-    'rate_limited' => '오늘 사용할 수 있는 횟수(:limit회)를 다 썼습니다. 내일 다시 시도해 주세요.',
+    'disabled' => 'AI Agent가 꺼져 있습니다.',
+    // 3축 한도(#4)의 차단 문구 — 어느 한도인지, 언제 풀리는지까지.
+    // 예: "오늘 내 메시지 한도(50)를 다 썼습니다. 2026-08-12 00:00 부터 다시 쓸 수 있습니다."
+    'limit_hit' => ':period :scope :metric 한도(:amount)를 다 썼습니다. :reset 부터 다시 쓸 수 있습니다.',
+    'limit_hit_scope_user' => '내',
+    'limit_hit_scope_panel' => '패널 전체',
+    'limit_hit_period_hour' => '이번 시간',
+    'limit_hit_period_day' => '오늘',
+    'limit_hit_period_week' => '이번 주',
+    'limit_hit_period_month' => '이번 달',
+    'limit_hit_metric_messages' => '메시지',
+    'limit_hit_metric_tokens' => '토큰',
+    // 입력창 위 한도 게이지 — 짧게. 무엇 기준인지는 툴팁(limit_meter_tip)이 말한다.
+    'limit_meter' => '한도 :percent% 사용',
+    'limit_meter_tip' => ':period :scope :metric 사용량 기준',
+    'limit_meter_scope_user' => '개인',
+    'limit_meter_scope_panel' => '패널 전체',
     'error' => '지금 응답을 받지 못했습니다. 잠시 뒤 다시 시도해 주세요. 계속 그러면 관리자에게 알려주세요.',
     'refused' => '그 요청에는 답할 수 없습니다. 다른 방식으로 물어봐 주세요.',
     'empty_reply' => '답변이 비어 있습니다. 다시 물어봐 주세요.',
@@ -323,7 +339,7 @@ return [
     'idle_snoozed' => '알겠습니다. :server 는 그대로 두고 다시 지켜볼게요.',
 
     // ── 관리자 · 설정 ──
-    'settings_title' => 'AI 도우미 설정',
+    'settings_title' => 'AI Agent 설정',
     'save' => '저장',
     'saved' => '설정을 저장했습니다.',
 
@@ -338,8 +354,8 @@ return [
     'api_key_set' => '설정됨 — 바꾸려면 새 값을 입력하세요',
     'api_key_unset' => '아직 설정되지 않음',
     'clear_api_key' => '키 삭제',
-    'api_key_cleared' => 'API 키를 삭제했습니다. AI 도우미가 응답하지 않습니다.',
-    'confirm_clear_key' => 'API 키를 삭제하면 AI 도우미가 즉시 멈춥니다. 계속할까요?',
+    'api_key_cleared' => 'API 키를 삭제했습니다. AI Agent가 응답하지 않습니다.',
+    'confirm_clear_key' => 'API 키를 삭제하면 AI Agent가 즉시 멈춥니다. 계속할까요?',
 
     'field_model' => '모델',
     'help_model' => '도구를 써서 사용자 서버를 조작하므로 Opus 를 권장합니다.',
@@ -348,11 +364,24 @@ return [
     'field_max_tokens' => '응답당 최대 토큰',
     'help_max_tokens' => '한 번의 답변이 쓸 수 있는 상한입니다.',
 
-    'field_daily_limit' => '사용자별 일일 메시지 한도',
-    'help_daily_limit' => '0 을 넣으면 무제한입니다. 한도에 걸려 거절된 요청은 한도에 세지 않습니다.',
+    'section_limits' => '사용 한도',
+    'section_limits_help' => '기준(메시지 수 또는 토큰) × 범위(사용자별·패널 전체) × 주기(시·일·주·월)로 정합니다. 한도에 걸려 거절된 요청은 한도에 세지 않습니다.',
+    'limit_metric' => '기준',
+    'limit_metric_messages' => '메시지 수',
+    'limit_metric_tokens' => '토큰',
+    'limit_scope' => '범위',
+    'limit_scope_user' => '사용자별',
+    'limit_scope_panel' => '패널 전체',
+    'limit_period' => '주기',
+    'limit_period_hour' => '시간',
+    'limit_period_day' => '일',
+    'limit_period_week' => '주',
+    'limit_period_month' => '월',
+    'limit_amount' => '한도',
+    'help_limit_amount' => '0 = 무제한',
 
     // ── 관리자 · 사용량 ──
-    'usage_title' => 'AI 도우미 사용량',
+    'usage_title' => 'AI Agent 사용 통계',
     'usage_label' => '사용 기록',
     'conversation_label' => '대화',
     'view_conversation' => '대화 보기',
@@ -394,6 +423,8 @@ return [
     'stat_today_users' => '오늘 사용한 사람',
     'stat_month_tokens' => '이번 달 토큰',
     'stat_month_tokens_hint' => '입력 + 출력 합계',
-    'stat_limit_per_user' => '1인당 하루 :limit회',
+    'stat_limit_summary' => '한도: :scope · :period · :metric :amount',
     'stat_no_limit' => '한도 없음',
+    'stat_panel_limit' => ':metric 한도 (패널 전체 · :period)',
+    'stat_limit_resets' => '초기화: :reset',
 ];

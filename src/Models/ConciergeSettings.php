@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $model
  * @property string $effort
  * @property int $max_tokens
- * @property int $daily_message_limit
+ * @property ?array<int, array<string, mixed>> $usage_limits
  * @property bool $idle_enabled
  * @property bool $search_enabled
  * @property int $search_max_uses
@@ -41,7 +41,7 @@ class ConciergeSettings extends Model
         'model',
         'effort',
         'max_tokens',
-        'daily_message_limit',
+        'usage_limits',
         'idle_enabled',
         'search_enabled',
         'search_max_uses',
@@ -63,7 +63,8 @@ class ConciergeSettings extends Model
         return [
             'api_key' => 'encrypted',
             'max_tokens' => 'integer',
-            'daily_message_limit' => 'integer',
+            // 3축 한도 규칙 목록(#4) — 형태 검증은 UsageLimiter::rules 가 한다.
+            'usage_limits' => 'array',
             'idle_enabled' => 'boolean',
             'search_enabled' => 'boolean',
             'search_max_uses' => 'integer',
@@ -86,7 +87,7 @@ class ConciergeSettings extends Model
             'model' => config('concierge.model'),
             'effort' => config('concierge.effort'),
             'max_tokens' => config('concierge.max_tokens'),
-            'daily_message_limit' => config('concierge.daily_message_limit'),
+            'usage_limits' => config('concierge.usage_limits'),
         ]);
     }
 
