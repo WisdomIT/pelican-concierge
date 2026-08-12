@@ -1,6 +1,6 @@
 {
     "*": {
-        "version": "1.4.1",
+        "version": "1.4.2",
         "download_url": "https://github.com/WisdomIT/pelican-concierge/releases/latest/download/concierge.zip"
     }
 }
