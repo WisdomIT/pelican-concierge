@@ -21,9 +21,10 @@ use WisdomIT\Concierge\Models\ConciergeSettings;
  *    그대로 돌려받기를 기대한다 — tool_use 항목에 얹어 저장했다가 되돌려 준다.
  *    (다른 어댑터는 이 여분 키를 모르고, 무시한다.)
  *
- * 웹 검색(google_search)은 끈다: generateContent 는 서버 측 검색 도구와
- * functionDeclarations 의 **동시 사용을 거부**하는데, 이 에이전트는 항상 패널
- * 도구를 싣고 다닌다. effort 도 끈다 — thinking 어휘가 모델 세대마다 달라서
+ * 웹 검색(google_search)은 함수 선언과 **동시에 실을 수 있다** — 단,
+ * toolConfig.includeServerSideToolInvocations 를 켜야 한다(안 켜면 400 이 그 플래그를
+ * 알려준다. #35 실검증). 검색 실행은 Google 서버 몫이고 우리는 groundingMetadata 로
+ * 과금만 집계한다. effort 는 끈다 — thinking 어휘가 모델 세대마다 달라서
  * (3: thinkingLevel, 2.5: thinkingBudget) 기본 동작(dynamic)에 맡기는 쪽이 안전하다.
  */
 final class GeminiProvider implements LlmProvider
@@ -38,7 +39,7 @@ final class GeminiProvider implements LlmProvider
     {
         return new Capabilities(
             supportsTools: true,
-            supportsWebSearch: false,
+            supportsWebSearch: true, // google_search — 서버 측 그라운딩 (#35)
             supportsEffort: false,
             needsBaseUrl: false,
         );
@@ -68,6 +69,16 @@ final class GeminiProvider implements LlmProvider
             ]];
         }
 
+        if ($this->settings->search_enabled) {
+            $payload['tools'][] = ['google_search' => (object) []];
+
+            // 서버 측 도구(검색)와 함수 선언을 한 요청에 실으려면 켜야 한다 —
+            // 없으면 400 이 이 플래그 이름을 알려준다(#35).
+            if ($tools !== []) {
+                $payload['toolConfig'] = ['includeServerSideToolInvocations' => true];
+            }
+        }
+
         $response = $this->client()->post(
             'models/' . rawurlencode((string) $this->settings->model) . ':streamGenerateContent?alt=sse',
             ['json' => $payload, 'stream' => true],
@@ -79,6 +90,7 @@ final class GeminiProvider implements LlmProvider
         $outputTokens = 0;
         $finishReason = null;
         $thinkingAnnounced = false;
+        $searchCount = 0;
 
         /** @var array<int, array{name: string, input: array<string, mixed>, signature: string}> $pendingTools */
         $pendingTools = [];
@@ -103,6 +115,12 @@ final class GeminiProvider implements LlmProvider
 
             if ($candidate === null) {
                 continue;
+            }
+
+            // 검색은 Google 서버가 돌리고 근거(groundingMetadata)만 실려 온다.
+            // 과금은 **요청 단위**라(질의 수와 무관) 근거가 있으면 1회로 센다.
+            if (($candidate['groundingMetadata']['webSearchQueries'] ?? []) !== []) {
+                $searchCount = 1;
             }
 
             foreach ($candidate['content']['parts'] ?? [] as $part) {
@@ -154,7 +172,7 @@ final class GeminiProvider implements LlmProvider
             stopKind: $toolUses !== [] ? StopKind::ToolUse : StopKind::EndTurn,
             rawStopReason: $finishReason,
             toolUses: $toolUses,
-            searchCount: 0,
+            searchCount: $searchCount,
         );
     }
 
