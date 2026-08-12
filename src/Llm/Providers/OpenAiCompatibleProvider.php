@@ -62,7 +62,8 @@ class OpenAiCompatibleProvider implements LlmProvider
                 'function' => [
                     'name' => $tool['name'],
                     'description' => $tool['description'] ?? '',
-                    'parameters' => $tool['input_schema'] ?? ['type' => 'object'],
+                    // ⚠ 스키마 키는 inputSchema(camelCase) — #43 참고.
+                    'parameters' => $tool['inputSchema'] ?? ['type' => 'object'],
                 ],
             ], $tools);
         }

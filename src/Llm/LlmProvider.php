@@ -26,8 +26,10 @@ use Closure;
  *
  * ## 중립 도구 정의
  *
- * `['name' => …, 'description' => …, 'input_schema' => JSON Schema]`.
- * Anthropic 와이어 형식과 같게 정해뒀다 — 도구상자 37종을 다시 쓰지 않기 위해서다.
+ * `['name' => …, 'description' => …, 'inputSchema' => JSON Schema]`.
+ * Anthropic **SDK** 형식과 같게 정해뒀다(camelCase 주의 — snake_case 로 읽으면
+ * 파라미터 없는 도구가 되어 모델이 빈 인자를 보낸다. #43) — 도구상자 37종을
+ * 다시 쓰지 않기 위해서다.
  * 다른 공급자 어댑터가 자기 형식(OpenAI function, Gemini functionDeclarations)으로 바꾼다.
  */
 interface LlmProvider
