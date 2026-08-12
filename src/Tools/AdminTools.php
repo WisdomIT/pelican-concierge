@@ -2,12 +2,15 @@
 
 namespace WisdomIT\Concierge\Tools;
 
+use App\Enums\SuspendAction;
 use App\Models\ActivityLog;
 use App\Models\Allocation;
 use App\Models\Node;
 use App\Models\Role;
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Allocations\AssignmentService;
+use App\Services\Servers\SuspensionService;
 
 /**
  * 패널 관리 화면을 **읽는** 도구들 (#46).
@@ -225,6 +228,143 @@ final class AdminTools
             $free->isEmpty() ? '(none — new servers cannot be deployed here)' : $this->ranges($free->pluck('port')->all()),
             $used === '' ? '  (none)' : $used,
         );
+    }
+
+    // ── 여기부터는 바꾼다 (#47). 전부 확인 카드를 거친 뒤에만 불린다. ──
+
+    /** 점검 모드 — 켜면 새 서버가 이 노드에 배치되지 않는다. 이미 있는 서버는 그대로 돈다. */
+    public function setNodeMaintenance(array $input): string
+    {
+        $node = $this->resolveNode($input);
+        $on = (bool) ($input['enabled'] ?? true);
+
+        $node->update(['maintenance_mode' => $on]);
+
+        return $on
+            ? "Node {$node->name} is now in maintenance mode — no new servers will be deployed here. Existing servers keep running."
+            : "Node {$node->name} is out of maintenance mode — it can take new servers again.";
+    }
+
+    /** 포트 추가 — 개설이 막히는 가장 흔한 원인이 빈 포트 부족이다. */
+    public function addNodeAllocations(array $input): string
+    {
+        $node = $this->resolveNode($input);
+        $ip = trim((string) ($input['ip'] ?? '0.0.0.0'));
+        $ports = array_values(array_filter(array_map('trim', (array) ($input['ports'] ?? []))));
+
+        if ($ports === []) {
+            throw new ToolInputException('ports is required — a list like ["27600", "27700-27709"].');
+        }
+
+        $before = $node->allocations()->count();
+
+        app(AssignmentService::class)->handle($node, [
+            'allocation_ip' => $ip,
+            'allocation_ports' => $ports,
+        ]);
+
+        $added = $node->allocations()->count() - $before;
+
+        return "Added {$added} allocation(s) on {$node->name} at {$ip}. The node now has "
+            . $node->allocations()->whereNull('server_id')->count() . ' free port(s).';
+    }
+
+    /** 포트 회수 — 서버가 쓰고 있으면 건드리지 않는다. */
+    public function removeNodeAllocation(array $input): string
+    {
+        $allocation = $this->resolveAllocation($input);
+        $label = $allocation->ip . ':' . $allocation->port;
+        $node = $allocation->node->name;
+
+        $allocation->delete();
+
+        return "Removed allocation {$label} from node {$node}.";
+    }
+
+    /** 정지·해제 — 정지된 서버는 꺼지고 주인도 켤 수 없다. */
+    public function setServerSuspended(array $input): string
+    {
+        $server = $this->resolveServer($input);
+        $suspend = (bool) ($input['suspended'] ?? true);
+
+        app(SuspensionService::class)->handle($server, $suspend ? SuspendAction::Suspend : SuspendAction::Unsuspend);
+
+        return $suspend
+            ? "Server {$server->name} is suspended — it has been stopped and its owner cannot start it."
+            : "Server {$server->name} is no longer suspended — its owner can start it again.";
+    }
+
+    /**
+     * 관리자 권한으로 대상 서버 찾기 — 자기 서버가 아니어도 된다.
+     *
+     * ⚠ 그래도 아무나 못 만진다. `viewList server` 를 가진 사람만 이 도구를 받고(노출),
+     *   여기서 canTarget 으로 그 서버의 노드에 손댈 수 있는지 다시 본다.
+     */
+    private function resolveServer(array $input): Server
+    {
+        $reference = trim((string) ($input['server'] ?? ''));
+
+        if ($reference === '') {
+            throw new ToolInputException('server is required.');
+        }
+
+        $server = Server::query()
+            ->where(fn ($q) => $q
+                ->where('uuid_short', $reference)
+                ->orWhere('uuid', $reference)
+                ->orWhere('id', is_numeric($reference) ? (int) $reference : 0)
+                ->orWhereRaw('lower(name) = ?', [mb_strtolower($reference)]))
+            ->with(['node', 'user'])
+            ->first();
+
+        if ($server === null) {
+            throw new ToolInputException("No server matches \"{$reference}\".");
+        }
+
+        if (!$this->user->canTarget($server->node)) {
+            throw new ToolInputException("That server is on node \"{$server->node->name}\", which you cannot administer.");
+        }
+
+        return $server;
+    }
+
+    private function resolveAllocation(array $input): Allocation
+    {
+        $node = $this->resolveNode($input);
+        $port = (int) ($input['port'] ?? 0);
+
+        $allocation = $node->allocations()->where('port', $port)
+            ->when(filled($input['ip'] ?? null), fn ($q) => $q->where('ip', trim((string) $input['ip'])))
+            ->with(['node', 'server'])
+            ->first();
+
+        if ($allocation === null) {
+            throw new ToolInputException("Node {$node->name} has no allocation on port {$port}.");
+        }
+
+        if ($allocation->server_id !== null) {
+            throw new ToolInputException(
+                "Port {$port} is in use by \"{$allocation->server?->name}\" — free it on that server first.",
+            );
+        }
+
+        return $allocation;
+    }
+
+    /** 카드가 보여줄 사실 — 모델이 쓴 문장이 아니라 **우리가 조회한 값**이다. */
+    public function nodeFacts(array $input): Node
+    {
+        return $this->resolveNode($input);
+    }
+
+    public function allocationFacts(array $input): Allocation
+    {
+        return $this->resolveAllocation($input);
+    }
+
+    public function serverFacts(array $input): Server
+    {
+        return $this->resolveServer($input);
     }
 
     /** @param array<string, mixed> $input */
