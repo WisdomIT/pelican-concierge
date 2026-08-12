@@ -22,6 +22,12 @@ return [
     'tool_accept_minecraft_eula' => 'EULA 동의하는 중',
     'tool_replace_in_server_file' => '파일 수정하는 중',
     'tool_list_available_games' => '만들 수 있는 게임 확인 중',
+    // 관리 화면 읽기 (#46)
+    'tool_list_nodes' => '노드 확인 중',
+    'tool_get_node_status' => '노드 상태 확인 중',
+    'tool_list_node_allocations' => '포트 현황 확인 중',
+    'tool_list_panel_users' => '사용자 확인 중',
+    'tool_list_roles' => '역할·권한 확인 중',
     'tool_create_server' => '서버 만드는 중',
 
     // ── 확인 카드 ──

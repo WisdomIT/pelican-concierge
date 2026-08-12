@@ -2,6 +2,8 @@
 
 namespace WisdomIT\Concierge\Tools;
 
+use App\Enums\RolePermissionModels;
+use App\Enums\RolePermissionPrefixes;
 use App\Enums\SubuserPermission;
 use App\Models\Server;
 use App\Models\User;
@@ -82,10 +84,18 @@ final class AgentToolbox
     /** 요청자가 어느 갈래를 받는가 (#45) — 도구 노출과 프롬프트가 같은 판정을 본다. */
     public readonly RequesterScope $scope;
 
+    private ?AdminTools $admin = null;
+
     public function __construct(private readonly User $user)
     {
         $this->catalog = new GameCatalog();
         $this->scope = new RequesterScope($user);
+    }
+
+    /** 관리 화면 조회 도구 (#46) — 실제로 부를 때만 만든다. */
+    private function admin(): AdminTools
+    {
+        return $this->admin ??= new AdminTools($this->user);
     }
 
     /**
@@ -109,8 +119,26 @@ final class AgentToolbox
     /** 서버를 새로 만드는 도구 (#45). */
     private const CREATE_TOOLS = ['list_available_games', 'create_server'];
 
-    /** 패널 관리 도구 (#45) — #46 에서 채운다. */
-    private const ADMIN_TOOLS = [];
+    /** 패널 관리 도구 (#46) — 지금은 **읽기 전용**이다. 바꾸는 도구는 #47. */
+    private const ADMIN_TOOLS = [
+        'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
+    ];
+
+    /**
+     * 어드민 도구별로 요구하는 **리소스 권한** (#46).
+     *
+     * 서버 도구가 서브유저 권한을 그대로 따르듯(TOOL_PERMISSIONS), 관리 도구는 관리
+     * 화면의 권한을 그대로 따른다. "노드만 보는 관리자"는 노드 도구만 받는다.
+     *
+     * @var array<string, array{0: RolePermissionPrefixes, 1: RolePermissionModels}>
+     */
+    private const ADMIN_TOOL_PERMISSIONS = [
+        'list_nodes' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'get_node_status' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'list_node_allocations' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Allocation],
+        'list_panel_users' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        'list_roles' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Role],
+    ];
 
     public function definitions(): array
     {
@@ -146,6 +174,13 @@ final class AgentToolbox
      */
     private function isRelevant(string $name): bool
     {
+        // 관리 도구는 서버 유무와 무관하고, 리소스 권한 하나하나로 갈린다 (#46).
+        if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
+            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
+
+            return $this->scope->can($prefix, $model);
+        }
+
         if ($this->serverCount() === 0) {
             return in_array($name, self::NO_SERVER_TOOLS, true);
         }
@@ -629,6 +664,51 @@ final class AgentToolbox
                     'required' => ['server', 'mod'],
                 ],
             ],
+            // ── 패널 관리 화면 읽기 (#46). 노출은 리소스 권한이 가른다. 바꾸지 않는다. ──
+            [
+                'name' => 'list_nodes',
+                'description' => 'Every node on this panel: which are in maintenance, how many servers each holds, '
+                    . 'allocated vs configured memory/disk, and whether wings is answering. '
+                    . 'Call this first for anything about node health or "where do servers go".',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_node_status',
+                'description' => 'One node in depth: wings version and reachability, live host usage (memory, disk, cpu, load), '
+                    . 'free allocations, and the servers on it. Use it when a node looks unhealthy or a server will not deploy.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'list_node_allocations',
+                'description' => 'Ports on a node: how many are free, which ranges, and which server holds each used one. '
+                    . '**A node with no free ports cannot take new servers** — check this when creation fails.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'list_panel_users',
+                'description' => 'Panel users with their roles, how many servers they own, and when they were last active. '
+                    . 'Pass search to narrow by username or email. Use it to answer "who is this", "who owns what".',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['search' => ['type' => 'string', 'description' => 'Optional: match part of a username or email.']],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'list_roles',
+                'description' => 'Roles on this panel with the permissions each grants and how many users hold it. '
+                    . 'This is the answer to "why can this person not do X" — check their role here.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+
             [
                 'name' => 'suggest_page',
                 'description' => 'Put a button to a panel screen in the chat, for things **the user must do themselves**. '
@@ -1133,6 +1213,17 @@ final class AgentToolbox
     {
         $this->lastServerId = null;
 
+        // ⚠ 여기도 권한 경계다 (#46). 노출에서 걸렀다고 실행을 그냥 열어 두면, 재개된
+        //   상태나 인젝션으로 도구 이름이 들어왔을 때 권한 없는 조회가 통과한다 —
+        //   서버 도구가 serverFor() 에서 다시 묻는 것과 같은 이유로 여기서 다시 묻는다.
+        if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
+            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
+
+            if (!$this->scope->can($prefix, $model)) {
+                return ToolCallResult::error($name, $input, 'You do not have permission to read that on this panel.');
+            }
+        }
+
         try {
             return match ($name) {
                 'list_my_servers' => $this->listMyServers($input),
@@ -1169,6 +1260,12 @@ final class AgentToolbox
                 'add_server_port' => $this->addServerPort($input),
                 'remove_server_port' => $this->removeServerPort($input),
                 'install_mod' => $this->installMod($input),
+                // 관리 화면 읽기 (#46) — 노출은 이미 리소스 권한으로 걸렀다.
+                'list_nodes' => new ToolCallResult($name, $input, $this->admin()->listNodes()),
+                'get_node_status' => new ToolCallResult($name, $input, $this->admin()->getNodeStatus($input)),
+                'list_node_allocations' => new ToolCallResult($name, $input, $this->admin()->listNodeAllocations($input)),
+                'list_panel_users' => new ToolCallResult($name, $input, $this->admin()->listPanelUsers($input)),
+                'list_roles' => new ToolCallResult($name, $input, $this->admin()->listRoles()),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
