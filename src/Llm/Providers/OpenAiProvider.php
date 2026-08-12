@@ -222,7 +222,9 @@ final class OpenAiProvider implements LlmProvider
             'type' => 'function',
             'name' => $tool['name'],
             'description' => $tool['description'] ?? '',
-            'parameters' => $tool['input_schema'] ?? ['type' => 'object'],
+            // ⚠ 스키마 키는 inputSchema(camelCase) — #43 참고. snake_case 로 읽으면
+            //   파라미터 없는 도구가 되고, 모델이 설명문으로 인자를 추측하게 된다.
+            'parameters' => $tool['inputSchema'] ?? ['type' => 'object'],
         ], $tools);
 
         if ($this->settings->search_enabled) {

@@ -14,6 +14,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use WisdomIT\Concierge\Filament\Admin\Resources\ConciergeUsages\Pages;
 use WisdomIT\Concierge\Filament\Admin\Resources\ConciergeUsages\Pages\ListConciergeUsages;
 use WisdomIT\Concierge\Models\ConciergeUsage;
 
@@ -228,6 +229,9 @@ class ConciergeUsageResource extends Resource
     {
         return [
             'index' => ListConciergeUsages::route('/'),
+            // 사용자별 통계·도표 (#32) — 화면 상단의 탭(UsageTabs)이 셋을 오간다.
+            'stats' => Pages\UsageStats::route('/stats'),
+            'charts' => Pages\UsageCharts::route('/charts'),
         ];
     }
 }

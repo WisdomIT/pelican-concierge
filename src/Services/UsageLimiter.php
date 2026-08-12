@@ -133,7 +133,8 @@ final class UsageLimiter
         };
     }
 
-    private static function windowStart(string $period): CarbonInterface
+    /** 현재 기간 창의 시작(UTC 변환 — 쿼리용). 사용자별 통계(#32)도 같은 창을 본다. */
+    public static function windowStart(string $period): CarbonInterface
     {
         $tz = self::timezone();
 

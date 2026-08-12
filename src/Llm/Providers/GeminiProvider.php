@@ -64,7 +64,10 @@ final class GeminiProvider implements LlmProvider
                 'functionDeclarations' => array_map(fn (array $tool) => [
                     'name' => $tool['name'],
                     'description' => $tool['description'] ?? '',
-                    'parameters' => $tool['input_schema'] ?? ['type' => 'object'],
+                    // ⚠ 중립 형식의 스키마 키는 inputSchema(camelCase)다 — input_schema 로
+                    //   읽으면 **파라미터 없는 스키마**가 나가고, Gemini 는 스키마를 엄격히
+                    //   따르므로 항상 빈 인자를 보낸다(#43의 원인).
+                    'parameters' => $this->scrubSchema($tool['inputSchema'] ?? ['type' => 'object']),
                 ], $tools),
             ]];
         }
@@ -174,6 +177,31 @@ final class GeminiProvider implements LlmProvider
             toolUses: $toolUses,
             searchCount: $searchCount,
         );
+    }
+
+    /**
+     * Gemini 의 parameters 는 **제한된 OpenAPI 부분집합**이다 — JSON Schema 의
+     * additionalProperties 같은 키를 만나면 요청 전체가 400 이 난다(#43).
+     * 지원 밖의 키만 걷어내고 구조는 그대로 둔다.
+     */
+    private function scrubSchema(mixed $schema): mixed
+    {
+        if ($schema instanceof \stdClass) {
+            $schema = (array) $schema;
+
+            // 빈 객체가 빈 배열이 되면 JSON 에서 [] 로 바뀐다 — 도로 객체로.
+            if ($schema === []) {
+                return (object) [];
+            }
+        }
+
+        if (!is_array($schema)) {
+            return $schema;
+        }
+
+        unset($schema['additionalProperties'], $schema['$schema']);
+
+        return array_map(fn ($value) => $this->scrubSchema($value), $schema);
     }
 
     private function client(): Client
