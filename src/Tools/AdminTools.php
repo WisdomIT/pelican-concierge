@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\Allocations\AssignmentService;
 use App\Services\Servers\DetailsModificationService;
+use App\Services\Servers\ServerDeletionService;
 use App\Services\Servers\SuspensionService;
 use App\Services\Users\UserCreationService;
 use App\Services\Users\UserUpdateService;
@@ -687,6 +688,144 @@ final class AdminTools
             'read_only' => (bool) ($input['read_only'] ?? true),
             'user_mountable' => false,
         ];
+    }
+
+    // ── 삭제 (#65). 되돌릴 수 없다 — 카드가 무엇이 사라지는지 숫자로 말한다. ──
+
+    /**
+     * 삭제 대상의 **사실**을 모은다 — 카드가 이걸 그대로 보여주고, 실행도 같은 검사를 탄다.
+     *
+     * 여기서 막는 것은 패널 화면이 막는 것과 같다: 서버가 있는 노드·사용자, 자기 자신.
+     * 화면에서 못 하는 일을 에이전트로 우회하게 두지 않는다(#36).
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{subject: mixed, label: string, losses: array<int, array{0: string, 1: string}>}
+     */
+    public function deletionPlan(string $tool, array $input): array
+    {
+        return match ($tool) {
+            'delete_server' => (function () use ($input) {
+                $server = $this->resolveServer($input);
+
+                return [
+                    'subject' => $server,
+                    'label' => $server->name,
+                    'losses' => [
+                        ['card_owner', $server->user?->username ?? '-'],
+                        ['card_delete_backups', (string) $server->backups()->count()],
+                        ['card_node', $server->node->name],
+                    ],
+                ];
+            })(),
+
+            'delete_panel_user' => (function () use ($input) {
+                $user = $this->targetableUser((string) ($input['user'] ?? ''));
+
+                if ($user->id === $this->user->id) {
+                    throw new ToolInputException('You cannot delete your own account.');
+                }
+
+                // 패널 화면도 서버를 가진 계정은 지우지 못하게 막는다 — 서버가 고아가 된다.
+                $owned = $user->servers()->count();
+
+                if ($owned > 0) {
+                    throw new ToolInputException(
+                        "{$user->username} still owns {$owned} server(s). Move them to another owner with "
+                        . 'transfer_server_owner (or delete them) before deleting the account.',
+                    );
+                }
+
+                return [
+                    'subject' => $user,
+                    'label' => $user->username,
+                    'losses' => [['card_email', $user->email]],
+                ];
+            })(),
+
+            'delete_role' => (function () use ($input) {
+                $reference = trim((string) ($input['role'] ?? ''));
+                $role = Role::query()
+                    ->where(fn ($q) => $q->where('id', is_numeric($reference) ? (int) $reference : 0)
+                        ->orWhereRaw('lower(name) = ?', [mb_strtolower($reference)]))
+                    ->withCount('users')
+                    ->first();
+
+                if ($role === null) {
+                    throw new ToolInputException("No role matches \"{$reference}\". Check list_roles.");
+                }
+
+                if ($role->name === Role::ROOT_ADMIN) {
+                    throw new ToolInputException('Root Admin cannot be deleted — the panel needs it.');
+                }
+
+                return [
+                    'subject' => $role,
+                    'label' => $role->name,
+                    // 지금 이 역할을 쥔 사람이 몇인지가 승인 판단의 핵심이다.
+                    'losses' => [['card_role_users', (string) $role->users_count]],
+                ];
+            })(),
+
+            'delete_node' => (function () use ($input) {
+                $node = $this->resolveNode($input);
+                $servers = $node->servers()->count();
+
+                if ($servers > 0) {
+                    throw new ToolInputException(
+                        "Node {$node->name} still has {$servers} server(s) on it. The panel refuses to delete a node "
+                        . 'that is in use — move or delete those servers first.',
+                    );
+                }
+
+                return [
+                    'subject' => $node,
+                    'label' => $node->name,
+                    'losses' => [['card_ports', (string) $node->allocations()->count()]],
+                ];
+            })(),
+
+            default => (function () use ($input) {
+                $reference = trim((string) ($input['mount'] ?? ''));
+                $mount = Mount::query()
+                    ->where(fn ($q) => $q->where('id', is_numeric($reference) ? (int) $reference : 0)
+                        ->orWhereRaw('lower(name) = ?', [mb_strtolower($reference)]))
+                    ->withCount(['nodes', 'eggs'])
+                    ->first();
+
+                if ($mount === null) {
+                    throw new ToolInputException("No mount matches \"{$reference}\". Check list_mounts.");
+                }
+
+                return [
+                    'subject' => $mount,
+                    'label' => $mount->name,
+                    'losses' => [['card_mount_source', $mount->source . ' → ' . $mount->target]],
+                ];
+            })(),
+        };
+    }
+
+    /** 삭제 실행 — 카드가 승인된 뒤에만 온다. 계획을 다시 세워 같은 검사를 한 번 더 탄다. */
+    public function runDeletion(string $tool, array $input): string
+    {
+        $plan = $this->deletionPlan($tool, $input);
+        $subject = $plan['subject'];
+        $label = $plan['label'];
+
+        match ($tool) {
+            // 서버는 데몬 쪽 파일까지 지워야 한다 — 모델만 지우면 디스크에 남는다.
+            'delete_server' => app(ServerDeletionService::class)->handle($subject),
+            default => $subject->delete(),
+        };
+
+        return match ($tool) {
+            'delete_server' => "Server {$label} and its files and backups are gone. This cannot be undone.",
+            'delete_panel_user' => "Account {$label} was deleted.",
+            'delete_role' => "Role {$label} was deleted — everyone who held it lost the access it granted.",
+            'delete_node' => "Node {$label} was removed from the panel. wings on that machine is untouched; "
+                . 'stop it there if it is no longer needed.',
+            default => "Mount {$label} was deleted.",
+        };
     }
 
     /** 손댈 수 있는 사용자인가 — 루트 관리자는 대상이 될 수 없다. */

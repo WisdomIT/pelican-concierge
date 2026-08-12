@@ -215,6 +215,24 @@ final class AgentToolbox
                 ]);
             })(),
 
+            // 삭제 (#65) — 카드가 **무엇이 사라지는지 숫자로** 말한다. 전부 danger.
+            'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount'
+                => (function () use ($common, $input, $name) {
+                    $plan = $this->admin()->deletionPlan($name, $input);
+
+                    return array_merge($common, [
+                        'lines' => array_merge(
+                            [['label' => trans('concierge::strings.card_delete_target'), 'value' => $plan['label']]],
+                            array_map(
+                                fn (array $loss) => ['label' => trans('concierge::strings.' . $loss[0]), 'value' => $loss[1]],
+                                $plan['losses'],
+                            ),
+                        ),
+                        'note' => trans('concierge::strings.card_note_' . $name),
+                        'danger' => true,
+                    ]);
+                })(),
+
             'create_node' => (function () use ($common, $input) {
                 // 계획을 카드 전에 세운다 — 검사가 여기서 끝나고, 카드가 그 값을 그대로 보여준다.
                 $plan = $this->admin()->nodePlan($input);
@@ -366,6 +384,8 @@ final class AgentToolbox
         'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
         // 인프라 생성 (#64)
         'create_node', 'create_mount',
+        // 삭제 (#65) — 되돌릴 수 없다
+        'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
         // 읽기 2차 (#61)
         'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
         'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
@@ -414,6 +434,12 @@ final class AgentToolbox
         // 인프라 생성 (#64)
         'create_node' => [RolePermissionPrefixes::Create, RolePermissionModels::Node],
         'create_mount' => [RolePermissionPrefixes::Create, RolePermissionModels::Mount],
+        // 삭제 (#65) — 각 리소스의 delete 권한을 그대로 본다.
+        'delete_server' => [RolePermissionPrefixes::Delete, RolePermissionModels::Server],
+        'delete_panel_user' => [RolePermissionPrefixes::Delete, RolePermissionModels::User],
+        'delete_role' => [RolePermissionPrefixes::Delete, RolePermissionModels::Role],
+        'delete_node' => [RolePermissionPrefixes::Delete, RolePermissionModels::Node],
+        'delete_mount' => [RolePermissionPrefixes::Delete, RolePermissionModels::Mount],
     ];
 
     public function definitions(): array
@@ -1190,6 +1216,57 @@ final class AgentToolbox
                     'required' => ['user', 'role', 'granted'],
                 ],
             ],
+            // ── 삭제 (#65). 되돌릴 수 없다 — 더 안전한 길이 있으면 그것부터 권할 것. ──
+            [
+                'name' => 'delete_server',
+                'description' => 'Delete a server: **its files and every backup go with it, permanently.** Suggest '
+                    . 'suspending it instead (set_server_suspended) unless they clearly want it gone. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['server' => ['type' => 'string', 'description' => 'Server name, id or uuid.']],
+                    'required' => ['server'],
+                ],
+            ],
+            [
+                'name' => 'delete_panel_user',
+                'description' => 'Delete a panel account permanently. Refused while they still own servers — hand those '
+                    . 'over first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['user' => ['type' => 'string', 'description' => 'Username, email or id.']],
+                    'required' => ['user'],
+                ],
+            ],
+            [
+                'name' => 'delete_role',
+                'description' => 'Delete a role. Everyone holding it loses what it granted — the card says how many that '
+                    . 'is. Taking the role off one person (set_user_role) is usually what they want instead. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['role' => ['type' => 'string', 'description' => 'Role name or id from list_roles.']],
+                    'required' => ['role'],
+                ],
+            ],
+            [
+                'name' => 'delete_node',
+                'description' => 'Remove a node from the panel. Refused while any server sits on it. wings on that machine '
+                    . 'is not touched. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.']],
+                    'required' => ['node'],
+                ],
+            ],
+            [
+                'name' => 'delete_mount',
+                'description' => 'Delete a mount. Servers using it lose that directory on their next restart. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['mount' => ['type' => 'string', 'description' => 'Mount name or id from list_mounts.']],
+                    'required' => ['mount'],
+                ],
+            ],
+
             [
                 'name' => 'create_node',
                 'description' => 'Register a new node on the panel. **This does not make it work** — wings still has to be '
@@ -1335,6 +1412,7 @@ final class AgentToolbox
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
         'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
         'create_node', 'create_mount',
+        'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
     ];
 
     /**
@@ -1437,6 +1515,7 @@ final class AgentToolbox
             'create_panel_user', 'set_user_role', 'transfer_server_owner',
             'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
             'create_node', 'create_mount',
+            'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
         ], true)) {
             return $this->adminCard($name, $input);
         }
@@ -1928,6 +2007,9 @@ final class AgentToolbox
                 // 인프라 생성 (#64)
                 'create_node' => new ToolCallResult($name, $input, $this->admin()->createNode($input)),
                 'create_mount' => new ToolCallResult($name, $input, $this->admin()->createMount($input)),
+                // 삭제 (#65) — 카드 승인 뒤에만 온다. 실행이 계획을 다시 세워 검사를 한 번 더 탄다.
+                'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount'
+                    => new ToolCallResult($name, $input, $this->admin()->runDeletion($name, $input)),
                 // 관리 화면 읽기 2차 (#61)
                 'list_eggs' => new ToolCallResult($name, $input, $this->adminRead()->listEggs()),
                 'get_egg_details' => new ToolCallResult($name, $input, $this->adminRead()->getEggDetails($input)),
