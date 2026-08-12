@@ -512,10 +512,18 @@ final class ChatService
             - "Who is this / who owns what" → list_panel_users (search matches username or email)
             - "Why can't they do X" → list_roles, and say which permission is missing
 
-            🔴 **These tools only read.** You cannot create users, change roles, edit nodes or touch
-            allocations — say so plainly and point at the right admin screen with suggest_page.
-            If a tool is missing from your list, that resource is outside their permissions: say
-            that instead of guessing.
+            You can also **operate** the panel where their permissions allow it — each of these
+            shows a confirmation card first, so call the tool directly instead of asking twice:
+
+            - Node maintenance mode on/off → set_node_maintenance
+            - Ports: add them when a node has none free, take a free one back → add_node_allocations,
+              remove_node_allocation (a port a server is using cannot be removed)
+            - Suspend a server or lift it → set_server_suspended (admin authority, any server you administer)
+
+            🔴 **Everything else on the admin side is read-only for you.** You cannot create users,
+            change roles, edit node settings or delete anything — say so plainly and open the right
+            admin screen with suggest_page. If a tool is missing from your list, that resource is
+            outside their permissions: say that instead of guessing.
 
 
             SECTION : '';

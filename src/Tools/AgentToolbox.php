@@ -99,6 +99,86 @@ final class AgentToolbox
     }
 
     /**
+     * 관리 변경의 확인 카드 (#47).
+     *
+     * 카드에 적히는 값은 **우리가 조회한 사실**이다 — 모델이 "안전합니다" 같은 말로
+     * 승인을 유도할 수 없어야 한다(기존 카드와 같은 원칙).
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function adminCard(string $name, array $input): array
+    {
+        $common = [
+            'tool' => $name,
+            'server_id' => null,
+            'title' => trans('concierge::strings.card_title_' . $name),
+            'confirm' => trans('concierge::strings.card_confirm_' . $name),
+        ];
+
+        return match ($name) {
+            'set_node_maintenance' => (function () use ($common, $input) {
+                $node = $this->admin()->nodeFacts($input);
+                $on = (bool) ($input['enabled'] ?? true);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_maintenance_' . ($on ? 'on' : 'off')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $node->name],
+                        ['label' => trans('concierge::strings.card_servers_on_node'), 'value' => (string) $node->servers()->count()],
+                    ],
+                    'note' => trans('concierge::strings.card_note_maintenance_' . ($on ? 'on' : 'off')),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'add_node_allocations' => (function () use ($common, $input) {
+                $node = $this->admin()->nodeFacts($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $node->name],
+                        ['label' => trans('concierge::strings.card_ports'), 'value' => implode(', ', (array) ($input['ports'] ?? []))],
+                        ['label' => trans('concierge::strings.card_ip'), 'value' => trim((string) ($input['ip'] ?? '0.0.0.0'))],
+                    ],
+                    'note' => null,
+                    'danger' => false,
+                ]);
+            })(),
+
+            'remove_node_allocation' => (function () use ($common, $input) {
+                // 해석 자체가 검사다 — 서버가 쓰는 포트면 여기서 막힌다.
+                $allocation = $this->admin()->allocationFacts($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $allocation->node->name],
+                        ['label' => trans('concierge::strings.card_ports'), 'value' => $allocation->ip . ':' . $allocation->port],
+                    ],
+                    'note' => null,
+                    'danger' => true,
+                ]);
+            })(),
+
+            default => (function () use ($common, $input) {
+                $server = $this->admin()->serverFacts($input);
+                $suspend = (bool) ($input['suspended'] ?? true);
+
+                return array_merge($common, [
+                    'server_id' => $server->id,
+                    'title' => trans('concierge::strings.card_title_suspend_' . ($suspend ? 'on' : 'off')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                        ['label' => trans('concierge::strings.card_owner'), 'value' => $server->user?->username ?? '-'],
+                    ],
+                    'note' => trans('concierge::strings.card_note_suspend_' . ($suspend ? 'on' : 'off')),
+                    'danger' => $suspend,
+                ]);
+            })(),
+        };
+    }
+
+    /**
      * Anthropic API 에 넘길 도구 정의.
      *
      * description 은 **언제 부르는지**까지 적는다 — 무엇을 하는지만 적으면 호출률이 떨어진다.
@@ -119,9 +199,10 @@ final class AgentToolbox
     /** 서버를 새로 만드는 도구 (#45). */
     private const CREATE_TOOLS = ['list_available_games', 'create_server'];
 
-    /** 패널 관리 도구 (#46) — 지금은 **읽기 전용**이다. 바꾸는 도구는 #47. */
+    /** 패널 관리 도구 — 읽기(#46) + 운영 변경(#47). 변경은 전부 확인 카드를 거친다. */
     private const ADMIN_TOOLS = [
         'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
+        'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
     ];
 
     /**
@@ -138,6 +219,11 @@ final class AgentToolbox
         'list_node_allocations' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Allocation],
         'list_panel_users' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
         'list_roles' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Role],
+        // 바꾸는 도구는 **그 리소스를 고칠 수 있는 사람**에게만 (#47).
+        'set_node_maintenance' => [RolePermissionPrefixes::Update, RolePermissionModels::Node],
+        'add_node_allocations' => [RolePermissionPrefixes::Create, RolePermissionModels::Allocation],
+        'remove_node_allocation' => [RolePermissionPrefixes::Delete, RolePermissionModels::Allocation],
+        'set_server_suspended' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
     ];
 
     public function definitions(): array
@@ -709,6 +795,62 @@ final class AgentToolbox
                 'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
             ],
 
+            // ── 관리 운영 변경 (#47). 전부 확인 카드가 먼저 뜬다 — 바로 부르면 된다. ──
+            [
+                'name' => 'set_node_maintenance',
+                'description' => 'Put a node into maintenance mode or take it out. In maintenance no new server '
+                    . 'lands on it; servers already there keep running. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'enabled' => ['type' => 'boolean', 'description' => 'true = go into maintenance, false = come out.'],
+                    ],
+                    'required' => ['node', 'enabled'],
+                ],
+            ],
+            [
+                'name' => 'add_node_allocations',
+                'description' => 'Add ports to a node so servers can be deployed on them. Ports may be single values '
+                    . 'or ranges ("27600", "27700-27709"). Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'ports' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Ports or ranges, e.g. ["27600", "27700-27709"].'],
+                        'ip' => ['type' => 'string', 'description' => 'IP to bind, default 0.0.0.0.'],
+                    ],
+                    'required' => ['node', 'ports'],
+                ],
+            ],
+            [
+                'name' => 'remove_node_allocation',
+                'description' => 'Remove a free port from a node. **A port a server is using cannot be removed** — '
+                    . 'free it on that server first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'node' => ['type' => 'string', 'description' => 'Node name or id from list_nodes.'],
+                        'port' => ['type' => 'integer', 'description' => 'Port number to remove.'],
+                        'ip' => ['type' => 'string', 'description' => 'Only when the node has the same port on several IPs.'],
+                    ],
+                    'required' => ['node', 'port'],
+                ],
+            ],
+            [
+                'name' => 'set_server_suspended',
+                'description' => 'Suspend a server (it is stopped and its owner cannot start it) or lift the suspension. '
+                    . 'Admin authority — works on any server you administer, not just your own. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'server' => ['type' => 'string', 'description' => 'Server name, id or uuid.'],
+                        'suspended' => ['type' => 'boolean', 'description' => 'true = suspend, false = lift.'],
+                    ],
+                    'required' => ['server', 'suspended'],
+                ],
+            ],
+
             [
                 'name' => 'suggest_page',
                 'description' => 'Put a button to a panel screen in the chat, for things **the user must do themselves**. '
@@ -743,6 +885,8 @@ final class AgentToolbox
         'uninstall_mod', 'update_mod',
         'write_server_file', 'create_server_directory', 'download_to_server',
         'delete_server_files', 'rename_server_file',
+        // 관리 변경 (#47) — 남의 서버·노드를 건드리므로 예외 없이 카드를 거친다.
+        'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
     ];
 
     /**
@@ -831,6 +975,11 @@ final class AgentToolbox
         // 개설은 아직 서버가 없다 — 다른 도구와 달리 대상 서버를 해석할 게 없다.
         if ($name === 'create_server') {
             return $this->createServerCard($input);
+        }
+
+        // 관리 변경(#47)은 대상이 노드·할당이거나 **남의 서버**다 — serverFor 로 풀 수 없다.
+        if (in_array($name, ['set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended'], true)) {
+            return $this->adminCard($name, $input);
         }
 
         $server = $this->serverFor($name, $input);
@@ -1266,6 +1415,11 @@ final class AgentToolbox
                 'list_node_allocations' => new ToolCallResult($name, $input, $this->admin()->listNodeAllocations($input)),
                 'list_panel_users' => new ToolCallResult($name, $input, $this->admin()->listPanelUsers($input)),
                 'list_roles' => new ToolCallResult($name, $input, $this->admin()->listRoles()),
+                // 관리 운영 변경 (#47) — 카드 승인 뒤에만 여기까지 온다.
+                'set_node_maintenance' => new ToolCallResult($name, $input, $this->admin()->setNodeMaintenance($input)),
+                'add_node_allocations' => new ToolCallResult($name, $input, $this->admin()->addNodeAllocations($input)),
+                'remove_node_allocation' => new ToolCallResult($name, $input, $this->admin()->removeNodeAllocation($input)),
+                'set_server_suspended' => new ToolCallResult($name, $input, $this->admin()->setServerSuspended($input)),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
