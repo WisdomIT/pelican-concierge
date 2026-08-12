@@ -86,6 +86,8 @@ final class AgentToolbox
 
     private ?AdminTools $admin = null;
 
+    private ?AdminReadTools $adminRead = null;
+
     public function __construct(private readonly User $user)
     {
         $this->catalog = new GameCatalog();
@@ -96,6 +98,12 @@ final class AgentToolbox
     private function admin(): AdminTools
     {
         return $this->admin ??= new AdminTools($this->user);
+    }
+
+    /** 관리 화면 읽기 2차 (#61). */
+    private function adminRead(): AdminReadTools
+    {
+        return $this->adminRead ??= new AdminReadTools($this->user);
     }
 
     /**
@@ -245,6 +253,9 @@ final class AgentToolbox
         'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        // 읽기 2차 (#61)
+        'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
+        'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
     ];
 
     /**
@@ -270,6 +281,17 @@ final class AgentToolbox
         // 역할 부여는 사용자를 고치는 일이다 — 역할 자체를 만드는 권한과 다르다.
         'set_user_role' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         'transfer_server_owner' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
+        // 읽기 2차 (#61) — 각자 자기 리소스의 목록 권한을 본다.
+        'list_eggs' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'get_egg_details' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'list_mounts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Mount],
+        'list_database_hosts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::DatabaseHost],
+        'list_backup_hosts' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::BackupHost],
+        'list_webhooks' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Webhook],
+        'list_api_keys' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::ApiKey],
+        // 헬스·활동 로그는 전용 리소스가 없다 — 노드를 볼 수 있는 사람이 보는 화면이다.
+        'get_panel_health' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
+        'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
     ];
 
     public function definitions(): array
@@ -897,6 +919,71 @@ final class AgentToolbox
                 ],
             ],
 
+            // ── 관리 화면 읽기 2차 (#61). 전부 조회만 한다. ──
+            [
+                'name' => 'list_eggs',
+                'description' => 'Eggs imported on this panel — what can be created here at all, how many servers use each. '
+                    . 'Check this before telling someone "an admin has to add that game".',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_egg_details',
+                'description' => 'One egg in depth: its variables (env name, default, whether users may see or edit them) '
+                    . 'and how many servers use it. Use it to explain what a startup setting is for.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['egg' => ['type' => 'string', 'description' => 'Egg name or id from list_eggs.']],
+                    'required' => ['egg'],
+                ],
+            ],
+            [
+                'name' => 'list_mounts',
+                'description' => 'Mounts configured on this panel — host directories attached into servers, and which nodes and eggs use them.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_database_hosts',
+                'description' => 'Database hosts servers can be given databases on. **No host without one can hand out databases** — '
+                    . 'check here when a database request fails. Passwords are never shown.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_backup_hosts',
+                'description' => 'Where backups are stored and which nodes use each host. Check here when backups fail. '
+                    . 'Access credentials are never shown.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_webhooks',
+                'description' => 'Webhooks configured on this panel and the events each one fires on.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'list_api_keys',
+                'description' => 'API keys: owner, memo, last use and expiry. **Key values are never returned** — '
+                    . 'if someone needs the value, send them to the panel screen with suggest_page.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_panel_health',
+                'description' => 'The panel\'s own health checks (database, cache, scheduler, queue, disk…). '
+                    . 'First thing to read when the panel itself misbehaves rather than a single server.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_activity_log',
+                'description' => 'Recent panel activity — who did what and when. Narrow it with user or server. '
+                    . 'This is the answer to "who deleted that", "when did this change".',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Optional: only this actor (username or id).'],
+                        'server' => ['type' => 'string', 'description' => 'Optional: only actions on this server.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+
             [
                 'name' => 'create_panel_user',
                 'description' => 'Create a panel account. **Never handle a password** — the new user is emailed a link '
@@ -1514,6 +1601,16 @@ final class AgentToolbox
                 'create_panel_user' => new ToolCallResult($name, $input, $this->admin()->createPanelUser($input)),
                 'set_user_role' => new ToolCallResult($name, $input, $this->admin()->setUserRole($input)),
                 'transfer_server_owner' => new ToolCallResult($name, $input, $this->admin()->transferServerOwner($input)),
+                // 관리 화면 읽기 2차 (#61)
+                'list_eggs' => new ToolCallResult($name, $input, $this->adminRead()->listEggs()),
+                'get_egg_details' => new ToolCallResult($name, $input, $this->adminRead()->getEggDetails($input)),
+                'list_mounts' => new ToolCallResult($name, $input, $this->adminRead()->listMounts()),
+                'list_database_hosts' => new ToolCallResult($name, $input, $this->adminRead()->listDatabaseHosts()),
+                'list_backup_hosts' => new ToolCallResult($name, $input, $this->adminRead()->listBackupHosts()),
+                'list_webhooks' => new ToolCallResult($name, $input, $this->adminRead()->listWebhooks()),
+                'list_api_keys' => new ToolCallResult($name, $input, $this->adminRead()->listApiKeys()),
+                'get_panel_health' => new ToolCallResult($name, $input, $this->adminRead()->getPanelHealth()),
+                'get_activity_log' => new ToolCallResult($name, $input, $this->adminRead()->getActivityLog($input)),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {

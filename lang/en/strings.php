@@ -28,6 +28,16 @@ return [
     'tool_list_node_allocations' => 'Checking ports',
     'tool_list_panel_users' => 'Checking users',
     'tool_list_roles' => 'Checking roles',
+    // Reading the admin side, second tranche (#61)
+    'tool_list_eggs' => 'Checking eggs',
+    'tool_get_egg_details' => 'Checking egg settings',
+    'tool_list_mounts' => 'Checking mounts',
+    'tool_list_database_hosts' => 'Checking database hosts',
+    'tool_list_backup_hosts' => 'Checking backup hosts',
+    'tool_list_webhooks' => 'Checking webhooks',
+    'tool_list_api_keys' => 'Checking API keys',
+    'tool_get_panel_health' => 'Checking panel health',
+    'tool_get_activity_log' => 'Checking activity log',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',

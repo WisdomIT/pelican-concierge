@@ -28,6 +28,16 @@ return [
     'tool_list_node_allocations' => '포트 현황 확인 중',
     'tool_list_panel_users' => '사용자 확인 중',
     'tool_list_roles' => '역할·권한 확인 중',
+    // 관리 화면 읽기 2차 (#61)
+    'tool_list_eggs' => '게임 목록 확인 중',
+    'tool_get_egg_details' => '게임 설정 확인 중',
+    'tool_list_mounts' => '마운트 확인 중',
+    'tool_list_database_hosts' => 'DB 호스트 확인 중',
+    'tool_list_backup_hosts' => '백업 호스트 확인 중',
+    'tool_list_webhooks' => '웹훅 확인 중',
+    'tool_list_api_keys' => 'API 키 확인 중',
+    'tool_get_panel_health' => '패널 상태 확인 중',
+    'tool_get_activity_log' => '활동 기록 확인 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
