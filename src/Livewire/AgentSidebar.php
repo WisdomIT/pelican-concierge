@@ -24,6 +24,7 @@ use WisdomIT\Concierge\Models\ConciergeUsage;
 use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
 use WisdomIT\Concierge\Services\UsageLimiter;
+use WisdomIT\Concierge\Tools\AgentToolbox;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
