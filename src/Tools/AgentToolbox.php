@@ -11,6 +11,7 @@ use App\Repositories\Daemon\DaemonFileRepository;
 use App\Repositories\Daemon\DaemonServerRepository;
 use Throwable;
 use WisdomIT\Concierge\Catalog\GameCatalog;
+use WisdomIT\Concierge\Support\OptionalPlugins;
 use WisdomIT\Concierge\Models\ConciergeInstallCheck;
 use App\Enums\ServerState;
 use App\Models\Allocation;
@@ -3290,14 +3291,74 @@ final class AgentToolbox
             'memory_mb' => $server->memory,
             'disk_mb' => $server->disk,
             'cpu_percent' => $server->cpu,
+            // ⚠ 이 목록은 **접근 가능한** 서버다 — 친구로 초대된 서버도, 관리자라면 패널의
+            //   모든 서버도 들어온다. 소유 여부를 안 적으면 모델이 전부 자기 것으로 보고
+            //   할당량을 남의 서버까지 합산한다(실측).
+            'owned_by_you' => $server->owner_id === $this->user->id,
             // 설치 중이면 데몬 상태를 물어봐야 소용없다 — 모델이 먼저 알아야 한다.
             'install_state' => $server->status?->value ?? 'installed',
         ])->all();
 
-        return new ToolCallResult('list_my_servers', $input, $this->json([
+        return new ToolCallResult('list_my_servers', $input, $this->json(array_filter([
             'count' => count($rows),
             'servers' => $rows,
-        ]));
+            // 한도는 **세어서 짐작하지 말고** 여기 값을 쓰라는 뜻으로 함께 준다.
+            'your_allowance' => $this->ownAllowance(),
+        ], fn ($value) => $value !== null)));
+    }
+
+    /**
+     * 이 사용자의 개인 할당량 — **자기가 소유한 서버만** 센다.
+     *
+     * 목록(list_my_servers)은 접근 가능한 서버를 전부 보여주므로, 모델이 그걸 합산하면
+     * 친구 서버·패널 전체가 섞여 실제보다 크게 나온다. 계산을 모델에게 맡기지 않고
+     * 소유 기준 수치를 직접 준다.
+     *
+     * UCS 가 없으면 개인 할당량이라는 개념 자체가 없다 → null (키가 아예 빠진다).
+     *
+     * @return ?array<string, mixed>
+     */
+    private function ownAllowance(): ?array
+    {
+        $class = 'Boy132\\UserCreatableServers\\Models\\UserResourceLimits';
+
+        if (!OptionalPlugins::usable('user-creatable-servers') || !class_exists($class)) {
+            return null;
+        }
+
+        $limits = $class::query()->where('user_id', $this->user->id)->first();
+
+        if ($limits === null) {
+            return ['note' => 'No personal allowance is configured for this account — an admin has to grant one.'];
+        }
+
+        $owned = $this->user->servers();
+
+        $used = [
+            'cpu_percent' => (int) $owned->clone()->sum('cpu'),
+            'memory_mb' => (int) $owned->clone()->sum('memory'),
+            'disk_mb' => (int) $owned->clone()->sum('disk'),
+            'servers' => (int) $owned->clone()->count(),
+        ];
+
+        return [
+            'note' => 'Counts only servers this user owns — servers they were merely invited to, '
+                . 'and (for admins) other people\'s servers in the list above, do not count. '
+                . 'Use these numbers instead of adding the list up.',
+            'limit' => [
+                'cpu_percent' => (int) $limits->cpu,
+                'memory_mb' => (int) $limits->memory,
+                'disk_mb' => (int) $limits->disk,
+                'servers' => (int) $limits->server_limit,
+            ],
+            'used_by_owned_servers' => $used,
+            'remaining' => [
+                'cpu_percent' => max(0, (int) $limits->cpu - $used['cpu_percent']),
+                'memory_mb' => max(0, (int) $limits->memory - $used['memory_mb']),
+                'disk_mb' => max(0, (int) $limits->disk - $used['disk_mb']),
+                'servers' => max(0, (int) $limits->server_limit - $used['servers']),
+            ],
+        ];
     }
 
     /** @param array<string, mixed> $input */
