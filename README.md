@@ -32,9 +32,14 @@ server for their friends do not, and never will.
 This plugin is aimed squarely at them. It does not replace the panel — every action it
 takes is one the panel already supports, performed through the panel's own services.
 
+It grew a second audience since: the person running the panel. Ask why a node is unhealthy,
+who owns what, why someone cannot do something, or hand out ports and roles — the same
+assistant, with whatever authority your own account has and nothing beyond it.
+
 ## What it can do
 
-37 tools, grouped by what they touch:
+Around 70 tools. **Nobody gets all of them** — the list handed to the model is assembled
+from the requester's own permissions, so it differs per person.
 
 | Area | Examples |
 |---|---|
@@ -47,7 +52,34 @@ takes is one the panel already supports, performed through the panel's own servi
 | Schedules | create, toggle, delete |
 | Startup | change egg variables, Docker image, startup command |
 | Console | send commands |
+| Friends | see who is invited to a server, invite with chosen permissions, change or revoke them |
+| Repair | reinstall a server whose game files are broken |
 | Web | search the web when a question needs current information |
+
+For administrators, on top of the above:
+
+| Area | Examples |
+|---|---|
+| Diagnose | node health and capacity, wings reachability, ports, users and what they own, roles and what each grants, eggs and their variables, mounts, database and backup hosts, webhooks, API keys, panel health, activity log |
+| Operate | maintenance mode, add or reclaim ports, suspend a server |
+| People | create an account, grant or revoke roles, transfer a server, edit an account, send a password reset link, clear a stuck two-factor, create roles and set their permissions |
+| Build | register a node or a mount |
+| Delete | servers, accounts, roles, nodes, mounts — each behind the strongest confirmation in the product |
+
+## What the assistant can do depends on who is asking
+
+The agent mirrors the requester's own authority: whatever they can see and do in the panel
+themselves is what it can help with, never more. The tool list is assembled from their real
+permissions, and every change still goes through a confirmation card.
+
+| Requester | What the assistant offers |
+|---|---|
+| Administrator | Everything above, **plus** the admin side — nodes, users, roles, allocations, eggs, mounts, hosts, health and activity, and the changes their role permits (maintenance mode, ports, suspension, accounts, roles, ownership, node and mount creation, deletions) |
+| User with User Creatable Servers | Creating servers within their quota, and full care of the servers they own or are invited to |
+| User without it | **Care only** — their existing servers: start/stop, logs and diagnosis, files, backups, schedules, mods, inviting friends. Creation is not offered at all; the assistant says an administrator has to do it |
+
+Permissions are checked twice — when deciding which tools to hand the model, and again when a
+tool runs — so a conversation cannot reach past what the person could do on their own screens.
 
 ### Anything destructive asks first
 
@@ -74,6 +106,20 @@ plugin — strongly recommended if your users open servers that need a vendor ac
 encrypted; without it they sit in `server_variables` in the clear, readable on the
 server's Startup page, and the assistant warns the user of exactly that before they type
 one. See the integrations table below.
+
+### Text from tools is data, not orders
+
+A console log carries in-game player chat verbatim; files can be written by anyone with
+access; mod listings and web results come from strangers. The assistant is told plainly
+that anything arriving in a tool result is **untrusted content to report on, never
+instructions to follow** — including text that claims to come from you, an administrator
+or "the system". High-risk results are fenced with their provenance, and when something
+tries to give it orders the assistant says so in its reply instead of obeying.
+
+That is a mitigation, not a guarantee. The real boundary is structural: the assistant can
+only reach what the requester could reach themselves, and every change needs a human to
+press the button. Replies also have images stripped, closing a channel that could pull
+data out of a conversation without a click.
 
 ### Idle servers
 
@@ -129,6 +175,7 @@ Everything lives on the admin settings page; nothing needs an `.env` change.
 | Web search | off | Adds a per-search fee on top of tokens |
 | Conversation deletion | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
 | Sidebar colour | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
+| About this deployment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
 
 Model and effort choices are listed in `config/concierge.php`. When Anthropic
 ships a new model you can add it there without touching code.
@@ -185,25 +232,11 @@ port range your router forwards, anything the assistant cannot discover through 
 Without it the assistant works but will not know your network. It is stored in the database,
 so it survives plugin updates, and it is sent with every message — keep it to short facts.
 
-## What the assistant can do depends on who is asking
-
-The agent mirrors the requester's own authority: whatever they can see and do in the panel
-themselves is what it can help with, never more. The tool list is assembled from their real
-permissions, and every change still goes through a confirmation card.
-
-| Requester | What the assistant offers |
-|---|---|
-| Administrator | Everything below, **plus** the admin side — nodes, users, roles, allocations, eggs, mounts, hosts, health and activity, and the changes their role permits (maintenance mode, ports, suspension, accounts, roles, ownership, node and mount creation, deletions) |
-| User with User Creatable Servers | Creating servers within their quota, and full care of the servers they own or are invited to |
-| User without it | **Care only** — their existing servers: start/stop, logs and diagnosis, files, backups, schedules, mods, inviting friends. Creation is not offered at all; the assistant says an administrator has to do it |
-
-Permissions are checked twice — when deciding which tools to hand the model, and again when a
-tool runs — so a conversation cannot reach past what the person could do on their own screens.
-
 ## Limitations
 
-- Everything the assistant does happens as the **panel user**, inside their permissions
-  and quotas. It has no admin powers.
+- Everything the assistant does happens **as the requester**, inside their own permissions
+  and quotas — an ordinary user's assistant has no admin powers, and an administrator's
+  reaches exactly as far as their role does, no further.
 - Games that need vendor credentials (a Steam account, a FiveM licence) require the user
   to enter those themselves in the panel — the assistant never asks for them in chat.
 - File downloads are restricted to a trusted-domain allowlist over HTTPS; private and
