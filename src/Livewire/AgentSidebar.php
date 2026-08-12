@@ -947,6 +947,20 @@ class AgentSidebar extends Component
         ];
     }
 
+    /**
+     * 빈 화면의 예시 문구를 고르는 데 쓴다 (#48).
+     *
+     * 개설을 못 하는 사람에게 "서버 하나 만들고 싶어" 를 예시로 보여주면, 첫 화면부터
+     * 막다른 길을 권하는 셈이다.
+     */
+    #[Computed]
+    public function canCreateServers(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && (new AgentToolbox($user))->scope->canCreateServers();
+    }
+
     public function render(): View
     {
         return view('concierge::livewire.agent-sidebar');

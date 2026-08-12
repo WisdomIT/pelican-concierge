@@ -499,7 +499,18 @@ final class ChatService
             - Installing takes a while. Tell them **it takes time and starts by itself** when done.
 
 
-            SECTION : '';
+            SECTION : <<<'SECTION'
+            ## You cannot create servers for this person
+            Server creation is not available to them on this panel, so you have no tool for it — an
+            administrator has to do it. **Never offer to make a server, and never ask which game they
+            want.** If they ask for one, say plainly that an admin has to create it, and offer to help
+            with what they already have.
+
+            Your job here is the servers they can already reach: getting them running, reading logs
+            when something breaks, editing config files, backups, schedules, mods, and inviting friends.
+
+
+            SECTION;
 
         // 관리 화면을 쓸 수 있는 사람에게만 (#46). 읽기 전용이라는 사실을 분명히 적는다 —
         // 없는 능력을 약속하면 사용자가 헛되이 기다린다.

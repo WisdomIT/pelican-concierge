@@ -5,6 +5,8 @@ return [
     // The product name is "AI Agent" in every locale (#31) — only surrounding words translate.
     'title' => 'AI Agent',
     'empty' => 'What can I help with? For example: "I want a Minecraft server"',
+    // For users who cannot create servers (#48) — do not open with a dead end.
+    'empty_no_create' => 'What can I help with? For example: "my server won\'t start", "edit the config for me"',
     'placeholder' => 'Just say what you want in plain words',
     'send' => 'Send',
     'sending' => 'Sending…',
