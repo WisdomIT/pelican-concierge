@@ -22,6 +22,12 @@ return [
     'tool_accept_minecraft_eula' => 'Accepting the EULA',
     'tool_replace_in_server_file' => 'Editing a file',
     'tool_list_available_games' => 'Checking available games',
+    // Reading the admin side (#46)
+    'tool_list_nodes' => 'Checking nodes',
+    'tool_get_node_status' => 'Checking node status',
+    'tool_list_node_allocations' => 'Checking ports',
+    'tool_list_panel_users' => 'Checking users',
+    'tool_list_roles' => 'Checking roles',
     'tool_create_server' => 'Creating the server',
 
     // ── Confirmation card ──

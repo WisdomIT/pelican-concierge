@@ -498,6 +498,28 @@ final class ChatService
 
             SECTION : '';
 
+        // 관리 화면을 쓸 수 있는 사람에게만 (#46). 읽기 전용이라는 사실을 분명히 적는다 —
+        // 없는 능력을 약속하면 사용자가 헛되이 기다린다.
+        $adminSection = $scope->has(ToolGroup::Admin) ? <<<'SECTION'
+            ## What you can do — read the admin side of the panel
+            This person administers the panel, so you can also **look at** nodes, users, roles and
+            allocations — exactly what their own admin permissions allow, nothing more. Use it to
+            diagnose: which node is unhealthy, why a server will not deploy, why someone cannot do
+            something. Do not tell an admin to "ask an administrator".
+
+            - Node health, capacity, maintenance mode → list_nodes, then get_node_status for depth
+            - "Cannot create a server / no ports" → list_node_allocations for that node
+            - "Who is this / who owns what" → list_panel_users (search matches username or email)
+            - "Why can't they do X" → list_roles, and say which permission is missing
+
+            🔴 **These tools only read.** You cannot create users, change roles, edit nodes or touch
+            allocations — say so plainly and point at the right admin screen with suggest_page.
+            If a tool is missing from your list, that resource is outside their permissions: say
+            that instead of guessing.
+
+
+            SECTION : '';
+
         // 한국어는 존댓말 수위가 답변 인상을 좌우한다. 그 언어일 때만 한 줄 얹는다.
         $register = str_starts_with((string) $this->user->language, 'ko')
             ? "\n            In Korean, use 해요체 — polite but warm. Not 하십시오체 (too stiff), not 반말.\n"
@@ -541,7 +563,7 @@ final class ChatService
             not called a tool for, call that tool now. (Tools with a confirmation card count as
             acting — calling them is what makes the card appear.)
 
-            ## What you can do — check things yourself
+            {$adminSection}## What you can do — check things yourself
             You can **read directly**: the server list, live status (power, CPU, memory, disk),
             and the files and logs inside a server. For games that support it, get_server_status
             also returns current_players (and player_names when the game reports them) — answer
