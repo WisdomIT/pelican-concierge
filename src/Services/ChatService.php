@@ -402,29 +402,20 @@ final class ChatService
      * DNS 구성, 접속 주소 형식 같은 것들. "켜져 있는데 접속이 안 돼요"는 로그가 아니라
      * 이 지식이 있어야 진단된다.
      *
-     * 원본은 저장소의 `optional/pelican/knowledge/agent.md` 이고 deploy.sh 가 동봉한다.
-     * 파일이 없으면(배포 과도기) 지식 없이 동작한다 — 죽는 것보다 낫다.
+     * 설정 화면에서 관리자가 직접 쓰고, 값은 DB 에 있다(#59). 종전에는 플러그인 안의
+     * 파일을 읽었는데 **업데이트가 그 파일을 지웠고**, 허브 사용자는 넣을 방법조차 없었다.
+     *
+     * 비어 있으면 이 절 자체가 프롬프트에서 사라진다 — 없는 사실을 지어내게 두지 않는다.
      */
     private function deploymentKnowledge(): string
     {
-        $path = plugin_path('concierge', 'resources', 'knowledge', 'agent.md');
+        $knowledge = trim((string) ($this->settings->deployment_knowledge ?? ''));
 
-        if (!is_file($path)) {
+        if ($knowledge === '') {
             return '';
         }
 
-        $content = trim((string) file_get_contents($path));
-
-        // 파일 앞부분은 **사람에게 하는 유지보수 안내**다(이 파일을 어떻게 고칠지). 모델에게는
-        // 필요 없고 토큰만 든다 — 실제 지식이 시작되는 절부터 잘라 넣는다.
-        $marker = '## Knowledge about this deployment';
-        $position = strpos($content, $marker);
-
-        if ($position !== false) {
-            $content = substr($content, $position);
-        }
-
-        return $content === '' ? '' : "\n" . $content;
+        return "\n## Knowledge about this deployment\n" . $knowledge;
     }
 
     /**
@@ -476,6 +467,12 @@ final class ChatService
     {
         $games = Egg::query()->orderBy('name')->pluck('name')->implode(', ');
         $knowledge = $this->deploymentKnowledge();
+
+        // 지식이 없는 설치에서는 그 절을 가리키는 문장도 없어야 한다 — 없는 절을 따르라고
+        // 하면 모델이 무엇을 지어내야 할지 고민하게 된다(#59).
+        $knowledgePointer = $knowledge === ''
+            ? ''
+            : ' Follow the diagnosis order in "Knowledge about this deployment" below.';
         $language = $this->replyLanguage();
 
         // ⚠ 도구를 상황에 따라 빼면(#47) 아래 "할 수 있는 것" 절과 어긋난다 — 그 사실을 알린다.
@@ -660,8 +657,8 @@ final class ChatService
               ⚠ Pelican marks **an install that was cut off partway as installed** all the same.
               Never say "the install went fine" from the status alone — use the `install_check`
               field in get_server_status, which is a real verdict.
-            - **"It's on but I can't connect"**: the cause is usually outside the container.
-              Follow the diagnosis order in "Knowledge about this deployment" below — logs alone
+            - **"It's on but I can't connect"**: the cause is usually outside the container —
+              the port, the address they typed, or a version mismatch.{$knowledgePointer} Logs alone
               will not find it.
             - If you do not know a path, find it with list_server_files first.
 

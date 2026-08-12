@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $idle_grace_minutes
  * @property bool $allow_conversation_delete
  * @property ?string $sidebar_color
+ * @property ?string $deployment_knowledge
  * @property string $provider
  * @property ?string $base_url
  * @property ?array<string, array<string, mixed>> $provider_settings
@@ -50,6 +51,7 @@ class ConciergeSettings extends Model
         'idle_grace_minutes',
         'allow_conversation_delete',
         'sidebar_color',
+        'deployment_knowledge',
         'provider',
         'base_url',
         'provider_settings',
