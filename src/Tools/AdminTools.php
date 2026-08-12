@@ -5,6 +5,7 @@ namespace WisdomIT\Concierge\Tools;
 use App\Enums\SuspendAction;
 use App\Models\ActivityLog;
 use App\Models\Allocation;
+use App\Models\Mount;
 use App\Models\Node;
 use App\Models\Role;
 use App\Models\Server;
@@ -16,6 +17,7 @@ use App\Services\Users\UserCreationService;
 use App\Services\Users\UserUpdateService;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
 
 /**
@@ -545,6 +547,146 @@ final class AdminTools
         }
 
         return $given;
+    }
+
+    /**
+     * 노드 만들기 (#64) — 패널 쪽 등록만 한다.
+     *
+     * ⚠ 이걸로 서버가 돌아가지는 않는다. 그 호스트에 wings 를 깔고 이 노드의 설정 파일을
+     *   넣어야 살아난다 — 그건 패널 밖의 일이라 에이전트가 못 한다. 결과 문구가 그 사실과
+     *   다음 단계를 분명히 말한다.
+     */
+    public function createNode(array $input): string
+    {
+        $facts = $this->nodePlan($input);
+
+        // daemon_token 은 모델에서 encrypted 캐스트다 — 평문을 넣어야 한 번만 암호화된다.
+        $node = Node::query()->create($facts + [
+            'daemon_token' => Str::random(Node::DAEMON_TOKEN_LENGTH),
+            'daemon_token_id' => Str::random(Node::DAEMON_TOKEN_ID_LENGTH),
+        ]);
+
+        return sprintf(
+            "Node %s was registered on the panel (%s://%s:%d).\n"
+            . '**It cannot host anything yet** — wings must be installed on that machine and given this node\'s '
+            . 'configuration. Send them to the node\'s Configuration screen to copy it, then add ports with '
+            . 'add_node_allocations before any server can be deployed here.',
+            $node->name,
+            $node->scheme,
+            $node->fqdn,
+            $node->daemon_listen,
+        );
+    }
+
+    /** 마운트 만들기 (#64) — 호스트 디렉터리를 서버 안에 붙일 수 있게 등록한다. */
+    public function createMount(array $input): string
+    {
+        $facts = $this->mountPlan($input);
+
+        // Mount 는 uuid 를 스스로 만들지 않는다 — 없으면 NOT NULL 로 죽는다(실측).
+        $mount = Mount::query()->create($facts + ['uuid' => Str::uuid()->toString()]);
+
+        return sprintf(
+            'Mount %s was created (%s → %s%s). It does nothing until you attach it to nodes and eggs on the mount screen.',
+            $mount->name,
+            $mount->source,
+            $mount->target,
+            $mount->read_only ? ', read-only' : '',
+        );
+    }
+
+    /**
+     * 카드와 실행이 **같은 값**을 보게 하는 계획 — 검사도 여기서 한 번만 한다.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function nodePlan(array $input): array
+    {
+        $name = trim((string) ($input['name'] ?? ''));
+        $fqdn = trim((string) ($input['fqdn'] ?? ''));
+
+        if ($name === '' || $fqdn === '') {
+            throw new ToolInputException('name and fqdn are required.');
+        }
+
+        if (Node::query()->whereRaw('lower(name) = ?', [mb_strtolower($name)])->exists()) {
+            throw new ToolInputException("A node named \"{$name}\" already exists.");
+        }
+
+        $scheme = mb_strtolower(trim((string) ($input['scheme'] ?? 'https')));
+
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            throw new ToolInputException('scheme must be http or https.');
+        }
+
+        // ⚠ https 는 그 호스트에 인증서가 있어야 동작한다. IP 주소로는 발급할 수 없으니
+        //   실수를 여기서 잡는다 — 안 잡으면 노드가 조용히 죽어 있는다.
+        if ($scheme === 'https' && filter_var($fqdn, FILTER_VALIDATE_IP) !== false) {
+            throw new ToolInputException(
+                'https needs a domain name with a certificate — an IP address cannot have one. '
+                . 'Use a hostname, or scheme http for a private network.',
+            );
+        }
+
+        $memory = (int) ($input['memory'] ?? 0);
+        $disk = (int) ($input['disk'] ?? 0);
+
+        if ($memory <= 0 || $disk <= 0) {
+            throw new ToolInputException('memory and disk are required, in MB (e.g. 32768 for 32GB).');
+        }
+
+        return [
+            'name' => $name,
+            'fqdn' => $fqdn,
+            'scheme' => $scheme,
+            'memory' => $memory,
+            'disk' => $disk,
+            'cpu' => (int) ($input['cpu'] ?? 0),
+            'memory_overallocate' => 0,
+            'disk_overallocate' => 0,
+            'cpu_overallocate' => 0,
+            // 기본 배치값 — 패널의 노드 생성 화면과 같은 기본이다.
+            'daemon_base' => '/var/lib/pelican/volumes',
+            'daemon_listen' => 8080,
+            'daemon_sftp' => 2022,
+            'daemon_connect' => 8080,
+            'public' => true,
+            'behind_proxy' => (bool) ($input['behind_proxy'] ?? false),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function mountPlan(array $input): array
+    {
+        $name = trim((string) ($input['name'] ?? ''));
+        $source = trim((string) ($input['source'] ?? ''));
+        $target = trim((string) ($input['target'] ?? ''));
+
+        if ($name === '' || $source === '' || $target === '') {
+            throw new ToolInputException('name, source and target are required.');
+        }
+
+        if (!str_starts_with($source, '/') || !str_starts_with($target, '/')) {
+            throw new ToolInputException('source and target must be absolute paths starting with /.');
+        }
+
+        if (Mount::query()->whereRaw('lower(name) = ?', [mb_strtolower($name)])->exists()) {
+            throw new ToolInputException("A mount named \"{$name}\" already exists.");
+        }
+
+        return [
+            'name' => $name,
+            'source' => $source,
+            'target' => $target,
+            'description' => trim((string) ($input['description'] ?? '')) ?: null,
+            // 기본은 읽기 전용이다 — 서버가 호스트 디렉터리를 덮어쓰는 사고를 기본값으로 만들지 않는다.
+            'read_only' => (bool) ($input['read_only'] ?? true),
+            'user_mountable' => false,
+        ];
     }
 
     /** 손댈 수 있는 사용자인가 — 루트 관리자는 대상이 될 수 없다. */

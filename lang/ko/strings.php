@@ -129,6 +129,22 @@ return [
     'card_confirm_set_role_permissions' => '적용하기',
     'card_note_role_permissions' => '아래 목록이 이 역할의 권한 전부가 됩니다 — 빠진 것은 이 역할을 가진 모든 사람에게서 회수됩니다.',
     'card_role_users' => '이 역할을 가진 사람',
+    // 인프라 생성 (#64)
+    'tool_create_node' => '노드 등록하는 중',
+    'tool_create_mount' => '마운트 만드는 중',
+    'card_title_create_node' => '이 노드를 등록할까요?',
+    'card_confirm_create_node' => '등록하기',
+    'card_note_create_node' => '패널에 등록만 됩니다 — 그 서버에 wings 를 설치하고 이 노드의 설정을 넣어야 실제로 동작합니다. 그다음 포트도 추가해야 합니다.',
+    'card_node_address' => '접속 주소',
+    'card_title_create_mount' => '이 마운트를 만들까요?',
+    'card_confirm_create_mount' => '만들기',
+    'card_note_create_mount' => '만들기만 합니다 — 마운트 화면에서 노드와 게임(egg)에 연결해야 실제로 붙습니다.',
+    'card_mount_name' => '이름',
+    'card_mount_source' => '노드 경로',
+    'card_mount_target' => '서버 안 경로',
+    'card_mount_mode' => '방식',
+    'card_mount_ro' => '읽기 전용',
+    'card_mount_rw' => '쓰기 가능 — 서버가 이 디렉터리를 덮어쓸 수 있음',
     'tool_create_server' => '서버 만드는 중',
 
     // ── 확인 카드 ──

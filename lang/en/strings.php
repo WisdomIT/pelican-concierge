@@ -129,6 +129,22 @@ return [
     'card_confirm_set_role_permissions' => 'Apply',
     'card_note_role_permissions' => 'The list below becomes the role\'s complete set — anything missing is revoked from everyone who holds it.',
     'card_role_users' => 'People with this role',
+    // Infrastructure creation (#64)
+    'tool_create_node' => 'Registering a node',
+    'tool_create_mount' => 'Creating a mount',
+    'card_title_create_node' => 'Register this node?',
+    'card_confirm_create_node' => 'Register',
+    'card_note_create_node' => 'This only registers it on the panel — wings must be installed on that machine with this node\'s configuration before it works, and ports have to be added afterwards.',
+    'card_node_address' => 'Address',
+    'card_title_create_mount' => 'Create this mount?',
+    'card_confirm_create_mount' => 'Create',
+    'card_note_create_mount' => 'Creating it is not enough — attach it to nodes and eggs on the mount screen for it to take effect.',
+    'card_mount_name' => 'Name',
+    'card_mount_source' => 'Path on the node',
+    'card_mount_target' => 'Path inside servers',
+    'card_mount_mode' => 'Mode',
+    'card_mount_ro' => 'Read-only',
+    'card_mount_rw' => 'Writable — servers can overwrite this directory',
     'tool_create_server' => 'Creating the server',
 
     // ── Confirmation card ──

@@ -215,6 +215,41 @@ final class AgentToolbox
                 ]);
             })(),
 
+            'create_node' => (function () use ($common, $input) {
+                // 계획을 카드 전에 세운다 — 검사가 여기서 끝나고, 카드가 그 값을 그대로 보여준다.
+                $plan = $this->admin()->nodePlan($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_node'), 'value' => $plan['name']],
+                        ['label' => trans('concierge::strings.card_node_address'), 'value' => "{$plan['scheme']}://{$plan['fqdn']}:{$plan['daemon_listen']}"],
+                        ['label' => trans('concierge::strings.card_resources'), 'value' => sprintf(
+                            '%s / %s%s',
+                            $plan['memory'] >= 1024 ? round($plan['memory'] / 1024, 1) . 'GB' : $plan['memory'] . 'MB',
+                            $plan['disk'] >= 1024 ? round($plan['disk'] / 1024, 1) . 'GB' : $plan['disk'] . 'MB',
+                            $plan['cpu'] > 0 ? ", CPU {$plan['cpu']}%" : '',
+                        )],
+                    ],
+                    'note' => trans('concierge::strings.card_note_create_node'),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'create_mount' => (function () use ($common, $input) {
+                $plan = $this->admin()->mountPlan($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_mount_name'), 'value' => $plan['name']],
+                        ['label' => trans('concierge::strings.card_mount_source'), 'value' => $plan['source']],
+                        ['label' => trans('concierge::strings.card_mount_target'), 'value' => $plan['target']],
+                        ['label' => trans('concierge::strings.card_mount_mode'), 'value' => trans('concierge::strings.card_mount_' . ($plan['read_only'] ? 'ro' : 'rw'))],
+                    ],
+                    'note' => trans('concierge::strings.card_note_create_mount'),
+                    'danger' => !$plan['read_only'],
+                ]);
+            })(),
+
             'update_panel_user' => (function () use ($common, $input) {
                 $user = $this->admin()->targetableUser((string) ($input['user'] ?? ''));
 
@@ -329,6 +364,8 @@ final class AgentToolbox
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
         // 사용자·역할 2차 (#63)
         'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+        // 인프라 생성 (#64)
+        'create_node', 'create_mount',
         // 읽기 2차 (#61)
         'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
         'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
@@ -374,6 +411,9 @@ final class AgentToolbox
         'clear_user_mfa' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         // 역할 편집은 역할을 고치는 권한이다. 새로 만드는 경우까지 이 한 도구가 덮는다.
         'set_role_permissions' => [RolePermissionPrefixes::Update, RolePermissionModels::Role],
+        // 인프라 생성 (#64)
+        'create_node' => [RolePermissionPrefixes::Create, RolePermissionModels::Node],
+        'create_mount' => [RolePermissionPrefixes::Create, RolePermissionModels::Mount],
     ];
 
     public function definitions(): array
@@ -1151,6 +1191,42 @@ final class AgentToolbox
                 ],
             ],
             [
+                'name' => 'create_node',
+                'description' => 'Register a new node on the panel. **This does not make it work** — wings still has to be '
+                    . 'installed on that machine with this node\'s configuration, which you cannot do. Ports must be added '
+                    . 'afterwards too. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Node name shown on the panel.'],
+                        'fqdn' => ['type' => 'string', 'description' => 'Hostname wings answers on. https needs a real domain, not an IP.'],
+                        'memory' => ['type' => 'integer', 'description' => 'Memory this node may hand out, in MB.'],
+                        'disk' => ['type' => 'integer', 'description' => 'Disk this node may hand out, in MB.'],
+                        'cpu' => ['type' => 'integer', 'description' => 'CPU percent it may hand out; 0 = unlimited.'],
+                        'scheme' => ['type' => 'string', 'description' => 'https (default) or http for a private network.'],
+                        'behind_proxy' => ['type' => 'boolean', 'description' => 'true when a reverse proxy terminates TLS.'],
+                    ],
+                    'required' => ['name', 'fqdn', 'memory', 'disk'],
+                ],
+            ],
+            [
+                'name' => 'create_mount',
+                'description' => 'Register a mount: a directory on the node made visible inside servers. It does nothing '
+                    . 'until it is attached to nodes and eggs on the mount screen. Read-only unless asked otherwise. '
+                    . 'Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'name' => ['type' => 'string', 'description' => 'Mount name.'],
+                        'source' => ['type' => 'string', 'description' => 'Absolute path on the node, e.g. /srv/shared-maps.'],
+                        'target' => ['type' => 'string', 'description' => 'Absolute path inside the server, e.g. /home/container/maps.'],
+                        'read_only' => ['type' => 'boolean', 'description' => 'Default true. false lets servers write to the host directory.'],
+                        'description' => ['type' => 'string', 'description' => 'Optional note.'],
+                    ],
+                    'required' => ['name', 'source', 'target'],
+                ],
+            ],
+            [
                 'name' => 'update_panel_user',
                 'description' => 'Change an account\'s username, email, language or timezone. **Passwords are not handled '
                     . 'here** — use send_password_reset instead. Confirmation card runs first.',
@@ -1258,6 +1334,7 @@ final class AgentToolbox
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
         'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+        'create_node', 'create_mount',
     ];
 
     /**
@@ -1359,6 +1436,7 @@ final class AgentToolbox
             'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
             'create_panel_user', 'set_user_role', 'transfer_server_owner',
             'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+            'create_node', 'create_mount',
         ], true)) {
             return $this->adminCard($name, $input);
         }
@@ -1847,6 +1925,9 @@ final class AgentToolbox
                 'send_password_reset' => new ToolCallResult($name, $input, $this->admin()->sendPasswordReset($input)),
                 'clear_user_mfa' => new ToolCallResult($name, $input, $this->admin()->clearUserMfa($input)),
                 'set_role_permissions' => new ToolCallResult($name, $input, $this->admin()->setRolePermissions($input)),
+                // 인프라 생성 (#64)
+                'create_node' => new ToolCallResult($name, $input, $this->admin()->createNode($input)),
+                'create_mount' => new ToolCallResult($name, $input, $this->admin()->createMount($input)),
                 // 관리 화면 읽기 2차 (#61)
                 'list_eggs' => new ToolCallResult($name, $input, $this->adminRead()->listEggs()),
                 'get_egg_details' => new ToolCallResult($name, $input, $this->adminRead()->getEggDetails($input)),
