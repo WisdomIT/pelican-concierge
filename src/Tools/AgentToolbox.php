@@ -17,6 +17,11 @@ use App\Models\Allocation;
 use App\Models\Backup;
 use App\Helpers\Utilities;
 use App\Models\Schedule;
+use App\Models\Subuser;
+use App\Services\Servers\ReinstallServerService;
+use App\Services\Subusers\SubuserCreationService;
+use App\Services\Subusers\SubuserDeletionService;
+use App\Services\Subusers\SubuserUpdateService;
 use App\Models\ServerVariable;
 use App\Models\Task;
 use App\Repositories\Daemon\DaemonBackupRepository;
@@ -919,6 +924,63 @@ final class AgentToolbox
                 ],
             ],
 
+            // ── 친구 관리·재설치 (#62). 서버 주인이 화면에서 하는 일과 같다. ──
+            [
+                'name' => 'list_server_subusers',
+                'description' => 'Who else is invited to a server and what each of them may do. '
+                    . 'Read this first when someone says a friend cannot start the server or see the files.',
+                'inputSchema' => ['type' => 'object', 'properties' => $serverProperty, 'required' => ['server']],
+            ],
+            [
+                'name' => 'invite_server_subuser',
+                'description' => 'Invite someone to a server by email and give them permissions. If they have no panel '
+                    . 'account, one is created and they are emailed a link. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'email' => ['type' => 'string', 'description' => 'Email address of the person to invite.'],
+                        'permissions' => [
+                            'type' => 'array',
+                            'items' => ['type' => 'string'],
+                            'description' => 'Permission values, e.g. ["control.console", "control.start", "control.stop", "file.read"]. '
+                                . 'Give only what they asked for — you cannot grant more than you hold yourself.',
+                        ],
+                    ],
+                    'required' => ['server', 'email', 'permissions'],
+                ],
+            ],
+            [
+                'name' => 'set_subuser_permissions',
+                'description' => 'Replace what an already-invited person may do on a server. The list you pass becomes '
+                    . 'their full set — include everything they should keep. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'user' => ['type' => 'string', 'description' => 'Username or email of the invited person.'],
+                        'permissions' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The complete new permission list.'],
+                    ],
+                    'required' => ['server', 'user', 'permissions'],
+                ],
+            ],
+            [
+                'name' => 'remove_server_subuser',
+                'description' => 'Take away someone\'s access to a server entirely. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => $serverProperty + [
+                        'user' => ['type' => 'string', 'description' => 'Username or email of the invited person.'],
+                    ],
+                    'required' => ['server', 'user'],
+                ],
+            ],
+            [
+                'name' => 'reinstall_server',
+                'description' => 'Reinstall a server: the game files are downloaded again from scratch. Use it when an '
+                    . 'install failed or the files are broken. **Back up first** — worlds usually survive but this cannot '
+                    . 'be undone. Confirmation card runs first.',
+                'inputSchema' => ['type' => 'object', 'properties' => $serverProperty, 'required' => ['server']],
+            ],
+
             // ── 관리 화면 읽기 2차 (#61). 전부 조회만 한다. ──
             [
                 'name' => 'list_eggs',
@@ -1059,6 +1121,8 @@ final class AgentToolbox
         'uninstall_mod', 'update_mod',
         'write_server_file', 'create_server_directory', 'download_to_server',
         'delete_server_files', 'rename_server_file',
+        // 친구 관리·재설치 (#62) — 남의 접근 권한과 서버 파일이 걸린 일이다.
+        'invite_server_subuser', 'set_subuser_permissions', 'remove_server_subuser', 'reinstall_server',
         // 관리 변경 (#47) — 남의 서버·노드·계정을 건드리므로 예외 없이 카드를 거친다.
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
         'create_panel_user', 'set_user_role', 'transfer_server_owner',
@@ -1121,6 +1185,12 @@ final class AgentToolbox
         'list_backups' => SubuserPermission::BackupRead,
         'create_backup' => SubuserPermission::BackupCreate,
         'restore_backup' => SubuserPermission::BackupRestore,
+        // 친구 관리·재설치 (#62) — 서버 주인이 화면에서 하는 일과 같은 권한을 본다.
+        'list_server_subusers' => SubuserPermission::UserRead,
+        'invite_server_subuser' => SubuserPermission::UserCreate,
+        'set_subuser_permissions' => SubuserPermission::UserUpdate,
+        'remove_server_subuser' => SubuserPermission::UserDelete,
+        'reinstall_server' => SubuserPermission::SettingsReinstall,
         'add_server_port' => SubuserPermission::AllocationCreate,
         'remove_server_port' => SubuserPermission::AllocationDelete,
     ];
@@ -1178,6 +1248,38 @@ final class AgentToolbox
                 ],
                 'note' => $name === 'start_server' ? null : trans('concierge::strings.card_note_disconnect'),
                 'danger' => $name !== 'start_server',
+            ];
+        }
+
+        // 친구 관리·재설치 (#62) — 카드에 적히는 값은 우리가 조회·검증한 것이다.
+        if (in_array($name, ['invite_server_subuser', 'set_subuser_permissions', 'remove_server_subuser'], true)) {
+            $who = $name === 'invite_server_subuser'
+                ? trim((string) ($input['email'] ?? ''))
+                : ($this->subuserFor($server, (string) ($input['user'] ?? ''))->user?->username ?? '?');
+
+            return $common + [
+                'lines' => array_values(array_filter([
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_friend'), 'value' => $who],
+                    $name === 'remove_server_subuser' ? null : [
+                        'label' => trans('concierge::strings.card_permissions'),
+                        // 권한 검사를 카드 전에 돌린다 — 승인 화면까지 갔다가 실패하지 않는다.
+                        'value' => implode(', ', $this->subuserPermissions($input, $server)),
+                    ],
+                ])),
+                'note' => trans('concierge::strings.card_note_' . $name),
+                'danger' => $name === 'remove_server_subuser',
+            ];
+        }
+
+        if ($name === 'reinstall_server') {
+            return $common + [
+                'lines' => [
+                    ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                    ['label' => trans('concierge::strings.card_game'), 'value' => $server->egg?->name ?? '-'],
+                ],
+                'note' => trans('concierge::strings.card_note_reinstall_tool'),
+                'danger' => true,
             ];
         }
 
@@ -1583,6 +1685,12 @@ final class AgentToolbox
                 'list_backups' => $this->listBackups($input),
                 'create_backup' => $this->createBackup($input),
                 'restore_backup' => $this->restoreBackup($input),
+                // 친구 관리·재설치 (#62)
+                'list_server_subusers' => $this->listServerSubusers($input),
+                'invite_server_subuser' => $this->inviteServerSubuser($input),
+                'set_subuser_permissions' => $this->setSubuserPermissions($input),
+                'remove_server_subuser' => $this->removeServerSubuser($input),
+                'reinstall_server' => $this->reinstallServer($input),
                 'update_server_resources' => $this->updateServerResources($input),
                 'add_server_port' => $this->addServerPort($input),
                 'remove_server_port' => $this->removeServerPort($input),
@@ -2289,6 +2397,172 @@ final class AgentToolbox
             ),
             $server->id,
         );
+    }
+
+    /**
+     * 이 서버에 초대된 친구들 (#62) — "내 친구가 서버를 못 켜요"의 첫 조회.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function listServerSubusers(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('list_server_subusers', $input);
+
+        $subusers = $server->subusers()->with('user:id,username,email')->get()
+            // 주인은 서브유저 표에도 들어가 있다(패널이 그렇게 만든다) — 친구 목록에서는 뺀다.
+            ->reject(fn (Subuser $s) => $s->user_id === $server->owner_id);
+
+        if ($subusers->isEmpty()) {
+            return new ToolCallResult('list_server_subusers', $input,
+                "Nobody else is invited to {$server->name} — only its owner can touch it.", $server->id);
+        }
+
+        $lines = $subusers->map(fn (Subuser $s) => sprintf(
+            '- %s — %s',
+            $s->user?->username ?? '?',
+            $s->permissions === [] ? 'no permissions yet' : implode(', ', $s->permissions),
+        ))->implode("\n");
+
+        return new ToolCallResult('list_server_subusers', $input,
+            "People invited to {$server->name}:\n{$lines}", $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function inviteServerSubuser(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('invite_server_subuser', $input);
+        $email = trim((string) ($input['email'] ?? ''));
+        $permissions = $this->subuserPermissions($input, $server);
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new ToolInputException('A valid email is required — the address of the person you are inviting.');
+        }
+
+        app(SubuserCreationService::class)->handle($server, $email, $permissions);
+
+        return new ToolCallResult('invite_server_subuser', $input, sprintf(
+            '%s can now access %s with: %s. If they had no panel account, one was created and they were emailed a link.',
+            $email,
+            $server->name,
+            implode(', ', $permissions),
+        ), $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function setSubuserPermissions(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('set_subuser_permissions', $input);
+        $subuser = $this->subuserFor($server, (string) ($input['user'] ?? ''));
+        $permissions = $this->subuserPermissions($input, $server);
+
+        app(SubuserUpdateService::class)->handle($subuser, $server, $permissions);
+
+        return new ToolCallResult('set_subuser_permissions', $input, sprintf(
+            '%s now has these permissions on %s: %s',
+            $subuser->user?->username ?? '?',
+            $server->name,
+            implode(', ', $permissions),
+        ), $server->id);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function removeServerSubuser(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('remove_server_subuser', $input);
+        $subuser = $this->subuserFor($server, (string) ($input['user'] ?? ''));
+        $name = $subuser->user?->username ?? '?';
+
+        app(SubuserDeletionService::class)->handle($subuser, $server);
+
+        return new ToolCallResult('remove_server_subuser', $input,
+            "{$name} can no longer access {$server->name}.", $server->id);
+    }
+
+    /**
+     * 재설치 (#62) — 게임 파일을 다시 받는다. 월드 파일은 남지만 되돌릴 수 없는 일이다.
+     *
+     * @param array<string, mixed> $input
+     */
+    private function reinstallServer(array $input): ToolCallResult
+    {
+        $server = $this->serverFor('reinstall_server', $input);
+
+        app(ReinstallServerService::class)->handle($server);
+
+        return new ToolCallResult('reinstall_server', $input, sprintf(
+            'Reinstall started for %s. It downloads the game files again and starts by itself when done — '
+            . 'this takes a few minutes. Do not check completion now; just say you will report back.',
+            $server->name,
+        ), $server->id);
+    }
+
+    /**
+     * 서브유저 권한 목록을 검사한다 — **자기가 못 하는 권한은 남에게 줄 수 없다.**
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<int, string>
+     */
+    private function subuserPermissions(array $input, Server $server): array
+    {
+        $given = array_values(array_unique(array_map('trim', (array) ($input['permissions'] ?? []))));
+
+        if ($given === []) {
+            throw new ToolInputException(
+                'permissions is required — a list like ["control.console", "control.start", "control.stop"].',
+            );
+        }
+
+        $valid = array_column(SubuserPermission::cases(), 'value');
+        $unknown = array_diff($given, $valid);
+
+        if ($unknown !== []) {
+            throw new ToolInputException(
+                'Unknown permissions: ' . implode(', ', $unknown) . '. Valid values are: ' . implode(', ', $valid),
+            );
+        }
+
+        // ⚠ 권한 상승 방지: 초대하는 사람이 가진 것보다 큰 권한은 넘기지 못한다.
+        //   패널의 서브유저 화면과 같은 규칙이다.
+        $beyond = array_filter($given, fn (string $p) => !$this->user->can($p, $server));
+
+        if ($beyond !== []) {
+            throw new ToolInputException(
+                'You cannot grant permissions you do not hold yourself: ' . implode(', ', $beyond),
+            );
+        }
+
+        // 웹소켓 연결 권한이 없으면 콘솔 화면 자체가 열리지 않는다 — 패널이 항상 함께 준다.
+        if (!in_array(SubuserPermission::WebsocketConnect->value, $given, true)) {
+            $given[] = SubuserPermission::WebsocketConnect->value;
+        }
+
+        return $given;
+    }
+
+    private function subuserFor(Server $server, string $reference): Subuser
+    {
+        $reference = trim($reference);
+
+        if ($reference === '') {
+            throw new ToolInputException('user is required — the username or email of the invited person.');
+        }
+
+        $subuser = $server->subusers()->with('user')->get()
+            ->first(fn (Subuser $s) => $s->user !== null && (
+                mb_strtolower($s->user->username) === mb_strtolower($reference)
+                || mb_strtolower($s->user->email) === mb_strtolower($reference)
+                || (string) $s->user->id === $reference
+            ));
+
+        if ($subuser === null) {
+            throw new ToolInputException("\"{$reference}\" is not invited to {$server->name}. Check list_server_subusers.");
+        }
+
+        if ($subuser->user_id === $server->owner_id) {
+            throw new ToolInputException('That is the server owner — their access cannot be changed here.');
+        }
+
+        return $subuser;
     }
 
     /** @param array<string, mixed> $input */
