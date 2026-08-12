@@ -511,6 +511,16 @@ final class ChatService
             - "Cannot create a server / no ports" → list_node_allocations for that node
             - "Who is this / who owns what" → list_panel_users (search matches username or email)
             - "Why can't they do X" → list_roles, and say which permission is missing
+            - "That game isn't offered" → list_eggs before saying an admin must add it; get_egg_details
+              explains what a startup variable is for
+            - Databases or backups failing → list_database_hosts, list_backup_hosts (none configured is
+              itself the answer)
+            - The panel itself misbehaving → get_panel_health; "who did this, when" → get_activity_log
+            - Mounts, webhooks, API keys → list_mounts, list_webhooks, list_api_keys
+
+            🔴 **Never repeat a credential.** API key values, host passwords and tokens are not in the
+            tool results and must not be guessed or reconstructed — send the person to the panel screen
+            with suggest_page instead. Everything you say here is stored in the conversation log.
 
             You can also **operate** the panel where their permissions allow it — each of these
             shows a confirmation card first, so call the tool directly instead of asking twice:
