@@ -10,7 +10,9 @@ use App\Models\Role;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Allocations\AssignmentService;
+use App\Services\Servers\DetailsModificationService;
 use App\Services\Servers\SuspensionService;
+use App\Services\Users\UserCreationService;
 
 /**
  * 패널 관리 화면을 **읽는** 도구들 (#46).
@@ -292,6 +294,138 @@ final class AdminTools
         return $suspend
             ? "Server {$server->name} is suspended — it has been stopped and its owner cannot start it."
             : "Server {$server->name} is no longer suspended — its owner can start it again.";
+    }
+
+    /**
+     * 사용자 만들기 — 비밀번호는 **받지 않는다.**
+     *
+     * 비워 두면 패널이 무작위 값을 넣고 초대 메일(재설정 링크)을 보낸다. 채팅으로
+     * 비밀번호를 주고받으면 대화 기록에 남는다 — 그 경로를 아예 만들지 않는다.
+     */
+    public function createPanelUser(array $input): string
+    {
+        $email = trim((string) ($input['email'] ?? ''));
+        $username = trim((string) ($input['username'] ?? ''));
+
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new ToolInputException('A valid email is required.');
+        }
+
+        if (User::query()->whereRaw('lower(email) = ?', [mb_strtolower($email)])->exists()) {
+            throw new ToolInputException("A user with email {$email} already exists.");
+        }
+
+        if ($username !== '' && User::query()->whereRaw('lower(username) = ?', [mb_strtolower($username)])->exists()) {
+            throw new ToolInputException("The username \"{$username}\" is taken.");
+        }
+
+        $user = app(UserCreationService::class)->handle(array_filter([
+            'email' => $email,
+            'username' => $username ?: null,
+        ]));
+
+        return "Created user {$user->username} ({$email}). They were emailed a link to set their own password — "
+            . 'no password was set here.';
+    }
+
+    /** 역할 부여·회수 — "왜 못 하지"의 반대편. */
+    public function setUserRole(array $input): string
+    {
+        [$user, $role] = $this->resolveUserRole($input);
+        $grant = (bool) ($input['granted'] ?? true);
+
+        if ($grant) {
+            $user->assignRole($role);
+
+            return "{$user->username} now holds the role \"{$role->name}\".";
+        }
+
+        $user->removeRole($role);
+
+        return "{$user->username} no longer holds the role \"{$role->name}\".";
+    }
+
+    /** 소유자 이전 — 서버의 주인이 바뀐다. 이전 주인은 접근을 잃는다. */
+    public function transferServerOwner(array $input): string
+    {
+        $server = $this->resolveServer($input);
+        $newOwner = $this->resolveUser((string) ($input['owner'] ?? ''));
+
+        if ($server->owner_id === $newOwner->id) {
+            throw new ToolInputException("{$newOwner->username} already owns that server.");
+        }
+
+        $previous = $server->user?->username ?? '?';
+
+        app(DetailsModificationService::class)->handle($server, [
+            'name' => $server->name,
+            'owner_id' => $newOwner->id,
+            'external_id' => $server->external_id,
+            'description' => $server->description,
+        ]);
+
+        return "Server {$server->name} now belongs to {$newOwner->username} (was {$previous}). "
+            . 'The previous owner lost access unless they are a subuser.';
+    }
+
+    /** @return array{0: User, 1: Role} */
+    private function resolveUserRole(array $input): array
+    {
+        $user = $this->resolveUser((string) ($input['user'] ?? ''));
+        $reference = trim((string) ($input['role'] ?? ''));
+
+        if ($reference === '') {
+            throw new ToolInputException('role is required. Check list_roles first.');
+        }
+
+        $role = Role::query()
+            ->where(fn ($q) => $q->where('id', is_numeric($reference) ? (int) $reference : 0)
+                ->orWhereRaw('lower(name) = ?', [mb_strtolower($reference)]))
+            ->first();
+
+        if ($role === null) {
+            throw new ToolInputException("No role matches \"{$reference}\". Get the exact name from list_roles.");
+        }
+
+        // ⚠ 루트 관리자는 손댈 수 없다 — 자기보다 센 계정을 에이전트로 우회해 건드리는 길을 막는다.
+        if (!$this->user->canTarget($user)) {
+            throw new ToolInputException("You cannot change roles for {$user->username}.");
+        }
+
+        return [$user, $role];
+    }
+
+    public function userFacts(string $reference): User
+    {
+        return $this->resolveUser($reference);
+    }
+
+    /** @return array{0: User, 1: Role} */
+    public function userRoleFacts(array $input): array
+    {
+        return $this->resolveUserRole($input);
+    }
+
+    private function resolveUser(string $reference): User
+    {
+        $reference = trim($reference);
+
+        if ($reference === '') {
+            throw new ToolInputException('user is required — a username, email or id.');
+        }
+
+        $user = User::query()
+            ->where(fn ($q) => $q
+                ->where('id', is_numeric($reference) ? (int) $reference : 0)
+                ->orWhereRaw('lower(username) = ?', [mb_strtolower($reference)])
+                ->orWhereRaw('lower(email) = ?', [mb_strtolower($reference)]))
+            ->first();
+
+        if ($user === null) {
+            throw new ToolInputException("No user matches \"{$reference}\". Check list_panel_users.");
+        }
+
+        return $user;
     }
 
     /**

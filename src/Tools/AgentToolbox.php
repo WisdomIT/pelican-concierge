@@ -160,6 +160,47 @@ final class AgentToolbox
                 ]);
             })(),
 
+            'create_panel_user' => array_merge($common, [
+                'lines' => [
+                    ['label' => trans('concierge::strings.card_email'), 'value' => trim((string) ($input['email'] ?? ''))],
+                    ['label' => trans('concierge::strings.card_username'), 'value' => trim((string) ($input['username'] ?? '')) ?: trans('concierge::strings.card_username_auto')],
+                ],
+                'note' => trans('concierge::strings.card_note_create_user'),
+                'danger' => false,
+            ]),
+
+            'set_user_role' => (function () use ($common, $input) {
+                // 해석이 곧 검사다 — 손댈 수 없는 계정이면 카드 단계에서 막힌다.
+                [$user, $role] = $this->admin()->userRoleFacts($input);
+                $grant = (bool) ($input['granted'] ?? true);
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_role_' . ($grant ? 'grant' : 'revoke')),
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_user'), 'value' => $user->username],
+                        ['label' => trans('concierge::strings.card_role'), 'value' => $role->name],
+                    ],
+                    'note' => trans('concierge::strings.card_note_role_' . ($grant ? 'grant' : 'revoke')),
+                    'danger' => !$grant,
+                ]);
+            })(),
+
+            'transfer_server_owner' => (function () use ($common, $input) {
+                $server = $this->admin()->serverFacts($input);
+                $newOwner = $this->admin()->userFacts((string) ($input['owner'] ?? ''));
+
+                return array_merge($common, [
+                    'server_id' => $server->id,
+                    'lines' => [
+                        ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
+                        ['label' => trans('concierge::strings.card_owner'), 'value' => $server->user?->username ?? '-'],
+                        ['label' => trans('concierge::strings.card_new_owner'), 'value' => $newOwner->username],
+                    ],
+                    'note' => trans('concierge::strings.card_note_transfer'),
+                    'danger' => true,
+                ]);
+            })(),
+
             default => (function () use ($common, $input) {
                 $server = $this->admin()->serverFacts($input);
                 $suspend = (bool) ($input['suspended'] ?? true);
@@ -203,6 +244,7 @@ final class AgentToolbox
     private const ADMIN_TOOLS = [
         'list_nodes', 'get_node_status', 'list_node_allocations', 'list_panel_users', 'list_roles',
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+        'create_panel_user', 'set_user_role', 'transfer_server_owner',
     ];
 
     /**
@@ -224,6 +266,10 @@ final class AgentToolbox
         'add_node_allocations' => [RolePermissionPrefixes::Create, RolePermissionModels::Allocation],
         'remove_node_allocation' => [RolePermissionPrefixes::Delete, RolePermissionModels::Allocation],
         'set_server_suspended' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
+        'create_panel_user' => [RolePermissionPrefixes::Create, RolePermissionModels::User],
+        // 역할 부여는 사용자를 고치는 일이다 — 역할 자체를 만드는 권한과 다르다.
+        'set_user_role' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
+        'transfer_server_owner' => [RolePermissionPrefixes::Update, RolePermissionModels::Server],
     ];
 
     public function definitions(): array
@@ -852,6 +898,47 @@ final class AgentToolbox
             ],
 
             [
+                'name' => 'create_panel_user',
+                'description' => 'Create a panel account. **Never handle a password** — the new user is emailed a link '
+                    . 'to set their own. Ask only for the email; a username is optional. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'email' => ['type' => 'string', 'description' => 'Email address for the new account.'],
+                        'username' => ['type' => 'string', 'description' => 'Optional — derived from the email when omitted.'],
+                    ],
+                    'required' => ['email'],
+                ],
+            ],
+            [
+                'name' => 'set_user_role',
+                'description' => 'Give a user a role or take it away. Roles decide what they can do in the admin area — '
+                    . 'check list_roles first. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'user' => ['type' => 'string', 'description' => 'Username, email or id.'],
+                        'role' => ['type' => 'string', 'description' => 'Role name or id from list_roles.'],
+                        'granted' => ['type' => 'boolean', 'description' => 'true = give the role, false = take it away.'],
+                    ],
+                    'required' => ['user', 'role', 'granted'],
+                ],
+            ],
+            [
+                'name' => 'transfer_server_owner',
+                'description' => 'Hand a server over to another user. **The previous owner loses access** unless they '
+                    . 'are also a subuser. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'server' => ['type' => 'string', 'description' => 'Server name, id or uuid.'],
+                        'owner' => ['type' => 'string', 'description' => 'New owner: username, email or id.'],
+                    ],
+                    'required' => ['server', 'owner'],
+                ],
+            ],
+
+            [
                 'name' => 'suggest_page',
                 'description' => 'Put a button to a panel screen in the chat, for things **the user must do themselves**. '
                     . 'Nothing is executed. **Use this instead of describing a path in words.** '
@@ -885,8 +972,9 @@ final class AgentToolbox
         'uninstall_mod', 'update_mod',
         'write_server_file', 'create_server_directory', 'download_to_server',
         'delete_server_files', 'rename_server_file',
-        // 관리 변경 (#47) — 남의 서버·노드를 건드리므로 예외 없이 카드를 거친다.
+        // 관리 변경 (#47) — 남의 서버·노드·계정을 건드리므로 예외 없이 카드를 거친다.
         'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+        'create_panel_user', 'set_user_role', 'transfer_server_owner',
     ];
 
     /**
@@ -978,7 +1066,10 @@ final class AgentToolbox
         }
 
         // 관리 변경(#47)은 대상이 노드·할당이거나 **남의 서버**다 — serverFor 로 풀 수 없다.
-        if (in_array($name, ['set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended'], true)) {
+        if (in_array($name, [
+            'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+            'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        ], true)) {
             return $this->adminCard($name, $input);
         }
 
@@ -1420,6 +1511,9 @@ final class AgentToolbox
                 'add_node_allocations' => new ToolCallResult($name, $input, $this->admin()->addNodeAllocations($input)),
                 'remove_node_allocation' => new ToolCallResult($name, $input, $this->admin()->removeNodeAllocation($input)),
                 'set_server_suspended' => new ToolCallResult($name, $input, $this->admin()->setServerSuspended($input)),
+                'create_panel_user' => new ToolCallResult($name, $input, $this->admin()->createPanelUser($input)),
+                'set_user_role' => new ToolCallResult($name, $input, $this->admin()->setUserRole($input)),
+                'transfer_server_owner' => new ToolCallResult($name, $input, $this->admin()->transferServerOwner($input)),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
