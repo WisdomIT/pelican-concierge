@@ -628,7 +628,7 @@ return [
     'stat_limit_resets' => 'Resets: :reset',
 
     // ── Game catalogue administration (#81) ──
-    'catalog_title' => 'Game catalogue',
+    'catalog_title' => 'AI Agent game catalogue',
     'catalog_game' => 'Game',
     'catalog_section_basics' => 'Basics',
     'catalog_section_basics_help' => 'What users see this game called, and which egg it is created from.',
@@ -645,9 +645,9 @@ return [
     'catalog_help_translations' => 'Optional. Leave empty and the default above is used — a single-language panel never needs these. Use language codes like ko, en.',
     'catalog_locale' => 'Language code',
     'catalog_add_translation' => 'Add a language',
-    'catalog_field_available' => 'Can be created',
-    'catalog_help_available' => 'Turn off to keep it listed but not creatable — for games needing a vendor account, where a user cannot do it themselves.',
-    'catalog_field_unavailable_reason' => 'Why it cannot be created',
+    'catalog_field_available' => 'Agent may create it',
+    'catalog_help_available' => 'Turn off and the assistant will still list this game but **will not create it**. Use it for games needing a vendor account or licence key, which a user cannot supply through chat. An administrator creating one from the panel is unaffected.',
+    'catalog_field_unavailable_reason' => 'Why the assistant cannot create it',
     'catalog_help_unavailable_reason' => 'The assistant explains it to the user in these words.',
     'catalog_section_sizes' => 'Sizes',
     'catalog_section_sizes_help' => 'A user picks by player count and gets these resources. The label is how it is described; the resources are what actually limits the server.',
@@ -673,5 +673,9 @@ return [
     'catalog_yaml_invalid' => 'The YAML could not be read: :error',
     'catalog_yaml_not_map' => 'The top level of the YAML must be a set of keys and values.',
     'catalog_egg_present' => 'Egg present',
+    'catalog_yaml_check' => 'Check YAML',
+    'catalog_yaml_ok' => 'The YAML is valid.',
+    'catalog_yaml_help' => 'Example',
+    'catalog_yaml_help_intro' => 'Every key below is optional — leave out anything you do not use.',
     'catalog_egg_missing' => 'Egg ":egg" is not on this panel — creating this game will fail.',
 ];

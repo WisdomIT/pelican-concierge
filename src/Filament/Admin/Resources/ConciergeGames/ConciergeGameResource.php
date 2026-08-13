@@ -3,7 +3,7 @@
 namespace WisdomIT\Concierge\Filament\Admin\Resources\ConciergeGames;
 
 use BackedEnum;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -14,12 +14,15 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Symfony\Component\Yaml\Yaml;
 use WisdomIT\Concierge\Models\ConciergeGame;
 
@@ -119,7 +122,7 @@ class ConciergeGameResource extends Resource
                         ->label(trans('concierge::strings.catalog_field_unavailable_reason'))
                         ->helperText(trans('concierge::strings.catalog_help_unavailable_reason'))
                         ->visible(fn ($get) => ! $get('available')),
-                ])->columns(2),
+                ]),
 
             Section::make(trans('concierge::strings.catalog_section_sizes'))
                 ->description(trans('concierge::strings.catalog_section_sizes_help'))
@@ -175,6 +178,45 @@ class ConciergeGameResource extends Resource
                         ->hiddenLabel()
                         ->rows(14)
                         ->helperText(trans('concierge::strings.catalog_help_advanced'))
+                        // YAML 은 들여쓰기가 곧 구조다 — 가변폭 글꼴에서는 어긋난 줄이 안 보인다.
+                        ->extraInputAttributes([
+                            'style' => 'font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;'
+                                . 'font-size: .8125rem; line-height: 1.55; white-space: pre; overflow-x: auto;',
+                            'spellcheck' => 'false',
+                        ])
+                        // 저장할 때만 알려 주면 늦다 — 쓰는 중에 확인할 수 있어야 한다.
+                        ->hintAction(
+                            Action::make('check_yaml')
+                                ->label(trans('concierge::strings.catalog_yaml_check'))
+                                ->icon('tabler-check')
+                                ->action(function (Get $get): void {
+                                    $error = self::yamlError((string) $get('advanced_yaml'));
+
+                                    Notification::make()
+                                        ->title($error ?? trans('concierge::strings.catalog_yaml_ok'))
+                                        ->status($error === null ? 'success' : 'danger')
+                                        ->send();
+                                })
+                        )
+                        // 예시는 **가까이** 있어야 한다 — 형식을 찾으러 문서로 나가야 하면
+                        // 이 칸은 아예 손대지 않게 된다.
+                        ->belowContent(
+                            Action::make('yaml_help')
+                                ->label(trans('concierge::strings.catalog_yaml_help'))
+                                ->icon('tabler-help')
+                                ->link()
+                                ->modalHeading(trans('concierge::strings.catalog_section_advanced'))
+                                ->modalDescription(trans('concierge::strings.catalog_yaml_help_intro'))
+                                ->modalContent(new HtmlString(
+                                    '<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;'
+                                    . 'font-size:.8125rem;line-height:1.6;white-space:pre;overflow-x:auto;'
+                                    . 'padding:.9rem;border-radius:.5rem;background:rgba(127,127,127,.12)">'
+                                    . e(self::advancedExample())
+                                    . '</pre>'
+                                ))
+                                ->modalSubmitAction(false)
+                                ->modalCancelActionLabel(trans('concierge::strings.card_cancel'))
+                        )
                         // ⚠ dehydrated(false) 로 두면 안 된다 — 폼 데이터에 값이 실리지 않아
                         //   저장 때 빈 YAML 로 읽히고, **기술 항목이 통째로 지워진다**(실측:
                         //   post_install·ports·secrets 10개가 날아갔다). 값은 그대로 싣고
@@ -187,20 +229,10 @@ class ConciergeGameResource extends Resource
                         // 개설 절차(post_install)가 통째로 사라지는 종류의 사고다.
                         ->rules([
                             fn () => function (string $attribute, $value, \Closure $fail) {
-                                if (blank($value)) {
-                                    return;
-                                }
+                                $error = self::yamlError((string) $value);
 
-                                try {
-                                    $parsed = Yaml::parse($value);
-                                } catch (\Throwable $exception) {
-                                    $fail(trans('concierge::strings.catalog_yaml_invalid', ['error' => $exception->getMessage()]));
-
-                                    return;
-                                }
-
-                                if (! is_array($parsed)) {
-                                    $fail(trans('concierge::strings.catalog_yaml_not_map'));
+                                if ($error !== null) {
+                                    $fail($error);
                                 }
                             },
                         ]),
@@ -246,8 +278,69 @@ class ConciergeGameResource extends Resource
                     ->color('gray'),
             ])
             ->recordActions([EditAction::make(), DeleteAction::make()])
-            ->toolbarActions([DeleteBulkAction::make()])
-            ->headerActions([CreateAction::make()]);
+            // 만들기 버튼은 페이지(ListConciergeGames)가 낸다 — 여기서도 내면 둘이 된다.
+            ->toolbarActions([DeleteBulkAction::make()]);
+    }
+
+    /**
+     * 고급 칸의 YAML 을 검사한다 — 저장 검증과 "YAML 검사" 버튼이 **같은 판단**을 쓴다.
+     * 둘이 갈리면 버튼이 통과시킨 값을 저장이 막는 일이 생긴다.
+     *
+     * @return ?string null = 이상 없음. 아니면 사람이 읽을 사유.
+     */
+    public static function yamlError(string $yaml): ?string
+    {
+        if (blank($yaml)) {
+            return null;
+        }
+
+        try {
+            $parsed = Yaml::parse($yaml);
+        } catch (\Throwable $exception) {
+            return trans('concierge::strings.catalog_yaml_invalid', ['error' => $exception->getMessage()]);
+        }
+
+        return is_array($parsed) ? null : trans('concierge::strings.catalog_yaml_not_map');
+    }
+
+    /** 도움말 모달에 보여줄 예시. 실제로 쓰는 키만 담는다 — 지어낸 형식을 보여주지 않는다. */
+    private static function advancedExample(): string
+    {
+        return <<<'YAML'
+        # 접속자 수 조회 방식 (Player Counter 가 있을 때)
+        query: minecraft_java
+        query_port_variable: QUERY_PORT
+
+        # 개설할 때 사용자에게 묻지 않고 고정으로 넣을 egg 변수
+        defaults:
+          BUILD_NUMBER: latest
+          SERVER_JARFILE: server.jar
+
+        # 이 게임이 필요로 하는 포트 수와 프로토콜
+        ports:
+          count: 1
+          protocol: [tcp, udp]
+
+        # 모델에게 보이지 않게 가릴 변수 (비밀번호·라이선스 키)
+        secrets: [SERVER_PASSWORD, ADMIN_PASSWORD]
+
+        # 모드·플러그인 설치 지원 여부
+        mods:
+          supported: true
+          kind: plugin
+          path: plugins/
+
+        # 설치 직후 자동으로 처리할 일
+        post_install:
+          - type: file_replace
+            path: eula.txt
+            from: eula=false
+            to: eula=true
+            reason: 동의하지 않으면 첫 기동이 조용히 실패한다
+
+        # 설치가 끝났는지 판단할 최소 용량(MB)
+        install_min_mb: 300
+        YAML;
     }
 
     public static function getPages(): array

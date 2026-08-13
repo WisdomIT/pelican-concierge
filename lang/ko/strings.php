@@ -629,7 +629,7 @@ return [
     'stat_limit_resets' => '초기화: :reset',
 
     // ── 게임 카탈로그 관리 (#81) ──
-    'catalog_title' => '게임 카탈로그',
+    'catalog_title' => 'AI Agent 게임 카탈로그',
     'catalog_game' => '게임',
     'catalog_section_basics' => '기본 정보',
     'catalog_section_basics_help' => '사용자에게 보이는 이름과, 이 게임이 어떤 egg 로 만들어지는지를 정합니다.',
@@ -646,9 +646,9 @@ return [
     'catalog_help_translations' => '선택 사항입니다. 비워 두면 위의 기본값을 씁니다 — 한 가지 언어만 쓰는 패널이라면 채울 필요가 없습니다. 언어 코드는 ko, en 처럼 적습니다.',
     'catalog_locale' => '언어 코드',
     'catalog_add_translation' => '언어 추가',
-    'catalog_field_available' => '개설 허용',
-    'catalog_help_available' => '끄면 목록에는 남지만 개설되지 않습니다. 계정이 필요한 게임처럼 사용자가 스스로 만들 수 없는 경우에 씁니다.',
-    'catalog_field_unavailable_reason' => '개설할 수 없는 이유',
+    'catalog_field_available' => '에이전트 개설 허용',
+    'catalog_help_available' => '끄면 에이전트가 이 게임을 목록에는 보여주되 **직접 만들지는 않습니다**. 스팀 계정이나 라이선스 키가 필요해 사용자가 대화만으로는 못 만드는 게임에 씁니다. 관리자가 패널에서 직접 만드는 것은 이 설정과 무관합니다.',
+    'catalog_field_unavailable_reason' => '에이전트가 만들 수 없는 이유',
     'catalog_help_unavailable_reason' => '에이전트가 사용자에게 이 문장으로 설명합니다.',
     'catalog_section_sizes' => '크기',
     'catalog_section_sizes_help' => '사용자가 인원으로 고르면 여기 적힌 자원이 배정됩니다. 라벨은 인원 표기이고, 실제 제한은 자원 값이 합니다.',
@@ -674,5 +674,9 @@ return [
     'catalog_yaml_invalid' => 'YAML 을 읽을 수 없습니다: :error',
     'catalog_yaml_not_map' => 'YAML 최상위는 키-값 묶음이어야 합니다.',
     'catalog_egg_present' => 'egg 존재',
+    'catalog_yaml_check' => 'YAML 검사',
+    'catalog_yaml_ok' => 'YAML 형식이 올바릅니다.',
+    'catalog_yaml_help' => '작성 예시',
+    'catalog_yaml_help_intro' => '아래 키들은 모두 선택입니다. 쓰지 않는 키는 적지 않아도 됩니다.',
     'catalog_egg_missing' => 'egg ":egg" 가 이 패널에 없습니다 — 개설하려 할 때 실패합니다.',
 ];
