@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use WisdomIT\Concierge\Support\UserTime;
 
 /**
  * 대화 하나. 메시지는 `concierge_usages` 가 갖고 있고 이 모델은 목록에 필요한 것만 든다.
@@ -198,7 +199,11 @@ class ConciergeConversation extends Model
             return trans('concierge::strings.time_hours_ago', ['n' => intdiv($minutes, 60)]);
         }
 
-        return $at->year === now()->year
+        // 날짜는 **보는 사람의 시계**로 계산한다(#79). 앱 타임존(UTC)으로 두면 밤에 나눈
+        // 대화가 하루 밀려 "어제"로 보인다 — 상대 시간과 달리 날짜는 경계가 있다.
+        $at = $at->copy()->timezone(UserTime::timezone());
+
+        return $at->year === now(UserTime::timezone())->year
             ? $at->format(trans('concierge::strings.time_date_this_year'))
             : $at->format(trans('concierge::strings.time_date_other_year'));
     }

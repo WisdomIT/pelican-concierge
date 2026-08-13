@@ -3,40 +3,62 @@
 namespace WisdomIT\Concierge\Catalog;
 
 use App\Models\Egg;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
-use Symfony\Component\Yaml\Yaml;
+use WisdomIT\Concierge\Models\ConciergeGame;
 
 /**
  * 게임 카탈로그(#16) 읽기.
  *
- * 카탈로그는 이 플러그인의 `resources/catalog/games.yaml` 이다. 배포 특정 값이 없는
- * 범용 지식이라 플러그인과 함께 배포된다 — 운영자가 자기 패널의 egg 에 맞게 고쳐도 된다.
- * 파일이 없으면 빈 목록으로 동작한다(죽지 않는다) — 다만 개설 가능한 게임이 사라진다.
+ * 카탈로그는 **DB**(concierge_games)에 있고 관리 화면에서 고친다(#81). 종전에는 플러그인
+ * 안의 `games.yaml` 이었는데, 운영자 데이터인데도 화면에서 못 고쳤고 무엇보다 플러그인
+ * 업데이트가 그 파일을 지웠다. 배포본 YAML 은 신규 설치의 씨앗으로만 남는다.
  *
- * 카탈로그가 없으면 개설·게임 목록 도구만 못 쓴다 — 나머지 도구는 정상 동작해야 하므로
+ * 카탈로그가 비면 개설·게임 목록 도구만 못 쓴다 — 나머지 도구는 정상 동작해야 하므로
  * 예외를 던지지 않고 빈 목록을 돌려준다.
+ *
+ * ⚠ 반환 형태는 **YAML 시절 배열 그대로**다. 소비자(개설·유휴 판정·마스킹·모드 설치)가
+ *   그 형태를 알고 있고, 저장소가 바뀌었다고 그들을 전부 고칠 이유는 없다.
  */
 final class GameCatalog
 {
-    /** @var ?array<int, array<string, mixed>> */
-    private static ?array $games = null;
+    /**
+     * ⚠ **로케일별로** 담는다. 이름은 읽는 시점의 언어로 풀려 나오므로 한 덩어리로 캐시하면
+     *   한 프로세스가 여러 언어를 오갈 때 틀린 언어가 나간다 — 유휴 감시(CheckIdleServers)가
+     *   주인마다 각자 언어로 알리는 경로가 정확히 그렇다(실측: 두 번째 사용자부터 첫
+     *   사용자의 언어로 나왔다).
+     *
+     * @var array<string, array<int, array<string, mixed>>>
+     */
+    private static array $games = [];
 
     /** @return array<int, array<string, mixed>> */
     public function all(): array
     {
-        if (self::$games !== null) {
-            return self::$games;
+        $locale = app()->getLocale();
+
+        if (isset(self::$games[$locale])) {
+            return self::$games[$locale];
         }
 
-        $path = plugin_path('concierge', 'resources', 'catalog', 'games.yaml');
-
-        if (!is_file($path)) {
-            return self::$games = [];
+        // 마이그레이션 전(설치 직후 부팅 등)에도 죽지 않아야 한다 — 테이블이 아직 없으면
+        // 빈 카탈로그다. 개설만 못 하고 나머지는 그대로 돈다.
+        if (!Schema::hasTable('concierge_games')) {
+            return self::$games[$locale] = [];
         }
 
-        $parsed = Yaml::parseFile($path);
+        return self::$games[$locale] = ConciergeGame::query()
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ConciergeGame $game) => $game->toCatalogArray())
+            ->all();
+    }
 
-        return self::$games = is_array($parsed['games'] ?? null) ? $parsed['games'] : [];
+    /** 화면에서 카탈로그를 고쳤다 — 이 요청에 캐시된 목록을 버린다. */
+    public static function forget(): void
+    {
+        self::$games = [];
     }
 
     /** 셀프서비스로 만들 수 있는 게임만. 스팀 자격증명이 필요한 것 등은 빠진다. */

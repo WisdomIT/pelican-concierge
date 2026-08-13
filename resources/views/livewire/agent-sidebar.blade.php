@@ -113,7 +113,13 @@
 
     /* 대화 로그만 늘어나고 머리말·입력은 제자리에 있어야 한다. */
     .cg-chat { display: flex; flex-direction: column; gap: 1rem; min-height: 0; flex: 1 1 auto; }
-    .cg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    {{-- column-reverse 가 스크롤 좌표계를 뒤집는다: **scrollTop 0 = 바닥**. 첫 렌더든
+         @persist 재부착이든 bfcache 복원이든, 브라우저가 스크롤을 리셋하면 그 0 이
+         곧 최근 대화다 — "바닥으로 맞출 순간"을 쫓을 필요가 없어진다(#84).
+         바닥(0)에 있는 동안은 내용이 늘어도 브라우저가 알아서 붙잡아 두고, 위로
+         올렸다면(음수) 그 자리를 보존한다 — 둘 다 네이티브 동작이다. --}}
+    .cg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column-reverse; }
+    .cg-scroll > .cg-log { flex-shrink: 0; }
 
     .cg-log { display: flex; flex-direction: column; gap: .75rem; }
 
@@ -147,6 +153,10 @@
     }
 
     .cg-hint { font-size: .875rem; color: var(--gray-500, #6b7280); }
+    {{-- 첫 발화의 스트리밍은 Livewire 재렌더 없이 DOM 에 직접 쓴다 — @forelse 가 다시
+         돌기 전까지 "무엇을 도와줄까요?" 안내가 첫 대화 옆에 남아 있었다. 어떤 말풍선이든
+         내용이 생기면 안내는 끝난 것이다. --}}
+    .cg-log:has(.cg-bubble:not(:empty)) .cg-hint { display: none; }
 
     /* ── 화면 이동 버튼 ── */
     .cg-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
@@ -544,11 +554,27 @@
             </div>
             </div>
 
-            {{-- 로그만 늘어나고 스크롤한다. 스트리밍은 Livewire 재렌더 없이 DOM 을 직접
-                 고치므로, 바닥 고정은 MutationObserver 로 해야 따라온다. --}}
+            {{-- 스크롤 위치는 CSS(column-reverse)가 지킨다 — 위 .cg-scroll 규칙 참고.
+                 바닥 고정·복원·이력 읽기 보존이 전부 브라우저 네이티브 동작이라
+                 시점을 쫓는 JS 가 필요 없다. JS 에 남은 일은 둘뿐이다:
+                  · 확인 카드가 뜨면 바닥이 아니라 **카드 머리**를 보여준다 — 카드는
+                    로그의 마지막 요소라, 바닥엔 버튼만 남고 제목은 위로 밀려난다.
+                  · 내가 발화하면 어디를 보고 있었든 대화 끝(0)으로 돌아간다. --}}
             <div class="cg-scroll"
-                 x-init="new MutationObserver(() => $el.scrollTop = $el.scrollHeight)
-                            .observe($el, { subtree: true, childList: true, characterData: true })">
+                 x-data="{ shown: null }"
+                 x-on:cg-sent.window="shown = null; $nextTick(() => { $el.scrollTop = 0 })"
+                 x-init="new MutationObserver(() => {
+                         const card = $el.querySelector('.cg-card');
+
+                         if (card && card !== shown) {
+                             shown = card;
+                             card.scrollIntoView({ block: 'start' });
+                         } else if (! card && shown) {
+                             /* 카드가 결정돼 사라졌다 — 대화가 다시 흐르므로 끝으로. */
+                             shown = null;
+                             $el.scrollTop = 0;
+                         }
+                     }).observe($el, { subtree: true, childList: true })">
                 <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
@@ -715,7 +741,9 @@
                 </div>
             @endif
 
-            <form wire:submit="send" x-data="{}" class="cg-form">
+            {{-- 내가 말을 걸었으면 이력을 올려다보던 중이라도 대화 끝으로 돌아간다(#84) —
+                 방금 보낸 말과 그 답을 보려고 보낸 것이니까. --}}
+            <form wire:submit="send" x-data="{}" x-on:submit="$dispatch('cg-sent')" class="cg-form">
             {{-- ⚠ 입력창은 **disable 하지 않는다.** wire:loading 에 target 없이 disabled 를
                  걸었더니 30초(진행 중 5초) 폴링마다 입력창이 잠기며 **포커스가 풀려 타이핑이
                  끊겼다**(실측, #26). 전송 중 중복 제출은 보내기 버튼과 send() 의 빈 입력

@@ -89,14 +89,17 @@ class ConciergeInstallCheck extends Model
         $this->forceFill(['notified_at' => now()])->save();
     }
 
-    /** 사람이 읽을 한 줄. `get_server_status` 와 진단에 그대로 쓴다. */
+    /**
+     * 한 줄 판정. `get_server_status` 가 그대로 실어 보낸다 — **모델이 읽는 글이라
+     * 영어다**(#79). 사용자에게는 모델이 그 사람의 언어로 옮겨 말한다.
+     */
     public function summary(): string
     {
         return match ($this->status) {
-            self::STATUS_OK => '설치 로그 확인 결과 정상적으로 설치되었습니다.',
-            self::STATUS_FAILED => '⚠ 설치가 정상적으로 끝나지 않았습니다: ' . $this->reason
-                . ' (다시 설치해야 합니다)',
-            default => '설치 로그를 확인하지 못했습니다.',
+            self::STATUS_OK => 'The install logs confirm it installed correctly.',
+            self::STATUS_FAILED => '⚠ The install did not finish properly: ' . $this->reason
+                . ' (it has to be reinstalled)',
+            default => 'The install logs could not be checked.',
         };
     }
 }

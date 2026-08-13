@@ -251,7 +251,8 @@ final class ChatService
                     $this->pushResult($state, $use, ToolCallResult::error(
                         $use['name'],
                         $use['input'],
-                        '이 작업을 준비하지 못했습니다: ' . $exception->getMessage(),
+                        // 모델이 읽고 사용자의 언어로 옮긴다 — 그래서 영어다(#79 관례).
+                        'Could not prepare this action: ' . $exception->getMessage(),
                     ));
 
                     continue;

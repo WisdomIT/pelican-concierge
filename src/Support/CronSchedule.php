@@ -14,20 +14,19 @@ use WisdomIT\Concierge\Tools\ToolInputException;
  */
 final class CronSchedule
 {
-    private const DOW = ['일', '월', '화', '수', '목', '금', '토'];
-
     /**
-     * 🔴 **크론은 앱 타임존(UTC)으로 저장된다.** 사용자는 한국 시간으로 말한다 —
+     * 🔴 **크론은 앱 타임존(UTC)으로 저장된다.** 사용자는 자기 시계로 말한다 —
      *    "새벽 4시"를 그대로 저장하면 실제로는 **낮 1시**에 돈다(실측: APP_TIMEZONE=UTC).
-     *    그래서 저장할 때 한국 시간 → 앱 타임존으로 옮기고, 보여줄 때 되돌린다.
+     *    그래서 저장할 때 사용자 시간 → 앱 타임존으로 옮기고, 보여줄 때 되돌린다.
+     *
+     * ⚠ 이 표시 시간대는 한때 'Asia/Seoul' 로 박혀 있었다(#79). 우리 배포에서는 맞았지만
+     *   그건 운영자의 사정이다 — 다른 패널에서는 예약이 엉뚱한 시각에 돌게 된다.
+     *   지금은 **요청한 사용자의 프로필 시간대**를 따른다(UserTime).
      */
-    private const DISPLAY_TIMEZONE = 'Asia/Seoul';
-
-    /** 표시 타임존이 앱 타임존보다 몇 시간 앞서는가. KST 는 서머타임이 없어 고정이다. */
     private static function offsetHours(): int
     {
         $app = new \DateTimeZone((string) config('app.timezone', 'UTC'));
-        $display = new \DateTimeZone(self::DISPLAY_TIMEZONE);
+        $display = new \DateTimeZone(UserTime::timezone());
         $now = new \DateTime('now', $app);
 
         return intdiv($display->getOffset($now) - $app->getOffset($now), 3600);
@@ -86,9 +85,11 @@ final class CronSchedule
         }
 
         if (ctype_digit((string) ($parts['cron_day_of_month'] ?? '*'))) {
+            // 도구 예외는 모델이 읽고 사용자의 언어로 옮긴다 — 그래서 영어다(#79 관례).
             throw new ToolInputException(
-                '날짜를 지정한 예약은 그 시각이 한국 시간으로 날을 넘겨서 정확히 맞출 수 없습니다. '
-                . '"매주 O요일" 이나 "매일" 로 잡아주세요.',
+                'A schedule pinned to a day of the month cannot be converted exactly, because '
+                . "the time crosses a day boundary in the user's timezone. Ask for a weekday "
+                . '("every Monday") or a daily schedule instead.',
             );
         }
 
@@ -165,27 +166,42 @@ final class CronSchedule
         $month = $parts['cron_month'] ?? '*';
         $dayOfWeek = $parts['cron_day_of_week'] ?? '*';
 
+        // 시각·요일 이름·문장 틀은 전부 번역이 만든다(#79). 시간대는 반드시 함께 적는다 —
+        // "04:00" 만 있으면 어느 시계 기준인지 알 수 없고, 예약은 그게 전부다.
+        $zone = UserTime::timezone();
+
         $time = ctype_digit($minute) && ctype_digit($hour)
-            ? sprintf('%d시 %02d분', (int) $hour, (int) $minute)
+            ? sprintf('%02d:%02d', (int) $hour, (int) $minute)
             : null;
 
         if ($time !== null && $dayOfMonth === '*' && $month === '*' && $dayOfWeek === '*') {
-            return "매일 {$time} (한국 시간)";
+            return trans('concierge::strings.cron_daily', ['time' => $time, 'zone' => $zone]);
         }
 
         if ($time !== null && $dayOfMonth === '*' && $month === '*' && ctype_digit($dayOfWeek)) {
-            return sprintf('매주 %s요일 %s (한국 시간)', self::DOW[(int) $dayOfWeek] ?? $dayOfWeek, $time);
+            return trans('concierge::strings.cron_weekly', [
+                'day' => trans('concierge::strings.weekday_' . ((int) $dayOfWeek % 7)),
+                'time' => $time,
+                'zone' => $zone,
+            ]);
         }
 
         if ($time !== null && ctype_digit($dayOfMonth) && $month === '*' && $dayOfWeek === '*') {
-            return sprintf('매달 %d일 %s (한국 시간)', (int) $dayOfMonth, $time);
+            return trans('concierge::strings.cron_monthly', [
+                'day' => (int) $dayOfMonth,
+                'time' => $time,
+                'zone' => $zone,
+            ]);
         }
 
         if (str_starts_with($minute, '*/') && $hour === '*') {
-            return sprintf('%d분마다', (int) substr($minute, 2));
+            return trans('concierge::strings.cron_every_minutes', ['n' => (int) substr($minute, 2)]);
         }
 
-        return sprintf('분:%s 시:%s 일:%s 월:%s 요일:%s', $minute, $hour, $dayOfMonth, $month, $dayOfWeek);
+        // 어느 틀에도 안 맞는 크론 — 있는 그대로 풀어 쓴다(시간대 환산이 이미 끝난 값이다).
+        return trans('concierge::strings.cron_raw', [
+            'minute' => $minute, 'hour' => $hour, 'dom' => $dayOfMonth, 'month' => $month, 'dow' => $dayOfWeek,
+        ]);
     }
 
     /** 저장된 스케줄을 사람 말로 — **한국 시간 기준**이다. */

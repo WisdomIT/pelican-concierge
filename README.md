@@ -6,7 +6,7 @@ An AI assistant for **Pelican Panel**, built for the two people who use one:
   user start their server?"*, *"open ports 27600-27610"*.
 - **Players** get their own server without learning the panel — *"make me a Minecraft
   server for six friends"*, *"why can nobody join?"* — creating within the quota you gave
-  them through [User Creatable Servers](https://hub.pelican.dev/plugins).
+  them through [User Creatable Servers](https://hub.pelican.dev/plugins/user-creatable-servers).
 
 Both talk to the same assistant. What it will do for each of them is decided by their own
 panel permissions, and nothing else.
@@ -218,11 +218,11 @@ still works, with exactly these differences:
 
 | Plugin | With it | Without it |
 |---|---|---|
-| [Player Counter](https://hub.pelican.dev/plugins) | Player counts in status answers; player-based idle detection | Counts unavailable (status answers say why); idle detection falls back to network traffic |
-| [Minecraft Modrinth](https://hub.pelican.dev/plugins) | Mod and plugin search & install for Minecraft | Mod tools explain the plugin is missing and that an admin can install it — they do not claim the game is unsupported |
-| [Rust uMod](https://hub.pelican.dev/plugins) | Plugin search & install for Rust | Same as above |
-| [User Creatable Servers](https://hub.pelican.dev/plugins) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | **Creation requires admin authority** (the panel's `create server` permission) — ordinary users cannot create at all. Admin creations skip quota and the port pool (reserved ports included) and get 0 backup/database limits; the assistant's reply says so. No delete link |
-| Factorio Mod Installer | A hand-off link to the mod page | No link (mods need a factorio.com account either way) |
+| [Player Counter](https://hub.pelican.dev/plugins/player-counter) | Player counts in status answers; player-based idle detection | Counts unavailable (status answers say why); idle detection falls back to network traffic |
+| [Minecraft Modrinth](https://hub.pelican.dev/plugins/minecraft-modrinth) | Mod and plugin search & install for Minecraft | Mod tools explain the plugin is missing and that an admin can install it — they do not claim the game is unsupported |
+| [Rust uMod](https://hub.pelican.dev/plugins/rust-umod) | Plugin search & install for Rust | Same as above |
+| [User Creatable Servers](https://hub.pelican.dev/plugins/user-creatable-servers) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | **Creation requires admin authority** (the panel's `create server` permission) — ordinary users cannot create at all. Admin creations skip quota and the port pool (reserved ports included) and get 0 backup/database limits; the assistant's reply says so. No delete link |
+| [Factorio Mod Installer](https://hub.pelican.dev/plugins/factorio-mod-installer) | A hand-off link to the mod page | No link (mods need a factorio.com account either way) |
 | [Secret Variables](https://github.com/WisdomIT/pelican-secret-variables) | Credentials collected in chat (Steam passwords, license keys) land in encrypted storage instead of `server_variables`, for every variable an admin marks *managed* there | Credentials are stored as plain server variables, **readable by the panel operator on the Startup page** — and the assistant says so to the user before they type one |
 
 The settings screen shows each plugin's live status. A disabled plugin behaves like a
@@ -232,19 +232,33 @@ UCS keeps the port protection while turning off its features.
 
 ## Tuning it for your panel
 
-Two things decide what the assistant knows beyond what its tools return.
+Two things decide what the assistant knows beyond what its tools return, and both are edited from the panel.
 
-**`resources/catalog/games.yaml`** — 18 games, mapped to the eggs they need, with query
-type, ports, which variables are secret, and post-install steps. This is what the
-assistant offers when someone asks for a server. Edit it to match the eggs on your panel;
-`resources/catalog/README.md` documents the format, and `scripts/validate-catalog.py`
-checks a catalog against your panel's actual eggs.
+**Game catalogue** *(Admin → Advanced → Game catalogue)* — the games the assistant offers,
+each mapped to the egg that creates it, with the sizes a user can pick, what to ask them,
+and the post-install steps. It ships with 18 games; edit them to match the eggs on your
+panel, or add your own. The list flags any game whose egg is missing here, so a broken
+mapping shows up before someone tries to create that game.
+
+It lives in the database, so it survives plugin updates. The technical parts (ports,
+secret variables, post-install steps) are edited as YAML in one field — their shape
+differs per entry, which a form would only make harder to read. Every key is documented in
+**[the advanced field reference](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/catalog-advanced.en.md)**
+([한국어](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/catalog-advanced.ko.md)),
+which the editor also shows in place — the same file, so the two never drift apart.
 
 **About this deployment** *(settings screen, optional)* — free-form text appended to the
 system prompt. This is where deployment facts go: the hostname players connect to, which
 port range your router forwards, anything the assistant cannot discover through a tool.
-Without it the assistant works but will not know your network. It is stored in the database,
-so it survives plugin updates, and it is sent with every message — keep it to short facts.
+Without it, *"it's running but nobody can join"* has no answer — the logs look fine, because
+the problem is outside the container.
+
+It is stored in the database, so it survives plugin updates, and it is sent with every
+message — keep it to short facts.
+**[How to write one](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/deployment-knowledge.en.md)**
+([한국어](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/deployment-knowledge.ko.md))
+has a worked example, what not to put in it, and why English costs about 40% fewer tokens
+for the same content.
 
 ## Limitations
 
@@ -257,6 +271,18 @@ so it survives plugin updates, and it is sent with every message — keep it to 
   loopback addresses are always refused.
 - Panel upgrades can move the internals this plugin builds on. Pin a version you have
   tested before upgrading a production panel.
+
+## Found a bug, or want it to work with another plugin?
+
+**[Open an issue](https://github.com/WisdomIT/pelican-concierge/issues/new/choose).** There
+are templates for a bug report, a plugin integration request, and anything else.
+
+A bug report is most useful with the panel version, this plugin's version, and **which
+provider and model** you were using — several past bugs were provider-specific, so that is
+usually the first thing worth knowing.
+
+⚠ **Never paste an API key, password or token into an issue.** We never need the value to
+understand a problem.
 
 ## Contributing
 

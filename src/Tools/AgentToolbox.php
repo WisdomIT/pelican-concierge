@@ -35,6 +35,7 @@ use WisdomIT\Concierge\Services\ModInstaller;
 use WisdomIT\Concierge\Services\PlayerCount;
 use WisdomIT\Concierge\Catalog\JavaRuntime;
 use WisdomIT\Concierge\Support\CronSchedule;
+use WisdomIT\Concierge\Support\UserTime;
 use WisdomIT\Concierge\Support\FilePaths;
 use WisdomIT\Concierge\Support\PortPool;
 use WisdomIT\Concierge\Support\Tenancy;
@@ -281,7 +282,7 @@ final class AgentToolbox
                         $lines[] = [
                             'label' => trans('concierge::strings.card_field_' . $field),
                             // 바뀌는 값은 **지금 값과 함께** 보여준다 — 무엇이 사라지는지 보여야 한다.
-                            'value' => ((string) $user->{$field} ?: '(없음)') . ' → ' . $value,
+                            'value' => ((string) $user->{$field} ?: trans('concierge::strings.value_empty')) . ' → ' . $value,
                         ];
                     }
                 }
@@ -1595,11 +1596,12 @@ final class AgentToolbox
                     ['label' => trans('concierge::strings.card_schedule_name'), 'value' => trim((string) ($input['name'] ?? ''))],
                     // 🔴 크론 문자열이 아니라 **사람이 읽는 문장**을 보여준다. 사용자가 확인하는
                     //    것은 표현식이 아니라 "언제 도는가"다.
-                    ['label' => trans('concierge::strings.card_schedule_when'), 'value' => CronSchedule::describe(CronSchedule::validate([
-                        'cron_minute' => $parts['cron_minute'], 'cron_hour' => (string) ($input['hour'] ?? '*'),
-                        'cron_day_of_month' => $parts['cron_day_of_month'], 'cron_month' => '*',
-                        'cron_day_of_week' => $parts['cron_day_of_week'],
-                    ]))],
+                    //
+                    // ⚠ $parts 는 **저장용**(앱 타임존)이다. 되돌리지 않고 그리면 시각과 요일이
+                    //   섞인다 — KST 사용자가 "월요일 4시"를 부탁했는데 카드가 "일요일 04:00"
+                    //   이라고 쓴다(실측). 저장값을 사용자 시계로 되돌려서 그린다.
+                    ['label' => trans('concierge::strings.card_schedule_when'),
+                        'value' => CronSchedule::describe(CronSchedule::toDisplay($parts))],
                     ['label' => trans('concierge::strings.card_schedule_action'), 'value' => trans("concierge::strings.schedule_action_{$action}") . ($payload !== '' ? " ({$payload})" : '')],
                 ],
                 'note' => trans('concierge::strings.card_note_schedule'),
@@ -1762,7 +1764,7 @@ final class AgentToolbox
                     ['label' => trans('concierge::strings.card_server'), 'value' => $server->name],
                     ['label' => trans('concierge::strings.card_backup_name'), 'value' => $backup->name],
                     // 🔴 **어느 시점으로 돌아가는지가 이 카드의 전부다.** 되돌린 뒤의 진행은 사라진다.
-                    ['label' => trans('concierge::strings.card_backup_made_at'), 'value' => (string) $backup->created_at],
+                    ['label' => trans('concierge::strings.card_backup_made_at'), 'value' => UserTime::format($backup->created_at)],
                     ['label' => trans('concierge::strings.card_power_state'), 'value' => trans($this->powerState($server) === 'running'
                         ? 'concierge::strings.state_running'
                         : 'concierge::strings.state_offline')],
@@ -2162,7 +2164,7 @@ final class AgentToolbox
             'when' => CronSchedule::describeSchedule($s),
             'active' => (bool) $s->is_active,
             'only_when_online' => (bool) $s->only_when_online,
-            'next_run_at' => (string) $s->next_run_at,
+            'next_run_at' => UserTime::format($s->next_run_at),
             'tasks' => $s->tasks->map(fn (Task $t) => trim($t->action . ' ' . $t->payload))->all(),
         ])->all();
 
@@ -2660,7 +2662,7 @@ final class AgentToolbox
         $backups = $server->backups()->latest('id')->limit(20)->get()->map(fn (Backup $b) => [
             'id' => $b->uuid,
             'name' => $b->name,
-            'created_at' => (string) $b->created_at,
+            'created_at' => UserTime::format($b->created_at),
             'size_mb' => (int) round($b->bytes / 1024 / 1024),
             // 실패했거나 만들어지는 중인 백업은 되돌릴 수 없다 — 모델이 그걸 알아야 한다.
             'restorable' => $b->is_successful && $b->completed_at !== null,
@@ -2681,7 +2683,11 @@ final class AgentToolbox
         $server = $this->serverFor('create_backup', $input);
         $this->assertBackupRoom($server);
 
-        $name = trim((string) ($input['name'] ?? '')) ?: null;
+        // 이름을 안 주면 코어가 `Backup at <app 타임존 시각>` 으로 짓는다 — 그러면 이름은
+        // UTC, 우리가 보여주는 만든 시각은 사용자 시계라 **같은 백업이 두 시각으로 보인다**
+        // (실측: 이름 06:53 / 시각 15:53). 사용자가 읽을 이름은 사용자 시계로 짓는다(#79).
+        $name = trim((string) ($input['name'] ?? ''))
+            ?: trans('concierge::strings.backup_default_name', ['at' => UserTime::format(now())]);
 
         try {
             $backup = app(InitiateBackupService::class)->handle($server, $name);
@@ -2918,7 +2924,7 @@ final class AgentToolbox
                 . 'it finishes. The server cannot be started until then.',
 
                 $backup->name,
-                $backup->created_at,
+                UserTime::format($backup->created_at),
             ),
             $server->id,
         );
