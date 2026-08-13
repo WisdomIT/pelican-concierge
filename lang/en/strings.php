@@ -60,6 +60,7 @@ return [
     'tool_list_api_keys' => 'Checking API keys',
     'tool_get_panel_health' => 'Checking panel health',
     'tool_get_activity_log' => 'Checking activity log',
+    'tool_get_usage_stats' => 'Checking usage statistics',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',
