@@ -606,12 +606,23 @@
                  }"
                  {{-- 사용자가 발화하면 어디를 보고 있었든 대화 끝으로 되돌린다. --}}
                  x-on:cg-sent.window="stick = true; shown = null; $nextTick(() => toBottom())"
+                 {{-- ⚠ 페이지를 옮겨도 이 컴포넌트는 @persist 로 살아남아 **x-init 이 다시 돌지
+                      않는다**. 그런데 요소가 새 문서로 옮겨 붙으면서 scrollTop 은 0 으로
+                      돌아간다 — 그래서 이동 후에는 맨 위(가장 오래된 말)를 보고 있었다.
+                      이동을 신호로 다시 맞춘다. --}}
+                 x-on:livewire:navigated.document="stick = true; shown = null;
+                     $nextTick(() => { toBottom(); follow(); })"
                  x-init="
                      /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. */
                      $nextTick(() => { toBottom(); follow(); });
                      $el.addEventListener('scroll', () => onScroll(), { passive: true });
                      new MutationObserver(() => follow())
-                         .observe($el, { subtree: true, childList: true, characterData: true })">
+                         .observe($el, { subtree: true, childList: true, characterData: true });
+                     /* ⚠ 첫 그림 시점의 높이는 아직 확정이 아니다 — 마크다운·폰트·코드블록이
+                        뒤늦게 자리를 잡으면 그때 맞춘 위치가 대화 중간이 된다(실측). 내용의
+                        **높이가 변할 때마다** 다시 맞춘다. 변경이 아니라 크기라서
+                        MutationObserver 로는 잡히지 않는다. */
+                     new ResizeObserver(() => follow()).observe($el.querySelector('.cg-log') ?? $el)">
                 <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
