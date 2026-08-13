@@ -575,6 +575,25 @@
                          requestAnimationFrame(() => { this.pinning = false });
                      },
                      toBottom() { this.pin(() => { $el.scrollTop = $el.scrollHeight }) },
+                     /* 한 번 맞춰서는 모자란 순간들이 있다 — 첫 그림, 그리고 캐시에서 복원된
+                        페이지. 높이가 몇 프레임에 걸쳐 잡히므로 그동안 계속 바닥에 붙인다.
+                        (도중에 pinning 이 유지돼 우리 스크롤이 추적을 끄지도 않는다) */
+                     settle(frames = 12) {
+                         const step = () => {
+                             this.follow();
+                             if (--frames > 0) { requestAnimationFrame(step); }
+                         };
+
+                         requestAnimationFrame(step);
+                     },
+                     /* ⚠ 관측 대상은 **지금 화면에 있는** .cg-log 여야 한다. 페이지가 복원되면
+                        옛 노드가 떨어져 나가 관측이 조용히 멎는다 — 그래서 다시 붙인다. */
+                     watch() {
+                         this.ro?.disconnect();
+                         this.ro = new ResizeObserver(() => this.follow());
+                         this.ro.observe($el.querySelector('.cg-log') ?? $el);
+                     },
+                     ro: null,
                      follow() {
                          const card = $el.querySelector('.cg-card');
 
@@ -611,18 +630,15 @@
                       돌아간다 — 그래서 이동 후에는 맨 위(가장 오래된 말)를 보고 있었다.
                       이동을 신호로 다시 맞춘다. --}}
                  x-on:livewire:navigated.document="stick = true; shown = null;
-                     $nextTick(() => { toBottom(); follow(); })"
+                     $nextTick(() => { toBottom(); watch(); settle(); })"
                  x-init="
-                     /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. */
-                     $nextTick(() => { toBottom(); follow(); });
+                     /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. 그 시점의 높이는
+                        아직 확정이 아니라(마크다운·폰트·코드블록이 뒤늦게 자리를 잡는다)
+                        몇 프레임 더 따라붙는다. */
+                     $nextTick(() => { toBottom(); watch(); settle(); });
                      $el.addEventListener('scroll', () => onScroll(), { passive: true });
                      new MutationObserver(() => follow())
-                         .observe($el, { subtree: true, childList: true, characterData: true });
-                     /* ⚠ 첫 그림 시점의 높이는 아직 확정이 아니다 — 마크다운·폰트·코드블록이
-                        뒤늦게 자리를 잡으면 그때 맞춘 위치가 대화 중간이 된다(실측). 내용의
-                        **높이가 변할 때마다** 다시 맞춘다. 변경이 아니라 크기라서
-                        MutationObserver 로는 잡히지 않는다. */
-                     new ResizeObserver(() => follow()).observe($el.querySelector('.cg-log') ?? $el)">
+                         .observe($el, { subtree: true, childList: true, characterData: true })">
                 <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
