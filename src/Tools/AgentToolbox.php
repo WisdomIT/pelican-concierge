@@ -476,7 +476,13 @@ final class AgentToolbox
      * 서버 도구가 서브유저 권한을 그대로 따르듯(TOOL_PERMISSIONS), 관리 도구는 관리
      * 화면의 권한을 그대로 따른다. "노드만 보는 관리자"는 노드 도구만 받는다.
      *
-     * @var array<string, array{0: RolePermissionPrefixes, 1: RolePermissionModels}>
+     * 값은 둘 중 하나다:
+     *  · `[Prefix, Model]` — 패널 리소스 권한(대부분)
+     *  · `'viewList wisdomAgent'` 같은 **문자열** — 패널 리소스가 아닌 권한
+     *
+     * ⚠ **그 데이터를 보여주는 화면이 있으면 그 화면의 정책과 같은 권한을 쓸 것**(#97).
+     *
+     * @var array<string, array{0: RolePermissionPrefixes, 1: RolePermissionModels}|string>
      */
     private const ADMIN_TOOL_PERMISSIONS = [
         'list_nodes' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
@@ -505,7 +511,10 @@ final class AgentToolbox
         'get_panel_health' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
         'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
         // 사용자별 소비를 보는 일이므로 활동 기록과 같은 권한을 요구한다(#92).
-        'get_usage_stats' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        // 🔴 사용량은 이 플러그인의 기록이고, 화면(ConciergeUsagePolicy)이 이미
+        //    `viewList wisdomAgent` 로 가른다. 도구가 다른 권한을 물으면 운영자가 사용량
+        //    접근을 준 적 없는 사람이 대화로는 볼 수 있게 된다(#97 — 실제로 그랬다).
+        'get_usage_stats' => 'viewList wisdomAgent',
         // 카탈로그(#91). 관리 화면의 ConciergeGamePolicy 와 **같은 권한**이다 — 갈리면
         // "화면에서는 되는데 대화로는 안 된다" 가 생긴다.
         'list_catalog_games' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
@@ -562,13 +571,56 @@ final class AgentToolbox
      * ⚠ 도구를 빼면 **시스템 프롬프트의 "할 수 있는 것" 절과 어긋날 수 있다.** 없는 도구를
      *   있다고 말하면 사용자가 헛되이 기다린다 — `contextNote()` 가 그 상황을 프롬프트에 알린다.
      */
+    /**
+     * 관리 도구의 권한 판정 — **노출과 실행이 같은 함수를 쓴다**(#46 의 두 겹).
+     *
+     * 둘이 갈리면 목록에 없는 도구를 실행이 통과시키거나, 그 반대가 된다. 실제로 #97 에서
+     * 화면과 도구가 갈려 같은 종류의 구멍이 났다 — 판단이 한 곳에 있어야 그런 일이 없다.
+     */
+    /**
+     * 이 사람이 쓸 수 있는 관리 도구가 하나라도 있는가 (#97).
+     *
+     * RequesterScope::isPanelAdmin() 이 이걸 쓴다 — 그룹 판정과 도구별 판정이 **같은 목록**을
+     * 보게 해서, 노출과 실행이 갈리지 않게 한다.
+     */
+    public static function hasAnyAdminTool(RequesterScope $scope): bool
+    {
+        foreach (self::ADMIN_TOOL_PERMISSIONS as $required) {
+            $allowed = is_string($required)
+                ? $scope->canPermission($required)
+                : $scope->can($required[0], $required[1]);
+
+            if ($allowed) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function allowedByAdminPermission(string $name): bool
+    {
+        $required = self::ADMIN_TOOL_PERMISSIONS[$name] ?? null;
+
+        if ($required === null) {
+            return true;
+        }
+
+        // 문자열 = 패널 리소스가 아닌 권한(이 플러그인이 등록한 wisdomAgent 등).
+        if (is_string($required)) {
+            return $this->scope->canPermission($required);
+        }
+
+        [$prefix, $model] = $required;
+
+        return $this->scope->can($prefix, $model);
+    }
+
     private function isRelevant(string $name): bool
     {
         // 관리 도구는 서버 유무와 무관하고, 리소스 권한 하나하나로 갈린다 (#46).
         if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
-            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
-
-            return $this->scope->can($prefix, $model);
+            return $this->allowedByAdminPermission($name);
         }
 
         if ($this->serverCount() === 0) {
@@ -2142,12 +2194,8 @@ final class AgentToolbox
         // ⚠ 여기도 권한 경계다 (#46). 노출에서 걸렀다고 실행을 그냥 열어 두면, 재개된
         //   상태나 인젝션으로 도구 이름이 들어왔을 때 권한 없는 조회가 통과한다 —
         //   서버 도구가 serverFor() 에서 다시 묻는 것과 같은 이유로 여기서 다시 묻는다.
-        if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
-            [$prefix, $model] = self::ADMIN_TOOL_PERMISSIONS[$name];
-
-            if (!$this->scope->can($prefix, $model)) {
-                return ToolCallResult::error($name, $input, 'You do not have permission to read that on this panel.');
-            }
+        if (!$this->allowedByAdminPermission($name)) {
+            return ToolCallResult::error($name, $input, 'You do not have permission to read that on this panel.');
         }
 
         try {
