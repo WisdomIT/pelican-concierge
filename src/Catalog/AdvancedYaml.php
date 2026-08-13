@@ -69,7 +69,7 @@ final class AdvancedYaml
         $issues = [];
 
         foreach ($parsed as $key => $value) {
-            $line = self::lineOf($yaml, (string) $key);
+            $line = self::lineOfPath($yaml, [(string) $key]);
 
             if (in_array($key, self::FORM_KEYS, true)) {
                 $issues[] = self::issue($line, 'catalog_check_form_key', ['key' => $key], 'warning');
@@ -113,20 +113,22 @@ final class AdvancedYaml
     private static function inspect(string $key, mixed $value, string $yaml, ?int $line): array
     {
         $issues = [];
+        // 경로의 줄. 못 찾으면 부모 줄로 물러난다.
+        $at = fn (array $path) => self::lineOfPath($yaml, array_merge([$key], $path)) ?? $line;
 
         if ($key === 'ports') {
             if (!isset($value['count'])) {
-                $issues[] = self::issue($line, 'catalog_check_ports_count_missing', [], 'error');
+                $issues[] = self::issue($at([]), 'catalog_check_ports_count_missing', [], 'error');
             } elseif (!is_int($value['count']) || $value['count'] < 1) {
                 // 형태 이름이 아니라 **적힌 값**을 보여준다 — "지금: 정수" 는 아무 도움이 안 된다.
-                $issues[] = self::issue($line, 'catalog_check_ports_count', [
+                $issues[] = self::issue($at(['count']), 'catalog_check_ports_count', [
                     'value' => is_scalar($value['count']) ? var_export($value['count'], true) : self::describe($value['count']),
                 ], 'error');
             }
 
             foreach ((array) ($value['protocol'] ?? []) as $protocol) {
                 if (!in_array($protocol, ['tcp', 'udp'], true)) {
-                    $issues[] = self::issue($line, 'catalog_check_protocol', ['value' => (string) $protocol], 'error');
+                    $issues[] = self::issue($at(['protocol']), 'catalog_check_protocol', ['value' => (string) $protocol], 'error');
                 }
             }
 
@@ -135,9 +137,9 @@ final class AdvancedYaml
                 $index = $derive['index'] ?? null;
 
                 if (!isset($derive['env']) || !is_int($index)) {
-                    $issues[] = self::issue($line, 'catalog_check_derive_shape', ['n' => $i + 1], 'error');
+                    $issues[] = self::issue($at(['derive', $i]), 'catalog_check_derive_shape', ['n' => $i + 1], 'error');
                 } elseif (is_int($value['count'] ?? null) && $index >= $value['count']) {
-                    $issues[] = self::issue($line, 'catalog_check_derive_range', [
+                    $issues[] = self::issue($at(['derive', $i]), 'catalog_check_derive_range', [
                         'env' => (string) $derive['env'], 'index' => $index, 'count' => $value['count'],
                     ], 'error');
                 }
@@ -146,10 +148,10 @@ final class AdvancedYaml
 
         if ($key === 'post_install') {
             foreach ($value as $i => $step) {
-                $at = ['n' => $i + 1];
+                $where = ['n' => $i + 1];
 
                 if (!is_array($step) || !isset($step['type'])) {
-                    $issues[] = self::issue($line, 'catalog_check_step_type_missing', $at, 'error');
+                    $issues[] = self::issue($at([$i]), 'catalog_check_step_type_missing', $where, 'error');
 
                     continue;
                 }
@@ -161,13 +163,13 @@ final class AdvancedYaml
                 };
 
                 if ($required === null) {
-                    $issues[] = self::issue($line, 'catalog_check_step_type', $at + ['type' => (string) $step['type']], 'error');
+                    $issues[] = self::issue($at([$i]), 'catalog_check_step_type', $where + ['type' => (string) $step['type']], 'error');
 
                     continue;
                 }
 
                 foreach (array_diff($required, array_keys($step)) as $missing) {
-                    $issues[] = self::issue($line, 'catalog_check_step_missing', $at + [
+                    $issues[] = self::issue($at([$i, $missing]) ?? $at([$i]), 'catalog_check_step_missing', $where + [
                         'type' => (string) $step['type'], 'field' => $missing,
                     ], 'error');
                 }
@@ -177,20 +179,20 @@ final class AdvancedYaml
         if ($key === 'secrets') {
             foreach ($value as $i => $name) {
                 if (!is_string($name) || trim($name) === '') {
-                    $issues[] = self::issue($line, 'catalog_check_secret_shape', ['n' => $i + 1], 'error');
+                    $issues[] = self::issue($at([$i]), 'catalog_check_secret_shape', ['n' => $i + 1], 'error');
                 }
             }
         }
 
         if ($key === 'mods' && ($value['supported'] ?? false) === true && blank($value['path'] ?? null)) {
             // 설치 경로를 모르면 모드를 어디에 둘지 알 수 없다 — 설치가 조용히 빗나간다.
-            $issues[] = self::issue($line, 'catalog_check_mods_path', [], 'error');
+            $issues[] = self::issue($at([]), 'catalog_check_mods_path', [], 'error');
         }
 
         if ($key === 'defaults') {
             foreach ($value as $env => $default) {
                 if (is_array($default)) {
-                    $issues[] = self::issue(self::lineOf($yaml, (string) $env) ?? $line, 'catalog_check_default_scalar', ['key' => (string) $env], 'error');
+                    $issues[] = self::issue($at([(string) $env]), 'catalog_check_default_scalar', ['key' => (string) $env], 'error');
                 }
             }
         }
@@ -225,18 +227,94 @@ final class AdvancedYaml
     }
 
     /**
-     * 원문에서 그 키가 처음 나오는 줄. 파서가 위치를 주지 않으므로 직접 찾는다 —
-     * 정확한 지점은 아니지만 "어디를 봐야 하는지"는 알려 준다.
+     * 원문에서 그 **경로**가 있는 줄. 파서는 위치를 돌려주지 않으므로 직접 찾는다.
+     *
+     * ⚠ 최상위 키만 찾으면 중첩된 문제가 전부 부모 줄로 보고된다 — 14번째 줄이 틀렸는데
+     *   12번째 줄이라고 말하던 원인이다(실측). 경로를 따라 블록 안으로 들어간다.
+     *
+     * @param  array<int, string|int>  $path  예: ['ports','count'] · ['post_install', 1]
      */
-    private static function lineOf(string $yaml, string $key): ?int
+    private static function lineOfPath(string $yaml, array $path): ?int
     {
-        foreach (explode("\n", $yaml) as $i => $line) {
-            if (preg_match('/^\s*' . preg_quote($key, '/') . '\s*:/', $line)) {
-                return $i + 1;
+        $lines = explode("\n", $yaml);
+        $from = 0;
+        $until = count($lines);
+        $indent = 0;
+        $found = null;
+
+        foreach ($path as $segment) {
+            $line = is_int($segment)
+                ? self::findItem($lines, $from, $until, $indent, $segment)
+                : self::findKey($lines, $from, $until, $indent, (string) $segment);
+
+            if ($line === null) {
+                // 못 찾으면 여기까지 좁힌 위치라도 돌려준다 — 없는 것보다 낫다.
+                return $found;
+            }
+
+            $found = $line + 1;
+            $indent = self::indentOf($lines[$line]) + 1;
+            $from = $line + 1;
+            $until = self::blockEnd($lines, $from, self::indentOf($lines[$line]));
+        }
+
+        return $found;
+    }
+
+    /** @param array<int, string> $lines */
+    private static function findKey(array $lines, int $from, int $until, int $minIndent, string $key): ?int
+    {
+        for ($i = $from; $i < $until; $i++) {
+            if (self::indentOf($lines[$i]) >= $minIndent
+                && preg_match('/^\s*-?\s*' . preg_quote($key, '/') . '\s*:/', $lines[$i])) {
+                return $i;
             }
         }
 
         return null;
+    }
+
+    /**
+     * 목록의 n 번째 항목(0 부터) 이 시작하는 줄.
+     *
+     * @param array<int, string> $lines
+     */
+    private static function findItem(array $lines, int $from, int $until, int $minIndent, int $index): ?int
+    {
+        $seen = -1;
+
+        for ($i = $from; $i < $until; $i++) {
+            if (self::indentOf($lines[$i]) >= $minIndent && preg_match('/^\s*-\s/', $lines[$i])) {
+                $seen++;
+
+                if ($seen === $index) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** 그 줄이 여는 블록이 끝나는 지점(들여쓰기가 되돌아오는 첫 줄). */
+    private static function blockEnd(array $lines, int $from, int $indent): int
+    {
+        for ($i = $from; $i < count($lines); $i++) {
+            if (trim($lines[$i]) === '' || str_starts_with(trim($lines[$i]), '#')) {
+                continue;
+            }
+
+            if (self::indentOf($lines[$i]) <= $indent) {
+                return $i;
+            }
+        }
+
+        return count($lines);
+    }
+
+    private static function indentOf(string $line): int
+    {
+        return strlen($line) - strlen(ltrim($line, ' '));
     }
 
     /**
