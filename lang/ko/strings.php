@@ -698,7 +698,6 @@ return [
     'catalog_check_step_type' => 'post_install :n번째: `:type` 은 모르는 절차입니다. file_replace 또는 json_vmarg 를 쓰세요.',
     'catalog_check_step_missing' => 'post_install :n번째(:type)에 :field 가 없습니다.',
     'catalog_check_secret_shape' => 'secrets :n번째 항목이 변수 이름이 아닙니다.',
-    'catalog_check_mods_path' => 'mods.supported 가 켜져 있으면 path 가 필요합니다 — 없으면 모드를 어디에 둘지 알 수 없습니다.',
     'catalog_check_default_scalar' => 'defaults 의 :key 값은 한 줄짜리 값이어야 합니다 (egg 변수에 그대로 들어갑니다).',
     'catalog_type_string' => '문자열',
     'catalog_type_string_or_null' => '문자열 또는 비움',

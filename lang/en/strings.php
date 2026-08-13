@@ -697,7 +697,6 @@ return [
     'catalog_check_step_type' => 'post_install step :n: `:type` is not a known step. Use file_replace or json_vmarg.',
     'catalog_check_step_missing' => 'post_install step :n (:type) is missing :field.',
     'catalog_check_secret_shape' => 'secrets entry :n is not a variable name.',
-    'catalog_check_mods_path' => 'mods.supported is on but path is missing — there is nowhere to put the mods.',
     'catalog_check_default_scalar' => 'The value of :key in defaults must be a single value (it goes straight into an egg variable).',
     'catalog_type_string' => 'text',
     'catalog_type_string_or_null' => 'text or empty',

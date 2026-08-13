@@ -184,10 +184,9 @@ final class AdvancedYaml
             }
         }
 
-        if ($key === 'mods' && ($value['supported'] ?? false) === true && blank($value['path'] ?? null)) {
-            // 설치 경로를 모르면 모드를 어디에 둘지 알 수 없다 — 설치가 조용히 빗나간다.
-            $issues[] = self::issue($at([]), 'catalog_check_mods_path', [], 'error');
-        }
+        // ⚠ mods.path 를 요구하는 규칙이 있었는데 **그 값을 쓰는 코드가 없다.** 근거 없는
+        //   규칙이라 걷어냈다 — 우리 카탈로그 5종이 걸렸고, 확인해 보니 워크숍 ID·모드 탭
+        //   방식이라 경로 자체가 필요 없는 게임들이었다. 검사기가 사실보다 앞서면 안 된다.
 
         if ($key === 'defaults') {
             foreach ($value as $env => $default) {
@@ -206,8 +205,11 @@ final class AdvancedYaml
             'string' => is_string($value),
             'string_or_null' => $value === null || is_string($value),
             'int' => is_int($value),
-            'map' => is_array($value) && !array_is_list($value),
-            'list' => is_array($value) && array_is_list($value),
+            // ⚠ 빈 배열은 PHP 에서 목록과 묶음을 구분할 수 없다(`{}` 도 `[]` 로 온다).
+            //   비어 있으면 통과시킨다 — 실측에서 우리 카탈로그의 `defaults: {}` 가
+            //   전부 "목록이 왔다"로 걸렸다.
+            'map' => is_array($value) && ($value === [] || !array_is_list($value)),
+            'list' => is_array($value) && ($value === [] || array_is_list($value)),
             default => true,
         };
     }
