@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Models\WebhookConfiguration;
 use Spatie\Health\ResultStores\ResultStore;
+use WisdomIT\Concierge\Support\UserTime;
 
 /**
  * 관리 화면 읽기 2차 (#61) — egg·mount·호스트·웹훅·API 키·헬스·활동 로그.
@@ -222,8 +223,9 @@ final class AdminReadTools
         ));
 
         // finishedAt 은 DateTime 이다 — 문자열로 이어 붙이면 예외가 난다(실측).
+        // 시각은 보는 사람의 시간대로 옮긴다(#79) — UTC 로 답하면 언제인지 가늠이 안 된다.
         $finished = $results->finishedAt instanceof \DateTimeInterface
-            ? $results->finishedAt->format('Y-m-d H:i')
+            ? UserTime::format($results->finishedAt)
             : (string) ($results->finishedAt ?? '?');
 
         return sprintf("Panel health (checked %s):\n%s", $finished, $lines->implode("\n"));
@@ -274,7 +276,7 @@ final class AdminReadTools
 
         $lines = $entries->map(fn (ActivityLog $log) => sprintf(
             '- %s  %s  by %s%s',
-            $log->timestamp,
+            UserTime::format($log->timestamp),
             $log->event,
             $log->actor?->username ?? 'system',
             $log->ip ? " from {$log->ip}" : '',

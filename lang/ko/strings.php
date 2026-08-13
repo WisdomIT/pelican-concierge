@@ -218,6 +218,22 @@ return [
 
     // LLM 공급자(#3).
     'field_provider' => 'LLM 공급자',
+
+    // 선택지 문구(#79) — config 는 데이터만 갖고, 사람이 읽는 말은 여기서 만든다.
+    //  · 모델 이름·공급자 이름은 고유명사라 config 에 남는다
+    //  · 로컬 엔드포인트만 이름 자체가 설명문이라 여기 있다
+    // 이름을 안 정하고 만든 백업(#79). 코어 기본값은 UTC 라 우리 표시와 어긋난다.
+    'backup_default_name' => '백업 :at',
+    'value_empty' => '(없음)',
+    'option_recommended' => '(권장)',
+    'provider_openai-compatible' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',
+    'provider_badge_openai-compatible' => '로컬',
+    'effort_minimal' => 'minimal — 추론 최소화 · 가장 빠름',
+    'effort_low' => 'low — 가장 저렴 · 단순한 요청',
+    'effort_medium' => 'medium — 균형',
+    'effort_high' => 'high — 깊은 추론 · 어려운 진단',
+    'effort_xhigh' => 'xhigh — 복잡한 다단계 작업',
+    'effort_max' => 'max — 비용 무관, 정확도 우선',
     'help_provider' => '채팅에 답하는 서비스입니다. 전환해도 각 공급자의 API 키·모델 선택은 남습니다 — 다시 돌아오면 복원됩니다.',
     'field_base_url' => '엔드포인트 주소',
     'help_base_url' => 'OpenAI 호환 엔드포인트를 /v1 까지 포함해 입력합니다 — Ollama 는 http://localhost:11434/v1. 로컬 서버는 보통 API 키가 필요 없습니다.',
@@ -392,6 +408,21 @@ return [
     'untitled_conversation' => '제목 없는 대화',
     'conversation_history' => '대화 기록',
     'older_turns_hidden' => '이전 대화 :count개는 표시하지 않습니다.',
+    // 예약 문구(#79). 시간대(:zone)는 반드시 함께 적는다 — 사용자가 정하고 읽는 값이라
+    // 어느 시계 기준인지가 곧 내용이다.
+    'cron_daily' => '매일 :time (:zone)',
+    'cron_weekly' => '매주 :day요일 :time (:zone)',
+    'cron_monthly' => '매달 :day일 :time (:zone)',
+    'cron_every_minutes' => ':n분마다',
+    'cron_raw' => '분::minute 시::hour 일::dom 월::month 요일::dow',
+    'weekday_0' => '일',
+    'weekday_1' => '월',
+    'weekday_2' => '화',
+    'weekday_3' => '수',
+    'weekday_4' => '목',
+    'weekday_5' => '금',
+    'weekday_6' => '토',
+
     'time_just_now' => '방금',
     'time_minutes_ago' => ':n분 전',
     'time_hours_ago' => ':n시간 전',

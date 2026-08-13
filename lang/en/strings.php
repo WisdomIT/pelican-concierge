@@ -218,6 +218,22 @@ return [
 
     // LLM 공급자(#3).
     'field_provider' => 'LLM provider',
+
+    // Option labels (#79) — config holds data only; the words people read live here.
+    //  · Model and provider names are proper nouns and stay in config
+    //  · Only the local endpoint's name is a description rather than a name
+    // Auto name for a backup made without one (#79) — core's default is UTC-based.
+    'backup_default_name' => 'Backup at :at',
+    'value_empty' => '(none)',
+    'option_recommended' => '(recommended)',
+    'provider_openai-compatible' => 'OpenAI-compatible (local: Ollama · vLLM · llama.cpp)',
+    'provider_badge_openai-compatible' => 'Local',
+    'effort_minimal' => 'minimal — least reasoning · fastest',
+    'effort_low' => 'low — cheapest · simple requests',
+    'effort_medium' => 'medium — balanced',
+    'effort_high' => 'high — deeper reasoning · hard diagnosis',
+    'effort_xhigh' => 'xhigh — complex multi-step work',
+    'effort_max' => 'max — accuracy first, cost no object',
     'help_provider' => 'Which service answers the chat. Switching keeps each provider\'s API key and model choice — switch back and they are restored.',
     'field_base_url' => 'Endpoint URL',
     'help_base_url' => 'The OpenAI-compatible endpoint, including /v1 — e.g. http://localhost:11434/v1 for Ollama. No API key is needed for most local servers.',
@@ -391,6 +407,21 @@ return [
     'untitled_conversation' => 'Untitled conversation',
     'conversation_history' => 'History',
     'older_turns_hidden' => ':count earlier turns are not shown.',
+    // Schedule wording (#79). Always carry the timezone (:zone) — the user both sets and
+    // reads these, so which clock they refer to is part of the meaning.
+    'cron_daily' => 'Every day at :time (:zone)',
+    'cron_weekly' => 'Every :day at :time (:zone)',
+    'cron_monthly' => 'Day :day of every month at :time (:zone)',
+    'cron_every_minutes' => 'Every :n minutes',
+    'cron_raw' => 'min::minute hour::hour day::dom month::month weekday::dow',
+    'weekday_0' => 'Sunday',
+    'weekday_1' => 'Monday',
+    'weekday_2' => 'Tuesday',
+    'weekday_3' => 'Wednesday',
+    'weekday_4' => 'Thursday',
+    'weekday_5' => 'Friday',
+    'weekday_6' => 'Saturday',
+
     'time_just_now' => 'now',
     'time_minutes_ago' => ':nm ago',
     'time_hours_ago' => ':nh ago',
