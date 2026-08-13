@@ -1,0 +1,49 @@
+name: Plugin integration request
+description: Ask for the assistant to work with another Pelican plugin
+labels: [enhancement, integration]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The assistant already works with several optional plugins — it uses one when it is
+        installed, and explains the fallback when it is not. That table is a real extension
+        point, so this is a request shape we expect.
+
+  - type: input
+    id: plugin
+    attributes:
+      label: Which plugin
+      placeholder: Player Counter
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Link to it
+      description: Its Hub page, or the repository if it is not on the Hub.
+      placeholder: https://hub.pelican.dev/plugins/player-counter
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-for
+    attributes:
+      label: What should the assistant be able to do with it
+      description: |
+        Describe it as something a user would ask for, not as an API call. That is what
+        decides whether an integration is worth having.
+      placeholder: |
+        "How many people are on right now?" — answer it without opening the panel.
+    validations:
+      required: true
+
+  - type: textarea
+    id: without-it
+    attributes:
+      label: What should happen when it is not installed
+      description: |
+        Every integration needs an answer to this. The assistant must not pretend the
+        feature does not exist, nor claim it works when it cannot.
+      placeholder: |
+        Say the count is unavailable and that an administrator can install the plugin.

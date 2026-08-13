@@ -255,6 +255,7 @@ return [
     // Deployment knowledge (#59) — facts no tool can report, written by the operator.
     'section_knowledge' => 'About this deployment',
     'section_knowledge_help' => 'Facts no tool can discover, used by the assistant when it diagnoses: the address players connect to, which port range your router forwards, how DNS is set up. "It is running but nobody can join" cannot be answered from logs — it needs this.',
+    'knowledge_guide' => 'How to write one',
     'help_knowledge' => 'Sent with every message, so length costs tokens — keep it to short facts. Leave it empty and the section is not sent at all. Writing it in English costs about 40% fewer tokens for the same content (it does not affect the language of replies).',
     'placeholder_knowledge' => "For example:\n- Players connect to gs.example.com; the router forwards ports 27500-27599 only.\n- Port 25565 is reserved for the legacy Minecraft server.\n- Backups run nightly at 04:00 to a NAS.",
 

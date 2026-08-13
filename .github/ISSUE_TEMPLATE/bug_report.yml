@@ -1,0 +1,90 @@
+name: Bug report
+description: Something the assistant does wrong, or does not do at all
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠ **Never paste an API key, password, token or licence key into an issue.**
+        Replace them with `…` — we never need the value to understand a problem.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you asked the assistant, and what it did.
+      placeholder: |
+        I asked "make me a Minecraft server for six friends".
+        It said it had created one, but no server appeared on the panel.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: panel-version
+    attributes:
+      label: Panel version
+      placeholder: v1.0.0-beta36
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Concierge version
+      description: Admin → Plugins, or the version in the release you installed.
+      placeholder: v1.6.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM provider
+      description: |
+        Several past bugs were provider-specific — a model that was withdrawn upstream, or
+        tool-call history one provider accepts and another rejects. This is usually the
+        first thing we check.
+      options:
+        - Anthropic (Claude)
+        - OpenAI (ChatGPT)
+        - Google (Gemini)
+        - OpenAI-compatible (local — Ollama, vLLM, llama.cpp)
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: claude-opus-5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproduces
+    attributes:
+      label: Does it happen again in a fresh conversation?
+      description: |
+        A long conversation carries its own history, so a problem that only appears there is
+        a different problem from one that appears immediately.
+      options:
+        - "Yes — a new conversation does it too"
+        - "No — only in that one conversation"
+        - "Not tried"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: |
+        Screenshots, the assistant's reply, or lines from `storage/logs/laravel.log`.
+        Check them for keys and passwords before pasting.
