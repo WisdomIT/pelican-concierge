@@ -109,6 +109,13 @@ final class AgentToolbox
     }
 
     /** 관리 화면 읽기 2차 (#61). */
+    private function catalogTools(): CatalogTools
+    {
+        return $this->catalogTools ??= new CatalogTools();
+    }
+
+    private ?CatalogTools $catalogTools = null;
+
     private function adminRead(): AdminReadTools
     {
         return $this->adminRead ??= new AdminReadTools($this->user);
@@ -132,7 +139,72 @@ final class AgentToolbox
             'confirm' => trans('concierge::strings.card_confirm_' . $name),
         ];
 
+        // 🔴 검사를 통과 못 하는 항목은 **카드에 올리지 않는다**(#91). 통과 못 할 것을
+        //    사람에게 눌러 달라고 하는 것은 확인 카드의 뜻을 저버리는 일이다 — 모델이
+        //    스스로 고치게 돌려보낸다.
+        if (in_array($name, ['create_catalog_game', 'update_catalog_game'], true)) {
+            $errors = $this->catalogTools()->blockingIssues($name, $input);
+
+            if ($errors !== []) {
+                throw new ToolInputException(
+                    'This catalogue entry does not validate, so it cannot be offered for confirmation. Fix it first: '
+                    . implode(' / ', array_map(
+                        fn (array $issue) => ($issue['line'] === null ? '' : "line {$issue['line']}: ") . $issue['message'],
+                        $errors,
+                    )),
+                );
+            }
+        }
+
         return match ($name) {
+            'create_catalog_game', 'update_catalog_game' => (function () use ($common, $input, $name) {
+                ['game' => $game, 'values' => $values, 'issues' => $issues] = $this->catalogTools()->plan($name, $input);
+
+                $lines = [
+                    ['label' => trans('concierge::strings.catalog_field_name'), 'value' => (string) $values['name']],
+                    ['label' => trans('concierge::strings.catalog_field_id'), 'value' => (string) $values['game_id']],
+                    ['label' => trans('concierge::strings.catalog_field_egg'), 'value' => (string) $values['egg']],
+                    ['label' => trans('concierge::strings.catalog_section_sizes'), 'value' => (string) count((array) $values['sizes'])],
+                    ['label' => trans('concierge::strings.catalog_section_ask'), 'value' => (string) count((array) $values['ask'])],
+                ];
+
+                if (($values['available'] ?? true) !== true) {
+                    $lines[] = [
+                        'label' => trans('concierge::strings.catalog_field_available'),
+                        'value' => trans('concierge::strings.card_catalog_unavailable'),
+                    ];
+                }
+
+                // 경고는 막지 않지만 **누르기 전에 보여준다** — 저장한 뒤에 알게 되면 늦다.
+                $warnings = array_map(
+                    fn (array $issue) => ($issue['line'] === null ? '' : "{$issue['line']}: ") . $issue['message'],
+                    $issues,
+                );
+
+                return array_merge($common, [
+                    'title' => trans('concierge::strings.card_title_' . $name),
+                    'lines' => $lines,
+                    'note' => $warnings === []
+                        ? trans('concierge::strings.card_note_catalog_' . ($game === null ? 'create' : 'update'))
+                        : implode(' · ', $warnings),
+                    'danger' => false,
+                ]);
+            })(),
+
+            'delete_catalog_game' => (function () use ($common, $input) {
+                $game = $this->catalogTools()->find($input);
+
+                return array_merge($common, [
+                    'lines' => [
+                        ['label' => trans('concierge::strings.catalog_field_name'), 'value' => $game->name],
+                        ['label' => trans('concierge::strings.catalog_field_id'), 'value' => $game->game_id],
+                        ['label' => trans('concierge::strings.catalog_field_egg'), 'value' => $game->egg],
+                    ],
+                    'note' => trans('concierge::strings.card_note_catalog_delete'),
+                    'danger' => true,
+                ]);
+            })(),
+
             'set_node_maintenance' => (function () use ($common, $input) {
                 $node = $this->admin()->nodeFacts($input);
                 $on = (bool) ($input['enabled'] ?? true);
@@ -393,6 +465,9 @@ final class AgentToolbox
         'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
         // 사용량 통계 (#92) — 숫자만. 대화 내용은 이 경로로 나가지 않는다
         'get_usage_stats',
+        // 게임 카탈로그 (#91) — 화면(ConciergeGamePolicy)과 같은 egg 권한을 쓴다
+        'list_catalog_games', 'get_catalog_game',
+        'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
     ];
 
     /**
@@ -431,6 +506,13 @@ final class AgentToolbox
         'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
         // 사용자별 소비를 보는 일이므로 활동 기록과 같은 권한을 요구한다(#92).
         'get_usage_stats' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        // 카탈로그(#91). 관리 화면의 ConciergeGamePolicy 와 **같은 권한**이다 — 갈리면
+        // "화면에서는 되는데 대화로는 안 된다" 가 생긴다.
+        'list_catalog_games' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'get_catalog_game' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Egg],
+        'create_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
+        'update_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
+        'delete_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
         // 사용자·역할 2차 (#63)
         'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
@@ -1228,6 +1310,79 @@ final class AgentToolbox
             ],
 
             [
+                'name' => 'list_catalog_games',
+                'description' => 'The game catalogue an administrator maintains: which games the assistant offers, '
+                    . 'which egg each is built from, and whether that egg exists on this panel. '
+                    . 'Unlike list_available_games this includes entries that are turned off, so it can answer '
+                    . '"why is that game not offered". Also lists eggs that have no catalogue entry yet.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'get_catalog_game',
+                'description' => 'One catalogue entry in full, including sizes, the questions asked, and the advanced '
+                    . 'block as YAML. Read this before changing an entry — update replaces what you send.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['id' => ['type' => 'string', 'description' => 'Catalogue id, e.g. minecraft-paper.']],
+                    'required' => ['id'],
+                ],
+            ],
+            [
+                'name' => 'create_catalog_game',
+                'description' => 'Add a game to the catalogue. Read the egg first (get_egg_details) and propose sizes '
+                    . 'and questions from its real variables. The advanced block is YAML — its keys are documented in '
+                    . 'docs/catalog-advanced. Confirmation card runs first, and an entry that fails validation is '
+                    . 'refused before the card, so fix problems rather than asking the user to accept them.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'string', 'description' => 'New catalogue id — lowercase with hyphens.'],
+                        'name' => ['type' => 'string', 'description' => 'What players see this game called.'],
+                        'summary' => ['type' => 'string', 'description' => 'One line: what it can and cannot do.'],
+                        'egg' => ['type' => 'string', 'description' => 'Egg name as imported on this panel.'],
+                        'available' => ['type' => 'boolean', 'description' => 'Whether the assistant may create it. Default true.'],
+                        'unavailable_reason' => ['type' => 'string', 'description' => 'Shown when available is false.'],
+                        'sizes' => ['type' => 'array', 'description' => 'Sizes: id, label, players, memory (MiB), disk (MiB), cpu (%).', 'items' => ['type' => 'object']],
+                        'ask' => ['type' => 'array', 'description' => 'Questions: env, label, type (text/number/choice/password), default, optional.', 'items' => ['type' => 'object']],
+                        'advanced' => ['type' => 'string', 'description' => 'YAML for ports, secrets, defaults, post_install and the rest.'],
+                    ],
+                    'required' => ['id', 'name', 'egg'],
+                ],
+            ],
+            [
+                'name' => 'update_catalog_game',
+                'description' => 'Change a catalogue entry. Only the fields you send are replaced; the rest are kept. '
+                    . 'Read the entry first with get_catalog_game — sending a partial sizes or ask list replaces the '
+                    . 'whole list, not one row. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id' => ['type' => 'string', 'description' => 'Which entry to change.'],
+                        'name' => ['type' => 'string'],
+                        'summary' => ['type' => 'string'],
+                        'egg' => ['type' => 'string'],
+                        'available' => ['type' => 'boolean'],
+                        'unavailable_reason' => ['type' => 'string'],
+                        'sizes' => ['type' => 'array', 'items' => ['type' => 'object']],
+                        'ask' => ['type' => 'array', 'items' => ['type' => 'object']],
+                        'advanced' => ['type' => 'string', 'description' => 'YAML. Send the whole block — it replaces the current one.'],
+                    ],
+                    'required' => ['id'],
+                ],
+            ],
+            [
+                'name' => 'delete_catalog_game',
+                'description' => 'Remove a game from the catalogue. Servers already created from it are untouched — '
+                    . 'only the entry goes. If the intent is just to stop offering it, update_catalog_game with '
+                    . 'available=false keeps the entry and explains why. Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['id' => ['type' => 'string']],
+                    'required' => ['id'],
+                ],
+            ],
+
+            [
                 'name' => 'create_panel_user',
                 'description' => 'Create a panel account. **Never handle a password** — the new user is emailed a link '
                     . 'to set their own. Ask only for the email; a username is optional. Confirmation card runs first.',
@@ -1432,7 +1587,26 @@ final class AgentToolbox
     }
 
     /** 상태를 바꾸는 도구 → 실행 전 확인 카드를 요구한다. */
+    /**
+     * 카드에서 **서버를 해석하지 않는** 변경들 — 대상이 노드·할당·계정·카탈로그이거나
+     * 남의 서버다.
+     *
+     * ⚠ 여기 빠뜨리면 카드가 serverFor() 로 가서 "server is required" 로 죽는다(실측:
+     *   카탈로그 도구를 추가하며 겪었다). 서버 없는 관리 도구를 만들면 여기에도 넣을 것.
+     */
+    private const ADMIN_CARD_TOOLS = [
+        'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
+        'create_panel_user', 'set_user_role', 'transfer_server_owner',
+        'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
+        'create_node', 'create_mount',
+        'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
+        // 카탈로그 (#91)
+        'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
+    ];
+
     private const CONFIRM_TOOLS = [
+        // 카탈로그 변경 (#91) — 운영자 데이터를 대신 고치는 일이라 전부 카드를 거친다
+        'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
         'start_server', 'stop_server', 'restart_server',
         'accept_minecraft_eula', 'replace_in_server_file',
         'create_server', 'install_mod',
@@ -1548,13 +1722,7 @@ final class AgentToolbox
         }
 
         // 관리 변경(#47)은 대상이 노드·할당이거나 **남의 서버**다 — serverFor 로 풀 수 없다.
-        if (in_array($name, [
-            'set_node_maintenance', 'add_node_allocations', 'remove_node_allocation', 'set_server_suspended',
-            'create_panel_user', 'set_user_role', 'transfer_server_owner',
-            'update_panel_user', 'send_password_reset', 'clear_user_mfa', 'set_role_permissions',
-            'create_node', 'create_mount',
-            'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
-        ], true)) {
+        if (in_array($name, self::ADMIN_CARD_TOOLS, true)) {
             return $this->adminCard($name, $input);
         }
 
@@ -2059,6 +2227,14 @@ final class AgentToolbox
                 'list_api_keys' => new ToolCallResult($name, $input, $this->adminRead()->listApiKeys()),
                 'get_panel_health' => new ToolCallResult($name, $input, $this->adminRead()->getPanelHealth()),
                 'get_activity_log' => new ToolCallResult($name, $input, $this->adminRead()->getActivityLog($input)),
+                'list_catalog_games' => new ToolCallResult($name, $input, $this->json($this->catalogTools()->list())),
+                'get_catalog_game' => new ToolCallResult($name, $input, $this->json($this->catalogTools()->get($input))),
+                'create_catalog_game', 'update_catalog_game' => new ToolCallResult(
+                    $name, $input, $this->json($this->catalogTools()->save($name, $input)),
+                ),
+                'delete_catalog_game' => new ToolCallResult(
+                    $name, $input, $this->json($this->catalogTools()->delete($input)),
+                ),
                 'get_usage_stats' => new ToolCallResult($name, $input, $this->json(
                     UsageStats::summary((string) ($input['window'] ?? 'today')),
                 )),
