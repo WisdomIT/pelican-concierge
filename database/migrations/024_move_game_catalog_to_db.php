@@ -81,7 +81,7 @@ return new class extends Migration
         // 어느 하나도 잃지 않는다. 새 키가 생겨도 자동으로 따라온다.
         $columns = [
             'id', 'name', 'summary', 'egg', 'available', 'unavailable_reason', 'sizes', 'ask',
-            'name_translations', 'summary_translations',
+            'name_translations', 'summary_translations', 'unavailable_reason_translations',
         ];
 
         foreach (array_values($games) as $sort => $game) {
@@ -99,6 +99,9 @@ return new class extends Migration
                 'egg' => (string) ($game['egg'] ?? ''),
                 'available' => (bool) ($game['available'] ?? true),
                 'unavailable_reason' => $game['unavailable_reason'] ?? null,
+                'unavailable_reason_translations' => isset($game['unavailable_reason_translations'])
+                    ? json_encode($game['unavailable_reason_translations'], JSON_UNESCAPED_UNICODE)
+                    : null,
                 'sizes' => json_encode($game['sizes'] ?? [], JSON_UNESCAPED_UNICODE),
                 'ask' => json_encode($game['ask'] ?? [], JSON_UNESCAPED_UNICODE),
                 'advanced' => json_encode(

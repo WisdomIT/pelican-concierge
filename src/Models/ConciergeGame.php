@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $egg
  * @property bool $available
  * @property ?string $unavailable_reason
+ * @property ?array<string, string> $unavailable_reason_translations
  * @property ?array<int, array<string, mixed>> $sizes
  * @property ?array<int, array<string, mixed>> $ask
  * @property ?array<string, mixed> $advanced
@@ -33,7 +34,8 @@ class ConciergeGame extends Model
 
     protected $fillable = [
         'game_id', 'sort', 'name', 'name_translations', 'summary', 'summary_translations',
-        'egg', 'available', 'unavailable_reason', 'sizes', 'ask', 'advanced',
+        'egg', 'available', 'unavailable_reason', 'unavailable_reason_translations',
+        'sizes', 'ask', 'advanced',
     ];
 
     /** @return array<string, string> */
@@ -42,6 +44,7 @@ class ConciergeGame extends Model
         return [
             'name_translations' => 'array',
             'summary_translations' => 'array',
+            'unavailable_reason_translations' => 'array',
             'sizes' => 'array',
             'ask' => 'array',
             'advanced' => 'array',
@@ -65,6 +68,43 @@ class ConciergeGame extends Model
         return $summary === '' ? null : $summary;
     }
 
+    public function localizedUnavailableReason(): ?string
+    {
+        $reason = $this->pick($this->unavailable_reason_translations, (string) $this->unavailable_reason);
+
+        return $reason === '' ? null : $reason;
+    }
+
+    /**
+     * 목록 안 항목의 라벨도 로케일을 탄다 (#99).
+     *
+     * ⚠ 이름·설명만 번역하던 때 크기 라벨이 그대로 새 나갔다 — 영어 사용자가
+     *   "Minecraft (plugins)" 아래에서 "4명 정도" 를 보고, 개설 카드에는
+     *   "Players: 8명 정도" 가 찍혔다. **사람이 읽는 값은 목록 안에 있어도 번역 대상**이다.
+     *
+     * `<필드>_translations` 가 그 항목 안에 있으면 쓰고, 없거나 비면 원래 값을 쓴다 —
+     * 단일 언어 패널 운영자는 라벨을 한 번만 쓰면 된다.
+     *
+     * @param  ?array<int, array<string, mixed>>  $items
+     * @param  array<int, string>  $fields
+     * @return array<int, array<string, mixed>>
+     */
+    private function localizeItems(?array $items, array $fields): array
+    {
+        return array_map(function (array $item) use ($fields) {
+            foreach ($fields as $field) {
+                if (!isset($item[$field])) {
+                    continue;
+                }
+
+                $item[$field] = $this->pick($item[$field . '_translations'] ?? null, (string) $item[$field]);
+            }
+
+            // 번역 원본은 소비자에게 보낼 필요가 없다 — 고르고 나면 그만이다.
+            return array_diff_key($item, array_flip(array_map(fn (string $f) => $f . '_translations', $fields)));
+        }, $items ?? []);
+    }
+
     /**
      * 소비자가 아는 형태(YAML 시절 배열)로 되돌린다. 기술 항목(advanced)은 최상위로
      * 펴 넣는다 — 원래 그 자리에 있었고, 소비자는 그 위치를 안다.
@@ -79,9 +119,9 @@ class ConciergeGame extends Model
             'summary' => $this->localizedSummary(),
             'egg' => $this->egg,
             'available' => $this->available,
-            'unavailable_reason' => $this->unavailable_reason,
-            'sizes' => $this->sizes ?? [],
-            'ask' => $this->ask ?? [],
+            'unavailable_reason' => $this->localizedUnavailableReason(),
+            'sizes' => $this->localizeItems($this->sizes, ['label']),
+            'ask' => $this->localizeItems($this->ask, ['label', 'note']),
         ], fn ($value) => $value !== null));
     }
 
