@@ -251,6 +251,10 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
                                     $error = ProviderProbe::verify($provider, $key, $baseUrl);
 
+                                    // 확인을 눌렀다는 것은 "지금 상태로 다시 봐 달라"는 뜻이다 —
+                                    // 캐시된 모델 목록을 버려 방금 통한 키의 목록을 받게 한다(#80).
+                                    ProviderFactory::forgetModels($provider, $key, $baseUrl);
+
                                     if ($error === null) {
                                         $set('key_verified', self::verifyFingerprint($provider, $typed, $baseUrl));
                                         Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
@@ -291,7 +295,15 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     // 선택지가 정의된 공급자는 드롭다운으로 —
                     Select::make('model')
                         ->label(trans('concierge::strings.field_model'))
-                        ->options(fn (Get $get) => ProviderFactory::modelOptions((string) $get('provider')))
+                        ->options(fn (Get $get) => ProviderFactory::modelOptions(
+                            (string) $get('provider'),
+                            // 아직 저장하지 않은 키로도 목록을 받아 온다 — 키를 넣자마자
+                            // 그 키가 쓸 수 있는 모델이 보이는 게 자연스럽다(#80).
+                            trim((string) $get('api_key')) ?: null,
+                            (string) $get('base_url') ?: null,
+                        ))
+                        // 공급자가 주는 목록은 길다(OpenAI 70여 개) — 찾아 고르게 한다.
+                        ->searchable()
                         ->helperText(trans('concierge::strings.help_model'))
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->model)
@@ -586,10 +598,12 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             $settings->switchProvider($provider);
         }
 
-        // 자유 입력 모델(로컬 엔드포인트)은 별도 필드로 받는다 — 선택지형과 하나로 합친다.
-        $models = array_keys((array) config("concierge.providers.{$provider}.models", []));
+        // 어느 입력을 쓰는 공급자인가는 **config 가** 정한다 — 로컬 엔드포인트는 모델 이름이
+        // 설치마다 달라 자유 입력이다. 조회 결과로 판단하면 안 된다: 로컬 엔드포인트가
+        // 살아 있어 목록이 돌아온 순간 자유 입력 값이 버려진다.
+        $isFreeForm = (array) config("concierge.providers.{$provider}.models", []) === [];
 
-        if ($models === []) {
+        if ($isFreeForm) {
             $data['model'] = trim((string) ($data['model_free'] ?? ''));
         }
 
@@ -597,6 +611,11 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
         // 공급자를 바꾼 직후 폼의 모델·effort 가 이전 공급자의 값일 수 있다 —
         // 그 공급자의 선택지에 없는 값은 기본값으로 되돌린다(404 를 설정 화면에서 막는다).
+        //
+        // ⚠ 검증 근거는 **화면이 보여준 목록**이어야 한다(#80). 배포본 목록으로만 검사하면
+        //   방금 고른 새 모델(플러그인이 모르는 최신 모델)이 저장 때 조용히 되돌려진다.
+        $models = $isFreeForm ? [] : ProviderFactory::modelIds($provider);
+
         if ($models !== [] && !in_array($data['model'] ?? '', $models, true)) {
             $data['model'] = (string) config("concierge.providers.{$provider}.default_model", $settings->model);
         }
