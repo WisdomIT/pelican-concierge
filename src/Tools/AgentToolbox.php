@@ -391,6 +391,8 @@ final class AgentToolbox
         // 읽기 2차 (#61)
         'list_eggs', 'get_egg_details', 'list_mounts', 'list_database_hosts', 'list_backup_hosts',
         'list_webhooks', 'list_api_keys', 'get_panel_health', 'get_activity_log',
+        // 사용량 통계 (#92) — 숫자만. 대화 내용은 이 경로로 나가지 않는다
+        'get_usage_stats',
     ];
 
     /**
@@ -427,6 +429,8 @@ final class AgentToolbox
         // 헬스·활동 로그는 전용 리소스가 없다 — 노드를 볼 수 있는 사람이 보는 화면이다.
         'get_panel_health' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::Node],
         'get_activity_log' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
+        // 사용자별 소비를 보는 일이므로 활동 기록과 같은 권한을 요구한다(#92).
+        'get_usage_stats' => [RolePermissionPrefixes::ViewAny, RolePermissionModels::User],
         // 사용자·역할 2차 (#63)
         'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
@@ -1198,6 +1202,26 @@ final class AgentToolbox
                     'properties' => [
                         'user' => ['type' => 'string', 'description' => 'Optional: only this actor (username or id).'],
                         'server' => ['type' => 'string', 'description' => 'Optional: only actions on this server.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+
+            [
+                'name' => 'get_usage_stats',
+                'description' => 'How much this assistant has been used and by whom: message counts and token totals, '
+                    . 'per user and per model, plus how much of each usage limit is spent and when it resets. '
+                    . 'Counted on server time. **Statistics only — conversation contents are never available.** '
+                    . 'Token counts are exact; cost is not calculated, so apply your own provider rates.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'window' => [
+                            'type' => 'string',
+                            'enum' => ['today', 'week', 'month', 'all'],
+                            'description' => 'today (since midnight, server time), week (last 7 days), '
+                                . 'month (last 30 days), all. Defaults to today.',
+                        ],
                     ],
                     'required' => [],
                 ],
@@ -2035,6 +2059,9 @@ final class AgentToolbox
                 'list_api_keys' => new ToolCallResult($name, $input, $this->adminRead()->listApiKeys()),
                 'get_panel_health' => new ToolCallResult($name, $input, $this->adminRead()->getPanelHealth()),
                 'get_activity_log' => new ToolCallResult($name, $input, $this->adminRead()->getActivityLog($input)),
+                'get_usage_stats' => new ToolCallResult($name, $input, $this->json(
+                    UsageStats::summary((string) ($input['window'] ?? 'today')),
+                )),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
