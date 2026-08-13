@@ -52,8 +52,56 @@ final class ProviderFactory
     public static function options(): array
     {
         return collect((array) config('concierge.providers', []))
-            ->map(fn (array $provider) => (string) ($provider['label'] ?? ''))
+            ->map(fn (array $provider, string $id) => self::label($id))
             ->filter()
+            ->all();
+    }
+
+    /**
+     * 공급자 이름. 대개 고유명사("Anthropic (Claude)")라 config 값을 그대로 쓰고,
+     * 설명문인 항목(로컬 엔드포인트)만 번역이 채운다(#79).
+     */
+    public static function label(string $provider): string
+    {
+        return (string) (config("concierge.providers.{$provider}.label")
+            ?? trans("concierge::strings.provider_{$provider}"));
+    }
+
+    /** 대화 기록 화면의 짧은 배지. 라벨과 같은 규칙. */
+    public static function badge(string $provider): string
+    {
+        return (string) (config("concierge.providers.{$provider}.badge")
+            ?? trans("concierge::strings.provider_badge_{$provider}"));
+    }
+
+    /**
+     * 모델 선택지. 이름은 고유명사라 config 가, "(권장)" 표시는 번역이 만든다(#79).
+     *
+     * @return array<string, string> id => 표시 문구
+     */
+    public static function modelOptions(string $provider): array
+    {
+        $recommended = config("concierge.providers.{$provider}.default_model");
+
+        return collect((array) config("concierge.providers.{$provider}.models", []))
+            ->map(fn (string $name, string $id) => $id === $recommended
+                ? $name . ' ' . trans('concierge::strings.option_recommended')
+                : $name)
+            ->all();
+    }
+
+    /**
+     * effort 선택지. 설명문이라 전부 번역이 만든다 — config 는 지원 목록과 순서만 정한다.
+     *
+     * @return array<string, string> id => 표시 문구
+     */
+    public static function effortOptions(string $provider): array
+    {
+        $recommended = config("concierge.providers.{$provider}.default_effort");
+
+        return collect((array) config("concierge.providers.{$provider}.efforts", []))
+            ->mapWithKeys(fn (string $id) => [$id => trans("concierge::strings.effort_{$id}")
+                . ($id === $recommended ? ' ' . trans('concierge::strings.option_recommended') : '')])
             ->all();
     }
 }

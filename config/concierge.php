@@ -22,6 +22,13 @@ return [
     // ── LLM 공급자별 선택지 (#3) ─────────────────────────────────
     //  모델이 새로 나오면 여기만 고치면 된다. 없는 id 를 고르면 API 가 404 를 낸다.
     //  effort 는 사고 깊이와 전체 토큰 지출을 함께 조절한다 — 공급자마다 어휘가 다르다.
+    //
+    //  ⚠ 여기에는 **데이터만** 둔다 — 화면에 그대로 찍히는 문구를 넣지 말 것(#79).
+    //     한때 'claude-opus-5' => 'Claude Opus 5 (권장)' 처럼 라벨을 박아 뒀는데,
+    //     번역 계층을 거치지 않으니 영어 사용자에게 "(권장)" 이 한국어로 나왔다.
+    //     · 모델 이름은 고유명사라 그대로 둔다(번역 대상이 아니다)
+    //     · '권장' 표시와 effort 설명문은 **문장**이라 lang 파일이 만든다
+    //       (effort 설명은 strings.php 의 effort_{id})
     'providers' => [
         'anthropic' => [
             'label' => 'Anthropic (Claude)',
@@ -29,18 +36,14 @@ return [
             'badge' => 'Anthropic',
             'default_model' => 'claude-opus-5',
             'default_effort' => 'medium',
+            // id => 표시 이름(고유명사). 권장 표시는 default_model 이 정한다.
             'models' => [
-                'claude-opus-5' => 'Claude Opus 5 (권장)',
+                'claude-opus-5' => 'Claude Opus 5',
                 'claude-sonnet-5' => 'Claude Sonnet 5',
                 'claude-haiku-4-5' => 'Claude Haiku 4.5',
             ],
-            'efforts' => [
-                'low' => 'low — 가장 저렴 · 단순한 요청',
-                'medium' => 'medium — 균형 (권장)',
-                'high' => 'high — 기본값 · 어려운 진단',
-                'xhigh' => 'xhigh — 복잡한 다단계 작업',
-                'max' => 'max — 비용 무관, 정확도 우선',
-            ],
+            // 설명문은 lang 이 만든다 — 여기서는 지원 여부와 순서만 정한다.
+            'efforts' => ['low', 'medium', 'high', 'xhigh', 'max'],
         ],
 
         'openai' => [
@@ -50,18 +53,13 @@ return [
             'default_model' => 'gpt-5.1',
             'default_effort' => 'medium',
             'models' => [
-                'gpt-5.1' => 'GPT-5.1 (권장)',
+                'gpt-5.1' => 'GPT-5.1',
                 'gpt-5.1-mini' => 'GPT-5.1 mini',
                 'gpt-5' => 'GPT-5',
                 'gpt-5-mini' => 'GPT-5 mini',
             ],
             // Responses API 의 reasoning.effort 어휘.
-            'efforts' => [
-                'minimal' => 'minimal — 추론 최소화 · 가장 빠름',
-                'low' => 'low — 가벼운 추론',
-                'medium' => 'medium — 균형 (권장)',
-                'high' => 'high — 깊은 추론',
-            ],
+            'efforts' => ['minimal', 'low', 'medium', 'high'],
         ],
 
         'gemini' => [
@@ -72,7 +70,7 @@ return [
             'default_effort' => null,
             // 2.5 세대는 신규 키에 404("no longer available to new users") — 뺐다(#35 조사).
             'models' => [
-                'gemini-3.1-pro-preview' => 'Gemini 3.1 Pro (권장)',
+                'gemini-3.1-pro-preview' => 'Gemini 3.1 Pro',
                 'gemini-3.6-flash' => 'Gemini 3.6 Flash',
             ],
             // thinking 어휘가 모델 세대마다 달라(3: thinkingLevel, 2.5: thinkingBudget)
@@ -81,9 +79,10 @@ return [
         ],
 
         'openai-compatible' => [
-            'label' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',
+            // 이 항목만 라벨이 설명문이다 — lang 의 provider_openai_compatible 이 채운다.
+            'label' => null,
             'short' => '',
-            'badge' => '로컬',
+            'badge' => null,
             'default_model' => '',
             'default_effort' => null,
             // 로컬 엔드포인트의 모델 이름은 설치마다 다르다 — 자유 입력.

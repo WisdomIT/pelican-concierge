@@ -291,7 +291,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     // 선택지가 정의된 공급자는 드롭다운으로 —
                     Select::make('model')
                         ->label(trans('concierge::strings.field_model'))
-                        ->options(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []))
+                        ->options(fn (Get $get) => ProviderFactory::modelOptions((string) $get('provider')))
                         ->helperText(trans('concierge::strings.help_model'))
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->model)
@@ -320,7 +320,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
 
                     Select::make('effort')
                         ->label(trans('concierge::strings.field_effort'))
-                        ->options(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.efforts', []))
+                        ->options(fn (Get $get) => ProviderFactory::effortOptions((string) $get('provider')))
                         ->helperText(trans('concierge::strings.help_effort'))
                         ->native(false)
                         ->default(fn () => ConciergeSettings::current()->effort)
@@ -601,7 +601,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             $data['model'] = (string) config("concierge.providers.{$provider}.default_model", $settings->model);
         }
 
-        $efforts = array_keys((array) config("concierge.providers.{$provider}.efforts", []));
+        // efforts 는 id 목록이다(설명문은 lang 이 만든다 — #79). 값이 곧 id 다.
+        $efforts = array_values((array) config("concierge.providers.{$provider}.efforts", []));
 
         if ($efforts !== [] && !in_array($data['effort'] ?? '', $efforts, true)) {
             $data['effort'] = (string) (config("concierge.providers.{$provider}.default_effort") ?? $efforts[0]);

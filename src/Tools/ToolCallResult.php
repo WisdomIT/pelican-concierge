@@ -37,7 +37,8 @@ final readonly class ToolCallResult
         return new self(
             $name,
             $input,
-            '사용자가 이 작업을 취소했습니다. 실행하지 않았습니다. 다시 물어보지 말고 다른 도움을 제안하세요.',
+            // 모델이 읽는 글이라 영어다 — 사용자에게는 모델이 그 사람의 언어로 옮긴다(#79).
+            'The user cancelled this action. Nothing was executed. Do not ask again — offer other help.',
             $serverId,
         );
     }
