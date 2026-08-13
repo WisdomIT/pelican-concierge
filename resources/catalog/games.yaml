@@ -22,8 +22,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: minecraft-paper
-    name: 마인크래프트 (플러그인)
-    summary: 플러그인을 넣을 수 있는 가장 대중적인 서버. 모드는 안 됨.
+    name: "Minecraft (plugins)"
+    name_translations: { ko: "마인크래프트 (플러그인)", en: "Minecraft (plugins)" }
+    summary: "The most common kind of server. Takes plugins, but not mods."
+    summary_translations: { ko: "플러그인을 넣을 수 있는 가장 대중적인 서버. 모드는 안 됨.", en: "The most common kind of server. Takes plugins, but not mods." }
     egg: Paper
     # 실행할 Java 는 **마인크래프트 버전**이 정한다. 이 변수에서 버전을 읽어 자동으로 고른다.
     #  ⚠ 지정하지 않으면 egg 의 첫 이미지가 쓰이는데 버전과 무관하다(Paper 는 java_25).
@@ -74,8 +76,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: minecraft-fabric
-    name: 마인크래프트 (모드)
-    summary: 모드를 넣을 수 있는 서버. Fabric 로더 사용.
+    name: "Minecraft (mods)"
+    name_translations: { ko: "마인크래프트 (모드)", en: "Minecraft (mods)" }
+    summary: "Runs mods through the Fabric loader."
+    summary_translations: { ko: "모드를 넣을 수 있는 서버. Fabric 로더 사용.", en: "Runs mods through the Fabric loader." }
     egg: Fabric
     # 위 Paper 와 같은 이유. egg 첫 이미지는 Fabric=java_8, Forge=java_25 로 제각각이다.
     java_from: MC_VERSION
@@ -118,8 +122,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: project-zomboid
-    name: 좀보이드
-    summary: 좀비 아포칼립스 생존. 자체 서버로 많이 돌린다.
+    name: "Project Zomboid"
+    name_translations: { ko: "좀보이드", en: "Project Zomboid" }
+    summary: "Zombie apocalypse survival. Commonly self-hosted."
+    summary_translations: { ko: "좀비 아포칼립스 생존. 자체 서버로 많이 돌린다.", en: "Zombie apocalypse survival. Commonly self-hosted." }
     egg: Project Zomboid
     # ⚠ 익명 로그인으로는 appid 380870 을 받을 수 없다(실측 — Missing configuration).
     #   그래서 **개설자 본인의 스팀 계정**(게임 소유)을 ask 로 받아 설치한다(사용자 결정, a안).
@@ -187,8 +193,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: valheim
-    name: 발헤임
-    summary: 바이킹 생존·건축. 소규모 친구들끼리 하기 좋다.
+    name: "Valheim"
+    name_translations: { ko: "발헤임", en: "Valheim" }
+    summary: "Viking survival and building. Good for a small group of friends."
+    summary_translations: { ko: "바이킹 생존·건축. 소규모 친구들끼리 하기 좋다.", en: "Viking survival and building. Good for a small group of friends." }
     egg: Valheim
     player_var: null
     sizes:
@@ -211,8 +219,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: palworld
-    name: 팰월드
-    summary: 팰 수집·건축. 인원이 늘면 메모리를 많이 먹는다.
+    name: "Palworld"
+    name_translations: { ko: "팰월드", en: "Palworld" }
+    summary: "Collect Pals and build. Memory use climbs quickly with more players."
+    summary_translations: { ko: "팰 수집·건축. 인원이 늘면 메모리를 많이 먹는다.", en: "Collect Pals and build. Memory use climbs quickly with more players." }
     egg: Palworld
     player_var: MAX_PLAYERS       # 이 게임은 인원 변수가 있다
     sizes:
@@ -250,8 +260,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: satisfactory
-    name: 새티스팩토리
-    summary: 공장 건설·자동화. 설치 용량이 크고 메모리를 많이 먹는다.
+    name: "Satisfactory"
+    name_translations: { ko: "새티스팩토리", en: "Satisfactory" }
+    summary: "Factory building and automation. Large install, heavy on memory."
+    summary_translations: { ko: "공장 건설·자동화. 설치 용량이 크고 메모리를 많이 먹는다.", en: "Factory building and automation. Large install, heavy on memory." }
     egg: Satisfactory
     player_var: MAX_PLAYERS
     sizes:
@@ -277,8 +289,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: core-keeper
-    name: 코어 키퍼
-    summary: 지하 탐험·건축 샌드박스. 가볍다.
+    name: "Core Keeper"
+    name_translations: { ko: "코어 키퍼", en: "Core Keeper" }
+    summary: "Underground exploration and building. Light to run."
+    summary_translations: { ko: "지하 탐험·건축 샌드박스. 가볍다.", en: "Underground exploration and building. Light to run." }
     egg: Core Keeper
     player_var: MAX_PLAYERS
     sizes:
@@ -300,8 +314,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: seven-days-to-die
-    name: 세븐 데이즈 투 다이
-    summary: 좀비 생존·기지 방어.
+    name: "7 Days to Die"
+    name_translations: { ko: "세븐 데이즈 투 다이", en: "7 Days to Die" }
+    summary: "Zombie survival and base defence."
+    summary_translations: { ko: "좀비 생존·기지 방어.", en: "Zombie survival and base defence." }
     egg: 7 Days To Die
     player_var: null             # egg 에 인원 변수가 없다
     sizes:
@@ -327,8 +343,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: minecraft-forge
-    name: 마인크래프트 (모드 · Forge)
-    summary: Forge 모드팩을 돌릴 때. Fabric 과 모드 호환이 다르다.
+    name: "Minecraft (mods · Forge)"
+    name_translations: { ko: "마인크래프트 (모드 · Forge)", en: "Minecraft (mods · Forge)" }
+    summary: "For Forge modpacks. Mods are not interchangeable with Fabric."
+    summary_translations: { ko: "Forge 모드팩을 돌릴 때. Fabric 과 모드 호환이 다르다.", en: "For Forge modpacks. Mods are not interchangeable with Fabric." }
     egg: Forge Minecraft
     # 위 Paper 와 같은 이유. egg 첫 이미지는 Fabric=java_8, Forge=java_25 로 제각각이다.
     java_from: MC_VERSION
@@ -359,8 +377,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: terraria
-    name: 테라리아
-    summary: 2D 샌드박스. 매우 가볍다.
+    name: "Terraria"
+    name_translations: { ko: "테라리아", en: "Terraria" }
+    summary: "2D sandbox. Very light to run."
+    summary_translations: { ko: "2D 샌드박스. 매우 가볍다.", en: "2D sandbox. Very light to run." }
     egg: Terraria Vanilla
     player_var: null
     sizes:
@@ -377,8 +397,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: factorio
-    name: 팩토리오
-    summary: 공장 자동화. 가볍고 안정적이다.
+    name: "Factorio"
+    name_translations: { ko: "팩토리오", en: "Factorio" }
+    summary: "Factory automation. Light and stable."
+    summary_translations: { ko: "공장 자동화. 가볍고 안정적이다.", en: "Factory automation. Light and stable." }
     egg: Factorio
     player_var: null
     sizes:
@@ -399,8 +421,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: necesse
-    name: 네세스
-    summary: 2D 생존·탐험. 가볍다.
+    name: "Necesse"
+    name_translations: { ko: "네세스", en: "Necesse" }
+    summary: "2D survival and exploration. Light to run."
+    summary_translations: { ko: "2D 생존·탐험. 가볍다.", en: "2D survival and exploration. Light to run." }
     egg: Necesse
     player_var: null
     sizes:
@@ -419,8 +443,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: the-forest
-    name: 더 포레스트
-    summary: 숲 생존·건축.
+    name: "The Forest"
+    name_translations: { ko: "더 포레스트", en: "The Forest" }
+    summary: "Forest survival and building."
+    summary_translations: { ko: "숲 생존·건축.", en: "Forest survival and building." }
     egg: The Forest
     player_var: null
     sizes:
@@ -449,8 +475,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: garrys-mod
-    name: 개리모드
-    summary: 소스 엔진 샌드박스. 애드온 자유도가 높다.
+    name: "Garry's Mod"
+    name_translations: { ko: "개리모드", en: "Garry's Mod" }
+    summary: "Source engine sandbox. Highly customisable through addons."
+    summary_translations: { ko: "소스 엔진 샌드박스. 애드온 자유도가 높다.", en: "Source engine sandbox. Highly customisable through addons." }
     egg: Garrys Mod
     player_var: null
     sizes:
@@ -470,8 +498,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: rust
-    name: 러스트
-    summary: 하드코어 생존·PvP. 맵 생성에 시간이 걸린다.
+    name: "Rust"
+    name_translations: { ko: "러스트", en: "Rust" }
+    summary: "Hardcore survival and PvP. Map generation takes a while."
+    summary_translations: { ko: "하드코어 생존·PvP. 맵 생성에 시간이 걸린다.", en: "Hardcore survival and PvP. Map generation takes a while." }
     egg: Rust
     player_var: null
     sizes:
@@ -508,8 +538,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: ark-survival-evolved
-    name: "아크: 서바이벌 이볼브드"
-    summary: 공룡 생존. 설치 22GB, 첫 기동에 10분 이상 걸린다.
+    name: "ARK: Survival Evolved"
+    name_translations: { ko: "아크: 서바이벌 이볼브드", en: "ARK: Survival Evolved" }
+    summary: "Dinosaur survival. 22GB install; the first start takes over ten minutes."
+    summary_translations: { ko: "공룡 생존. 설치 22GB, 첫 기동에 10분 이상 걸린다.", en: "Dinosaur survival. 22GB install; the first start takes over ten minutes." }
     egg: "Ark: Survival Evolved"
     player_var: MAX_PLAYERS
     sizes:
@@ -552,8 +584,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: fivem
-    name: FiveM (GTA V)
-    summary: GTA V 멀티플레이. Cfx.re 라이선스 키가 필요하다.
+    name: "FiveM (GTA V)"
+    name_translations: { ko: "FiveM (GTA V)", en: "FiveM (GTA V)" }
+    summary: "GTA V multiplayer. Needs a Cfx.re licence key."
+    summary_translations: { ko: "GTA V 멀티플레이. Cfx.re 라이선스 키가 필요하다.", en: "GTA V multiplayer. Needs a Cfx.re licence key." }
     egg: FiveM
     # ⚠ FIVEM_LICENSE 가 필수인데 기본값이 없다 → 사용자가 직접 개설하면 입력 단계에서 막힌다.
     #   keymaster.fivem.net 에서 발급받는 값이고, 관리자가 채워 넘겨야 한다.
@@ -582,8 +616,10 @@ games:
 
   # ────────────────────────────────────────────────────────────────
   - id: dont-starve-together
-    name: 돈스타브 투게더
-    summary: 협동 생존.
+    name: "Don't Starve Together"
+    name_translations: { ko: "돈스타브 투게더", en: "Don't Starve Together" }
+    summary: "Co-op survival."
+    summary_translations: { ko: "협동 생존.", en: "Co-op survival." }
     egg: "Don't Starve Together"
     # ⚠ SERVER_TOKEN 이 필수인데 기본값이 없다. Klei 계정에서 발급하는 클러스터 토큰이라
     #   사용자가 직접 개설하면 입력 단계에서 막힌다. 좀보이드·FiveM 과 같은 유형.

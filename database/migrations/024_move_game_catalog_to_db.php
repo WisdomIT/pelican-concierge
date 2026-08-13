@@ -79,16 +79,23 @@ return new class extends Migration
 
         // 폼이 다루는 칸과 그 밖의 것을 가른다 — 나머지는 통째로 advanced 에 담아
         // 어느 하나도 잃지 않는다. 새 키가 생겨도 자동으로 따라온다.
-        $columns = ['id', 'name', 'summary', 'egg', 'available', 'unavailable_reason', 'sizes', 'ask'];
+        $columns = [
+            'id', 'name', 'summary', 'egg', 'available', 'unavailable_reason', 'sizes', 'ask',
+            'name_translations', 'summary_translations',
+        ];
 
         foreach (array_values($games) as $sort => $game) {
             DB::table('concierge_games')->insert([
                 'game_id' => (string) ($game['id'] ?? ''),
                 'sort' => $sort,
                 'name' => (string) ($game['name'] ?? ''),
-                'name_translations' => null,
+                'name_translations' => isset($game['name_translations'])
+                    ? json_encode($game['name_translations'], JSON_UNESCAPED_UNICODE)
+                    : null,
                 'summary' => $game['summary'] ?? null,
-                'summary_translations' => null,
+                'summary_translations' => isset($game['summary_translations'])
+                    ? json_encode($game['summary_translations'], JSON_UNESCAPED_UNICODE)
+                    : null,
                 'egg' => (string) ($game['egg'] ?? ''),
                 'available' => (bool) ($game['available'] ?? true),
                 'unavailable_reason' => $game['unavailable_reason'] ?? null,
