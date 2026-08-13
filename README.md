@@ -232,13 +232,17 @@ UCS keeps the port protection while turning off its features.
 
 ## Tuning it for your panel
 
-Two things decide what the assistant knows beyond what its tools return.
+Two things decide what the assistant knows beyond what its tools return, and both are edited from the panel.
 
-**`resources/catalog/games.yaml`** — 18 games, mapped to the eggs they need, with query
-type, ports, which variables are secret, and post-install steps. This is what the
-assistant offers when someone asks for a server. Edit it to match the eggs on your panel;
-`resources/catalog/README.md` documents the format, and `scripts/validate-catalog.py`
-checks a catalog against your panel's actual eggs.
+**Game catalogue** *(Admin → Advanced → Game catalogue)* — the games the assistant offers,
+each mapped to the egg that creates it, with the sizes a user can pick, what to ask them,
+and the post-install steps. It ships with 18 games; edit them to match the eggs on your
+panel, or add your own. The list flags any game whose egg is missing here, so a broken
+mapping shows up before someone tries to create that game.
+
+It lives in the database, so it survives plugin updates. The technical parts (ports,
+secret variables, post-install steps) are edited as YAML in one field — their shape
+differs per entry, which a form would only make harder to read.
 
 **About this deployment** *(settings screen, optional)* — free-form text appended to the
 system prompt. This is where deployment facts go: the hostname players connect to, which
