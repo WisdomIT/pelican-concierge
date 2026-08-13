@@ -174,7 +174,11 @@ class ConciergeGameResource extends Resource
                                 ])
                                 ->required(),
                             TextInput::make('default')->label(trans('concierge::strings.catalog_ask_default')),
-                            Toggle::make('optional')->label(trans('concierge::strings.catalog_ask_optional')),
+                            // 다른 칸은 라벨이 위에 있는데 토글만 라벨 옆에 붙어 한 칸이
+                            // 뭉쳐 보였다 — 같은 배치로 맞춘다.
+                            Toggle::make('optional')
+                                ->label(trans('concierge::strings.catalog_ask_optional'))
+                                ->inline(false),
                             TextInput::make('note')->label(trans('concierge::strings.catalog_ask_note'))->columnSpanFull(),
                         ])
                         ->columns(3)
