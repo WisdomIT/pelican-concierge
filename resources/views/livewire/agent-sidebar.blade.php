@@ -153,6 +153,10 @@
     }
 
     .cg-hint { font-size: .875rem; color: var(--gray-500, #6b7280); }
+    {{-- 첫 발화의 스트리밍은 Livewire 재렌더 없이 DOM 에 직접 쓴다 — @forelse 가 다시
+         돌기 전까지 "무엇을 도와줄까요?" 안내가 첫 대화 옆에 남아 있었다. 어떤 말풍선이든
+         내용이 생기면 안내는 끝난 것이다. --}}
+    .cg-log:has(.cg-bubble:not(:empty)) .cg-hint { display: none; }
 
     /* ── 화면 이동 버튼 ── */
     .cg-links { display: flex; flex-wrap: wrap; gap: .4rem; align-self: flex-start; }
