@@ -135,6 +135,15 @@ class ConciergeGameResource extends Resource
                         ->helperText(trans('concierge::strings.catalog_help_unavailable_reason'))
                         ->visible(fn ($get) => ! $get('available'))
                         ->columnSpanFull(),
+
+                    // 못 만드는 **이유**를 설명하는 문장이라, 모르는 언어면 설명이 아니게 된다(#99).
+                    KeyValue::make('unavailable_reason_translations')
+                        ->label(trans('concierge::strings.catalog_field_reason_translations'))
+                        ->keyLabel(trans('concierge::strings.catalog_locale'))
+                        ->valueLabel(trans('concierge::strings.catalog_field_unavailable_reason'))
+                        ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                        ->visible(fn ($get) => ! $get('available'))
+                        ->columnSpanFull(),
                 // 짧은 칸(식별자·egg·이름)만 나란히 두고, 긴 것은 전체 폭을 쓴다.
                 ])->columns(2),
 
@@ -146,6 +155,13 @@ class ConciergeGameResource extends Resource
                         ->schema([
                             TextInput::make('id')->label(trans('concierge::strings.catalog_size_id'))->required(),
                             TextInput::make('label')->label(trans('concierge::strings.catalog_size_label'))->required(),
+                            // 라벨도 사용자가 읽는 값이다(#99) — 비우면 위 라벨을 쓴다.
+                            KeyValue::make('label_translations')
+                                ->label(trans('concierge::strings.catalog_field_label_translations'))
+                                ->keyLabel(trans('concierge::strings.catalog_locale'))
+                                ->valueLabel(trans('concierge::strings.catalog_size_label'))
+                                ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                                ->columnSpanFull(),
                             TextInput::make('players')->label(trans('concierge::strings.catalog_size_players'))->numeric()->required(),
                             TextInput::make('memory')->label(trans('concierge::strings.catalog_size_memory'))->numeric()->suffix('MiB')->required(),
                             TextInput::make('disk')->label(trans('concierge::strings.catalog_size_disk'))->numeric()->suffix('MiB')->required(),
@@ -181,6 +197,18 @@ class ConciergeGameResource extends Resource
                                 ->label(trans('concierge::strings.catalog_ask_optional'))
                                 ->inline(false),
                             TextInput::make('note')->label(trans('concierge::strings.catalog_ask_note'))->columnSpanFull(),
+                            KeyValue::make('label_translations')
+                                ->label(trans('concierge::strings.catalog_field_label_translations'))
+                                ->keyLabel(trans('concierge::strings.catalog_locale'))
+                                ->valueLabel(trans('concierge::strings.catalog_ask_label'))
+                                ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                                ->columnSpanFull(),
+                            KeyValue::make('note_translations')
+                                ->label(trans('concierge::strings.catalog_field_note_translations'))
+                                ->keyLabel(trans('concierge::strings.catalog_locale'))
+                                ->valueLabel(trans('concierge::strings.catalog_ask_note'))
+                                ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                                ->columnSpanFull(),
                         ])
                         ->columns(3)
                         ->itemLabel(fn (array $state) => trim(($state['label'] ?? '') . ' — ' . ($state['env'] ?? '')))

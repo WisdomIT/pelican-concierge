@@ -1394,8 +1394,11 @@ final class AgentToolbox
                         'egg' => ['type' => 'string', 'description' => 'Egg name as imported on this panel.'],
                         'available' => ['type' => 'boolean', 'description' => 'Whether the assistant may create it. Default true.'],
                         'unavailable_reason' => ['type' => 'string', 'description' => 'Shown when available is false.'],
-                        'sizes' => ['type' => 'array', 'description' => 'Sizes: id, label, players, memory (MiB), disk (MiB), cpu (%).', 'items' => ['type' => 'object']],
-                        'ask' => ['type' => 'array', 'description' => 'Questions: env, label, type (text/number/choice/password), default, optional.', 'items' => ['type' => 'object']],
+                        'sizes' => ['type' => 'array', 'description' => 'Sizes: id, label, players, memory (MiB), disk (MiB), cpu (%). '
+                            . 'Add label_translations {locale: text} when the panel serves more than one language — '
+                            . 'labels are read by players, and an untranslated one is shown as written.', 'items' => ['type' => 'object']],
+                        'ask' => ['type' => 'array', 'description' => 'Questions: env, label, type (text/number/choice/password), default, optional, note. '
+                            . 'label_translations and note_translations work the same way.', 'items' => ['type' => 'object']],
                         'advanced' => ['type' => 'string', 'description' => 'YAML for ports, secrets, defaults, post_install and the rest.'],
                     ],
                     'required' => ['id', 'name', 'egg'],
