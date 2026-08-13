@@ -545,10 +545,57 @@
             </div>
 
             {{-- 로그만 늘어나고 스크롤한다. 스트리밍은 Livewire 재렌더 없이 DOM 을 직접
-                 고치므로, 바닥 고정은 MutationObserver 로 해야 따라온다. --}}
+                 고치므로, 스크롤 추적은 MutationObserver 로 해야 따라온다(#84).
+
+                 세 가지를 구분한다:
+                  1. **첫 그림** — 옵저버는 *이후* 변경에만 반응한다. 긴 이력이 한 번에
+                     그려지는 최초 렌더가 바로 고정이 필요한 순간인데 거기서 아무 일도
+                     일어나지 않아, 다시 열면 맨 위(가장 오래된 말)를 보고 있었다.
+                  2. **확인 카드** — 카드가 뜨면 바닥이 아니라 **카드**를 보여준다.
+                     바닥을 쫓으면 시야가 카드 아래 텍스트에 머물러, 대화를 멈춰 세운
+                     카드를 못 보고 지나친다.
+                  3. **사용자가 위로 올려 읽는 중** — 그때까지 바닥으로 끌어내리면
+                     이력을 읽을 수가 없다. 바닥 근처일 때만 따라간다. --}}
             <div class="cg-scroll"
-                 x-init="new MutationObserver(() => $el.scrollTop = $el.scrollHeight)
-                            .observe($el, { subtree: true, childList: true, characterData: true })">
+                 x-data="{
+                     shown: null,
+                     stick: true,
+                     /* 이 여유 안에 있으면 '바닥을 보고 있다'로 친다 — 한 줄 남짓. */
+                     nearBottom() { return $el.scrollHeight - $el.scrollTop - $el.clientHeight < 80 },
+                     toBottom() { $el.scrollTop = $el.scrollHeight },
+                     follow() {
+                         const card = $el.querySelector('.cg-card');
+
+                         if (card) {
+                             if (card !== this.shown) {
+                                 this.shown = card;
+                                 /* 카드는 로그의 마지막 요소다 — 바닥에 붙이면 화면에 남는 건
+                                    버튼뿐이고 제목은 위로 밀려난다. 카드 **머리**를 보여줘야
+                                    무엇을 묻고 있는지가 읽힌다. */
+                                 card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                                 /* 카드가 떠 있는 동안은 바닥을 쫓지 않는다 — 뒤늦게 도착한
+                                    타자기 글자가 카드를 다시 밀어내면 안 된다. */
+                                 this.stick = false;
+                             }
+
+                             return;
+                         }
+
+                         if (this.shown) {
+                             /* 카드가 결정돼 사라졌다 — 대화가 다시 흐르므로 따라간다. */
+                             this.shown = null;
+                             this.stick = true;
+                         }
+
+                         if (this.stick) { this.toBottom(); }
+                     },
+                 }"
+                 x-init="
+                     /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. */
+                     $nextTick(() => { toBottom(); follow(); });
+                     $el.addEventListener('scroll', () => { stick = nearBottom() }, { passive: true });
+                     new MutationObserver(() => follow())
+                         .observe($el, { subtree: true, childList: true, characterData: true })">
                 <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
