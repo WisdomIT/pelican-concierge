@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Pelican Panel itself
+    url: https://github.com/pelican-dev/panel/issues
+    about: Problems with the panel, not with this plugin
+  - name: Other Pelican plugins
+    url: https://github.com/pelican-dev/plugins/issues
+    about: Player Counter, User Creatable Servers, Modrinth, uMod and the rest live here

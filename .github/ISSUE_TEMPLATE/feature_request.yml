@@ -1,0 +1,40 @@
+name: Feature request
+description: Something the assistant should be able to do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠ **Never paste an API key, password, token or licence key into an issue.**
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: |
+        Describe the situation, not the feature. Knowing what someone was trying to get done
+        usually points at a better answer than the one first asked for.
+      placeholder: |
+        My users keep asking me to raise their quota, and I never know whether they need it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you had in mind
+      description: Optional — an idea of how it might work.
+
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who is this for
+      description: |
+        The assistant offers different things to different people, so this decides where the
+        work lands.
+      options:
+        - Administrators
+        - Players (people who own or were invited to a server)
+        - Both
+    validations:
+      required: true

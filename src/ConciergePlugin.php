@@ -15,6 +15,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -63,6 +64,14 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 $panel->{$method}($path, "WisdomIT\\Concierge\\Filament\\$id\\$dir");
             }
         }
+    }
+
+    /** 배포 지식 작성 가이드 — 화면에서 읽는 사람과 저장소에서 읽는 사람이 같은 글을 본다. */
+    private static function knowledgeGuideUrl(): string
+    {
+        $locale = app()->getLocale() === 'ko' ? 'ko' : 'en';
+
+        return "https://github.com/WisdomIT/pelican-concierge/blob/main/docs/deployment-knowledge.{$locale}.md";
     }
 
     public function boot(Panel $panel): void {}
@@ -407,6 +416,17 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->placeholder(trans('concierge::strings.placeholder_knowledge'))
                         ->helperText(trans('concierge::strings.help_knowledge'))
                         ->default(fn () => ConciergeSettings::current()->deployment_knowledge),
+
+                    // 무엇을 어떻게 쓰는지는 이 칸 하나로 설명되지 않는다 — 예시와 요령이
+                    // 필요하다. 문서는 저장소에도 그대로 있다(#87).
+                    Actions::make([
+                        Action::make('knowledge_guide')
+                            ->label(trans('concierge::strings.knowledge_guide'))
+                            ->button()
+                            ->color('gray')
+                            ->url(fn () => self::knowledgeGuideUrl())
+                            ->openUrlInNewTab(),
+                    ]),
                 ]),
 
             // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
