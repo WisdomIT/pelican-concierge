@@ -60,17 +60,20 @@ final class RequesterScope
         return in_array($group, $this->groups(), true);
     }
 
-    /** 관리 화면을 조금이라도 쓸 수 있는 사람인가. */
+    /**
+     * 관리 도구를 하나라도 쓸 수 있는 사람인가 — 그게 Admin 그룹을 받을 조건이다.
+     *
+     * ⚠ 한때 패널 리소스 권한(RolePermissionModels)만 훑었다. 그러면 이 플러그인이 등록한
+     *   권한(`viewList wisdomAgent`)만 가진 사람이 **노출에서는 빠지는데 실행은 통과**한다 —
+     *   두 겹이 갈리는 것이고, 실측에서 그랬다(#97). 판정을 도구 목록 자체에서 끌어오면
+     *   "쓸 수 있는 도구가 있다 = 그룹을 받는다" 가 정의상 어긋날 수 없다.
+     */
     public function isPanelAdmin(): bool
     {
-        foreach (RolePermissionModels::cases() as $model) {
-            if ($this->can(RolePermissionPrefixes::ViewAny, $model)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->panelAdmin ??= AgentToolbox::hasAnyAdminTool($this);
     }
+
+    private ?bool $panelAdmin = null;
 
     /**
      * 리소스별 권한 — 어드민 도구는 낱개로 이걸 물어 붙는다(#46).
@@ -79,8 +82,19 @@ final class RequesterScope
      */
     public function can(RolePermissionPrefixes $prefix, RolePermissionModels $model): bool
     {
-        $permission = $prefix->value . ' ' . $model->value;
+        return $this->canPermission($prefix->value . ' ' . $model->value);
+    }
 
+    /**
+     * 패널 리소스가 아닌 권한 — 이 플러그인이 직접 등록한 묶음(`wisdomAgent`)이 그렇다.
+     *
+     * ⚠ **화면과 도구는 같은 권한을 써야 한다**(#97). 사용량 화면은 정책에서
+     *   `viewList wisdomAgent` 를 묻는데 도구는 `viewList user` 를 물어, 운영자가 사용량
+     *   접근을 준 적 없는 사람이 대화로는 볼 수 있었다. 새 도구를 만들 때 그 데이터를
+     *   보여주는 화면이 있다면 **그 화면의 정책과 같은 권한**을 쓸 것.
+     */
+    public function canPermission(string $permission): bool
+    {
         return $this->checked[$permission] ??= $this->user->can($permission);
     }
 }
