@@ -33,6 +33,12 @@ class CreateConciergeGame extends CreateRecord
         ];
     }
 
+    /** 폼 버튼은 오른쪽 — 편집 화면과 같은 규칙. */
+    public function getFormActionsAlignment(): string | \Filament\Support\Enums\Alignment
+    {
+        return \Filament\Support\Enums\Alignment::End;
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

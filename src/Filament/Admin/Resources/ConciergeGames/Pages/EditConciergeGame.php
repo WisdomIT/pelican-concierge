@@ -3,6 +3,7 @@
 namespace WisdomIT\Concierge\Filament\Admin\Resources\ConciergeGames\Pages;
 
 use Filament\Actions\Action;
+use Filament\Support\Enums\Alignment;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use WisdomIT\Concierge\Catalog\GameCatalog;
@@ -44,8 +45,16 @@ class EditConciergeGame extends EditRecord
                 ->color('gray')
                 ->label(trans('filament-panels::resources/pages/edit-record.form.actions.cancel.label')),
 
-            DeleteAction::make()->button(),
+            // 이 패널은 삭제 액션에 hiddenLabel 을 기본으로 건다 — 저장·취소는 글자인데
+            // 삭제만 아이콘이면 같은 줄에서 종류가 달라 보인다. 라벨을 되살린다.
+            DeleteAction::make()->button()->hiddenLabel(false),
         ];
+    }
+
+    /** 폼 버튼은 오른쪽 — 페이지 흐름의 끝에 둔다. */
+    public function getFormActionsAlignment(): string | Alignment
+    {
+        return Alignment::End;
     }
 
     /**

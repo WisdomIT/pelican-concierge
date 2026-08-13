@@ -208,12 +208,13 @@ class ConciergeGameResource extends Resource
                             },
                         ]),
 
-                    // 검사 결과는 **칸 바로 아래**에 늘 보인다. 버튼을 눌러야만 알 수 있으면
-                    // 대개 누르지 않고, 문제는 저장할 때에야 드러난다.
+                    // 검사 결과는 **칸 바로 아래에 늘** 보인다 — 문제가 없을 때도.
+                    // 아무것도 안 뜨면 "정상"인지 "검사가 안 돈 것"인지 알 수 없다(사용자 지적).
+                    // 토스트에 기대지 않는 이유이기도 하다: 사이드바가 떠 있는 화면에서는
+                    // 알림이 어디에 뜨는지 장담할 수 없지만, 이 줄은 늘 같은 자리에 있다.
                     Text::make(fn (Get $get) => new HtmlString(
-                        self::issueList(AdvancedYaml::issues((string) $get('advanced_yaml')))
-                    ))
-                        ->visible(fn (Get $get) => AdvancedYaml::issues((string) $get('advanced_yaml')) !== []),
+                        self::checkPanel(AdvancedYaml::issues((string) $get('advanced_yaml')))
+                    )),
 
                     // ⚠ 필드의 belowContent 로 붙이면 **페이지 맨 끝**(저장·취소 옆)으로 밀려난다
                     //   — 실측. 검사 버튼은 고치는 칸 바로 아래 있어야 의미가 있으므로
@@ -322,6 +323,22 @@ class ConciergeGameResource extends Resource
             $errors > 0 ? trans('concierge::strings.catalog_check_errors', ['n' => $errors]) : null,
             $warnings > 0 ? trans('concierge::strings.catalog_check_warnings', ['n' => $warnings]) : null,
         ]));
+    }
+
+    /**
+     * 칸 아래 상시 표시되는 검사 결과. 문제가 없으면 그렇다고 말한다.
+     *
+     * @param array<int, array<string, mixed>> $issues
+     */
+    private static function checkPanel(array $issues): string
+    {
+        if ($issues === []) {
+            return '<div style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:#15803d">'
+                . '<span aria-hidden="true">✓</span><span>' . e(trans('concierge::strings.catalog_check_ok')) . '</span></div>';
+        }
+
+        return '<div style="font-size:.8125rem;font-weight:600;margin-bottom:.15rem">'
+            . e(self::issueHeading($issues)) . '</div>' . self::issueList($issues);
     }
 
     /** @param array<int, array<string, mixed>> $issues */

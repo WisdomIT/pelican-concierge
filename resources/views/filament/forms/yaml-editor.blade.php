@@ -45,9 +45,12 @@
             x-ref="editor"
             x-model="value"
             @input="count()"
+            @input.debounce.700ms="$wire.set('{{ $statePath }}', value)"
             @scroll="$refs.gutter.scrollTop = $refs.editor.scrollTop"
-            {{-- 값은 칸을 벗어날 때 보낸다 — 그때 검사가 다시 돌고 거터가 갱신된다. --}}
-            @blur="$wire.set('{{ $statePath }}', value)"
+            {{-- ⚠ 칸을 벗어날 때 **서버 왕복을 일으키면 안 된다.** 버튼을 누르면 blur 가 먼저
+                 나고, 그 왕복이 DOM 을 갈아 끼우는 사이 클릭이 통째로 사라진다(실측: 검사
+                 버튼이 아무 반응도 없었다). 세 번째 인자 false = 다음 요청에 실어 보낸다. --}}
+            @blur="$wire.set('{{ $statePath }}', value, false)"
             rows="16"
             spellcheck="false"
             wrap="off"
