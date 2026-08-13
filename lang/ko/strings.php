@@ -222,6 +222,8 @@ return [
     // 선택지 문구(#79) — config 는 데이터만 갖고, 사람이 읽는 말은 여기서 만든다.
     //  · 모델 이름·공급자 이름은 고유명사라 config 에 남는다
     //  · 로컬 엔드포인트만 이름 자체가 설명문이라 여기 있다
+    // 이름을 안 정하고 만든 백업(#79). 코어 기본값은 UTC 라 우리 표시와 어긋난다.
+    'backup_default_name' => '백업 :at',
     'value_empty' => '(없음)',
     'option_recommended' => '(권장)',
     'provider_openai-compatible' => 'OpenAI 호환 (로컬: Ollama · vLLM · llama.cpp)',

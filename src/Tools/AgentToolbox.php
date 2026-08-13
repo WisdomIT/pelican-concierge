@@ -2683,7 +2683,11 @@ final class AgentToolbox
         $server = $this->serverFor('create_backup', $input);
         $this->assertBackupRoom($server);
 
-        $name = trim((string) ($input['name'] ?? '')) ?: null;
+        // 이름을 안 주면 코어가 `Backup at <app 타임존 시각>` 으로 짓는다 — 그러면 이름은
+        // UTC, 우리가 보여주는 만든 시각은 사용자 시계라 **같은 백업이 두 시각으로 보인다**
+        // (실측: 이름 06:53 / 시각 15:53). 사용자가 읽을 이름은 사용자 시계로 짓는다(#79).
+        $name = trim((string) ($input['name'] ?? ''))
+            ?: trans('concierge::strings.backup_default_name', ['at' => UserTime::format(now())]);
 
         try {
             $backup = app(InitiateBackupService::class)->handle($server, $name);

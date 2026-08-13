@@ -222,6 +222,8 @@ return [
     // Option labels (#79) — config holds data only; the words people read live here.
     //  · Model and provider names are proper nouns and stay in config
     //  · Only the local endpoint's name is a description rather than a name
+    // Auto name for a backup made without one (#79) — core's default is UTC-based.
+    'backup_default_name' => 'Backup at :at',
     'value_empty' => '(none)',
     'option_recommended' => '(recommended)',
     'provider_openai-compatible' => 'OpenAI-compatible (local: Ollama · vLLM · llama.cpp)',
