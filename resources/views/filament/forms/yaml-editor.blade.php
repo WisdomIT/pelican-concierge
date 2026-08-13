@@ -57,13 +57,23 @@
     </div>
 
     <style>
+        /* ⚠ 테마가 `.fi-body :where(*):not(code):not(pre)…{font-family: inherit}` 로 글꼴을
+           통일한다. 특정도가 같아 나중에 온 규칙이 이기는데, 어느 쪽이 나중인지는 로드
+           순서에 달렸다 — 편집기의 글꼴은 취향이 아니라 **기능**이므로(들여쓰기가 구조다)
+           !important 로 못 박는다. */
+        .cg-yaml,
+        .cg-yaml .cg-yaml-gutter,
+        .cg-yaml .cg-yaml-line,
+        .cg-yaml .cg-yaml-input {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace !important;
+        }
+
         .cg-yaml {
             display: flex;
             border: 1px solid var(--gray-300, #d1d5db);
             border-radius: .5rem;
             overflow: hidden;
             background: var(--gray-50, #f9fafb);
-            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: .8125rem;
             line-height: 1.6;
         }
@@ -95,7 +105,8 @@
             resize: vertical;
             white-space: pre;
             overflow-x: auto;
-            font: inherit;
+            font-size: inherit;
+            line-height: inherit;
             box-shadow: none;
         }
         .cg-yaml-input:focus { outline: none; box-shadow: none; }

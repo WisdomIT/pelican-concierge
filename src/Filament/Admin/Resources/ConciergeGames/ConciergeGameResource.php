@@ -223,16 +223,28 @@ class ConciergeGameResource extends Resource
                             ->label(trans('concierge::strings.catalog_yaml_check'))
                             ->button()
                             ->color('gray')
-                            // 결과는 **열 때** 만든다. action() 안에서 모달을 붙이면 이미 실행이
-                            // 끝난 뒤라 아무것도 열리지 않는다(실측).
-                            ->modalHeading(fn (Get $get) => self::issueHeading(
-                                AdvancedYaml::issues((string) $get('advanced_yaml'))
-                            ))
-                            ->modalContent(fn (Get $get) => new HtmlString(self::issueList(
-                                AdvancedYaml::issues((string) $get('advanced_yaml'))
-                            )))
-                            ->modalSubmitAction(false)
-                            ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
+                            // 결과는 알림 한 번으로 끝낸다. 문제가 없을 때도 반드시 알린다 —
+                            // 아무것도 안 뜨면 "정상"인지 "검사가 안 돈 것"인지 알 수 없다.
+                            ->action(function (Get $get): void {
+                                $issues = AdvancedYaml::issues((string) $get('advanced_yaml'));
+
+                                if ($issues === []) {
+                                    Notification::make()
+                                        ->success()
+                                        ->title(trans('concierge::strings.catalog_check_ok'))
+                                        ->send();
+
+                                    return;
+                                }
+
+                                // 자세한 내용은 칸 아래 목록에 이미 있다 — 여기서는 몇 건인지와
+                                // 첫 문제만 짚어 준다.
+                                Notification::make()
+                                    ->status(AdvancedYaml::errors((string) $get('advanced_yaml')) === [] ? 'warning' : 'danger')
+                                    ->title(self::issueHeading($issues))
+                                    ->body(self::issueText($issues[0]))
+                                    ->send();
+                            }),
 
                         Action::make('yaml_help')
                             ->label(trans('concierge::strings.catalog_yaml_help'))

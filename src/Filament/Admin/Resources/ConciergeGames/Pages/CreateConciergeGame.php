@@ -14,6 +14,26 @@ class CreateConciergeGame extends CreateRecord
     protected static string $resource = ConciergeGameResource::class;
 
     /**
+     * 편집 화면과 같은 규칙 — 라벨 있는 일반 버튼. 이 패널의 기본 폼 액션은 아이콘
+     * 버튼이라 아이콘이 비면 투명한 자리만 남는다(실측).
+     *
+     * @return array<\Filament\Actions\Action>
+     */
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getCreateFormAction()
+                ->button()
+                ->label(trans('filament-panels::resources/pages/create-record.form.actions.create.label')),
+
+            $this->getCancelFormAction()
+                ->button()
+                ->color('gray')
+                ->label(trans('filament-panels::resources/pages/edit-record.form.actions.cancel.label')),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
