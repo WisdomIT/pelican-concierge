@@ -61,6 +61,12 @@ return [
     'tool_get_panel_health' => 'Checking panel health',
     'tool_get_activity_log' => 'Checking activity log',
     'tool_get_usage_stats' => 'Checking usage statistics',
+    // Catalogue tools (#91)
+    'tool_list_catalog_games' => 'Checking the game catalogue',
+    'tool_get_catalog_game' => 'Checking a catalogue entry',
+    'tool_create_catalog_game' => 'Adding a game to the catalogue',
+    'tool_update_catalog_game' => 'Updating a catalogue entry',
+    'tool_delete_catalog_game' => 'Removing a catalogue entry',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',

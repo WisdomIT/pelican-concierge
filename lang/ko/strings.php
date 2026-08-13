@@ -61,6 +61,12 @@ return [
     'tool_get_panel_health' => '패널 상태 확인 중',
     'tool_get_activity_log' => '활동 기록 확인 중',
     'tool_get_usage_stats' => '사용량 통계 확인 중',
+    // 카탈로그 도구 (#91)
+    'tool_list_catalog_games' => '게임 카탈로그 확인 중',
+    'tool_get_catalog_game' => '카탈로그 항목 확인 중',
+    'tool_create_catalog_game' => '카탈로그에 게임 추가하는 중',
+    'tool_update_catalog_game' => '카탈로그 항목 고치는 중',
+    'tool_delete_catalog_game' => '카탈로그 항목 지우는 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
