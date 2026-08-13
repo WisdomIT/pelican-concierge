@@ -626,4 +626,130 @@ return [
     'stat_no_limit' => 'No limit',
     'stat_panel_limit' => ':metric limit (panel-wide · :period)',
     'stat_limit_resets' => 'Resets: :reset',
+
+    // ── Game catalogue administration (#81) ──
+    'catalog_title' => 'AI Agent game catalogue',
+    'catalog_game' => 'Game',
+    'catalog_section_basics' => 'Basics',
+    'catalog_section_basics_help' => 'What users see this game called, and which egg it is created from.',
+    'catalog_field_id' => 'Identifier',
+    'catalog_help_id' => 'How the assistant refers to this game. Lowercase letters and hyphens; do not change it once set.',
+    'catalog_field_egg' => 'Egg',
+    'catalog_help_egg' => 'Chosen from the eggs imported on this panel. Referenced by name, so it survives a panel rebuild.',
+    'catalog_field_name' => 'Name',
+    'catalog_help_name' => 'Shown to users as-is. Write what people call the game, not the egg name.',
+    'catalog_field_summary' => 'One-line summary',
+    'catalog_help_summary' => 'What it can and cannot do, in one line. The assistant uses this when suggesting a game.',
+    'catalog_field_name_translations' => 'Names by language',
+    'catalog_field_summary_translations' => 'Summaries by language',
+    'catalog_help_translations' => 'Optional. Leave empty and the default above is used — a single-language panel never needs these. Use language codes like ko, en.',
+    'catalog_locale' => 'Language code',
+    'catalog_add_translation' => 'Add a language',
+    'catalog_field_available' => 'Agent may create it',
+    'catalog_help_available' => 'Turn off and the assistant will still list this game but will not create it. Use it for games needing a vendor account or licence key, which a user cannot supply through chat. An administrator creating one from the panel is unaffected.',
+    'catalog_field_unavailable_reason' => 'Why the assistant cannot create it',
+    'catalog_help_unavailable_reason' => 'The assistant explains it to the user in these words.',
+    'catalog_section_sizes' => 'Sizes',
+    'catalog_section_sizes_help' => 'A user picks by player count and gets these resources. The label is how it is described; the resources are what actually limits the server.',
+    'catalog_size_id' => 'Identifier',
+    'catalog_size_label' => 'Label',
+    'catalog_size_players' => 'Players',
+    'catalog_size_memory' => 'Memory',
+    'catalog_size_disk' => 'Disk',
+    'catalog_size_cpu' => 'CPU',
+    'catalog_add_size' => 'Add a size',
+    'catalog_section_ask' => 'What to ask the user',
+    'catalog_section_ask_help' => 'Keep only the egg variables that mean something to a player. Every extra question makes creating a server harder.',
+    'catalog_ask_env' => 'Egg variable',
+    'catalog_ask_label' => 'Question',
+    'catalog_ask_type' => 'Type',
+    'catalog_ask_default' => 'Default',
+    'catalog_ask_optional' => 'Can be skipped',
+    'catalog_ask_note' => 'Extra explanation',
+    'catalog_add_ask' => 'Add a question',
+    'catalog_section_advanced' => 'Advanced (YAML)',
+    'catalog_section_advanced_help' => 'Post-install steps, ports, secret variables and mod settings. Their shape differs per entry, so they are edited as YAML.',
+    'catalog_help_advanced' => 'Keys that overlap the fields above (name, egg, sizes…) are dropped on save — those fields are the source.',
+    'catalog_yaml_invalid' => 'The YAML could not be read: :error',
+    'catalog_yaml_not_map' => 'The top level of the YAML must be a set of keys and values.',
+    'catalog_egg_present' => 'Egg present',
+    'catalog_yaml_check' => 'Check YAML',
+    'catalog_yaml_ok' => 'The YAML is valid.',
+    'catalog_yaml_help' => 'Example',
+    'catalog_yaml_help_intro' => 'Every key below is optional — leave out anything you do not use.',
+    'catalog_egg_missing' => 'Egg ":egg" is not on this panel — creating this game will fail.',
+
+    // Advanced field semantic checks (#81) — not syntax, but "is this usable".
+    'catalog_check_ok' => 'No problems found.',
+    'catalog_check_errors' => ':n problem(s)',
+    'catalog_check_warnings' => ':n warning(s)',
+    'catalog_check_line' => 'line :line',
+    'catalog_check_nowhere' => 'location unknown',
+    'catalog_check_form_key' => '`:key` is set by the fields above — anything written here is dropped on save.',
+    'catalog_check_unknown_key' => '`:key` is not a key this plugin knows. Check for a typo (unknown keys still save).',
+    'catalog_check_wrong_type' => '`:key` must be :expected, but :actual was given.',
+    'catalog_check_ports_count_missing' => 'ports has no count — there is no way to tell how many ports to reserve.',
+    'catalog_check_ports_count' => 'ports.count must be a whole number of at least 1 (currently :value).',
+    'catalog_check_protocol' => 'ports.protocol only takes tcp or udp (found :value).',
+    'catalog_check_derive_shape' => 'ports.derive entry :n is missing env or index.',
+    'catalog_check_derive_range' => 'ports.derive maps :env to allocation :index, but count is :count — there is no such allocation.',
+    'catalog_check_step_type_missing' => 'post_install step :n has no type.',
+    'catalog_check_step_type' => 'post_install step :n: `:type` is not a known step. Use file_replace or json_vmarg.',
+    'catalog_check_step_missing' => 'post_install step :n (:type) is missing :field.',
+    'catalog_check_secret_shape' => 'secrets entry :n is not a variable name.',
+    'catalog_check_default_scalar' => 'The value of :key in defaults must be a single value (it goes straight into an egg variable).',
+    'catalog_type_string' => 'text',
+    'catalog_type_string_or_null' => 'text or empty',
+    'catalog_type_int' => 'a whole number',
+    'catalog_type_map' => 'a set of keys and values',
+    'catalog_type_list' => 'a list',
+    'catalog_type_bool' => 'true/false',
+    'catalog_type_null' => 'empty',
+    // Advanced field example (#81). Anything needing another plugin says so — written
+    // without it, the setting is silently ignored and nobody can tell why.
+    'catalog_yaml_example' => "# ─ Player count query ─  [needs the Player Counter plugin]\n"
+        . "#   Without it this is ignored, and idle detection falls back to network traffic.\n"
+        . "query: minecraft_java\n"
+        . "query_port_variable: QUERY_PORT\n"
+        . "\n"
+        . "# ─ Mod / plugin installation ─  [needs Minecraft Modrinth or Rust uMod]\n"
+        . "#   Without it the assistant says an administrator has to install that plugin.\n"
+        . "mods:\n"
+        . "  supported: true\n"
+        . "  kind: plugin      # plugin · mod · addon · workshop_id · resource · config_ini\n"
+        . "  path: plugins/    # required when supported is true\n"
+        . "\n"
+        . "# ─ Values to hide from the model ─  [no plugin needed — this plugin masks them]\n"
+        . "#   When these variables appear in a console or config file, they are removed\n"
+        . "#   before the text reaches the model.\n"
+        . "#   ⚠ Masking is not storage. To keep the value encrypted, mark that variable as\n"
+        . "#      managed in the Secret Variables plugin — separate from listing it here.\n"
+        . "secrets: [SERVER_PASSWORD, ADMIN_PASSWORD]\n"
+        . "\n"
+        . "# ─ Egg variables set automatically at creation ─\n"
+        . "defaults:\n"
+        . "  BUILD_NUMBER: latest\n"
+        . "  SERVER_JARFILE: server.jar\n"
+        . "\n"
+        . "# ─ Ports this game needs ─\n"
+        . "ports:\n"
+        . "  count: 2\n"
+        . "  protocol: [tcp, udp]\n"
+        . "  derive:                       # puts the 2nd allocated port into this variable\n"
+        . "    - { env: QUERY_PORT, from: allocation, index: 1 }\n"
+        . "\n"
+        . "# ─ Done automatically right after install ─\n"
+        . "post_install:\n"
+        . "  - type: file_replace          # needs path · from · to\n"
+        . "    path: eula.txt\n"
+        . "    from: eula=false\n"
+        . "    to: eula=true\n"
+        . "    reason: the first boot fails silently if this is not accepted\n"
+        . "\n"
+        . "# ─ Minimum size that counts as a finished install (MB) ─\n"
+        . "install_min_mb: 300\n",
+    'catalog_check_secret_undeclared' => 'The egg has variables that look secret but are not in secrets: :vars. The name-pattern safety net masks them, but the catalogue is the only place that knows what is secret for this game.',
+    'catalog_check_env_unknown' => ':env is not a variable on egg ":egg" — this value is silently ignored.',
+    'catalog_doc_title' => 'Advanced field reference',
+    'catalog_doc_intro' => 'Every key is optional. The editor checks what you write against this reference and against the egg you picked.',
 ];

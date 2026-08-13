@@ -627,4 +627,129 @@ return [
     'stat_no_limit' => '한도 없음',
     'stat_panel_limit' => ':metric 한도 (패널 전체 · :period)',
     'stat_limit_resets' => '초기화: :reset',
+
+    // ── 게임 카탈로그 관리 (#81) ──
+    'catalog_title' => 'AI Agent 게임 카탈로그',
+    'catalog_game' => '게임',
+    'catalog_section_basics' => '기본 정보',
+    'catalog_section_basics_help' => '사용자에게 보이는 이름과, 이 게임이 어떤 egg 로 만들어지는지를 정합니다.',
+    'catalog_field_id' => '식별자',
+    'catalog_help_id' => '에이전트가 이 게임을 가리킬 때 쓰는 값입니다. 영문 소문자와 하이픈으로 짓고, 한번 정하면 바꾸지 마세요.',
+    'catalog_field_egg' => 'egg',
+    'catalog_help_egg' => '이 패널에 임포트된 egg 중에서 고릅니다. 이름으로 참조하므로 패널을 재구축해도 유지됩니다.',
+    'catalog_field_name' => '이름',
+    'catalog_help_name' => '사용자에게 그대로 보입니다. egg 이름이 아니라 사람이 부르는 이름으로 적으세요.',
+    'catalog_field_summary' => '한 줄 설명',
+    'catalog_help_summary' => '무엇을 할 수 있고 무엇을 못 하는지 한 줄로. 에이전트가 게임을 추천할 때 씁니다.',
+    'catalog_field_name_translations' => '언어별 이름',
+    'catalog_field_summary_translations' => '언어별 설명',
+    'catalog_help_translations' => '선택 사항입니다. 비워 두면 위의 기본값을 씁니다 — 한 가지 언어만 쓰는 패널이라면 채울 필요가 없습니다. 언어 코드는 ko, en 처럼 적습니다.',
+    'catalog_locale' => '언어 코드',
+    'catalog_add_translation' => '언어 추가',
+    'catalog_field_available' => '에이전트 개설 허용',
+    'catalog_help_available' => '끄면 에이전트가 이 게임을 목록에는 보여주되 직접 만들지는 않습니다. 스팀 계정이나 라이선스 키가 필요해 사용자가 대화만으로는 못 만드는 게임에 씁니다. 관리자가 패널에서 직접 만드는 것은 이 설정과 무관합니다.',
+    'catalog_field_unavailable_reason' => '에이전트가 만들 수 없는 이유',
+    'catalog_help_unavailable_reason' => '에이전트가 사용자에게 이 문장으로 설명합니다.',
+    'catalog_section_sizes' => '크기',
+    'catalog_section_sizes_help' => '사용자가 인원으로 고르면 여기 적힌 자원이 배정됩니다. 라벨은 인원 표기이고, 실제 제한은 자원 값이 합니다.',
+    'catalog_size_id' => '식별자',
+    'catalog_size_label' => '라벨',
+    'catalog_size_players' => '인원',
+    'catalog_size_memory' => '메모리',
+    'catalog_size_disk' => '디스크',
+    'catalog_size_cpu' => 'CPU',
+    'catalog_add_size' => '크기 추가',
+    'catalog_section_ask' => '사용자에게 물을 것',
+    'catalog_section_ask_help' => 'egg 변수 중 의미 있는 것만 남기세요. 물어볼 것이 많을수록 개설이 어려워집니다.',
+    'catalog_ask_env' => 'egg 변수',
+    'catalog_ask_label' => '질문',
+    'catalog_ask_type' => '형식',
+    'catalog_ask_default' => '기본값',
+    'catalog_ask_optional' => '건너뛸 수 있음',
+    'catalog_ask_note' => '덧붙일 설명',
+    'catalog_add_ask' => '질문 추가',
+    'catalog_section_advanced' => '고급 (YAML)',
+    'catalog_section_advanced_help' => '설치 후 처리·포트·비밀 변수·모드 설정입니다. 형태가 항목마다 달라 YAML 로 편집합니다.',
+    'catalog_help_advanced' => '위 칸과 겹치는 키(name, egg, sizes 등)는 저장할 때 버려집니다 — 그쪽 칸이 원본입니다.',
+    'catalog_yaml_invalid' => 'YAML 을 읽을 수 없습니다: :error',
+    'catalog_yaml_not_map' => 'YAML 최상위는 키-값 묶음이어야 합니다.',
+    'catalog_egg_present' => 'egg 존재',
+    'catalog_yaml_check' => 'YAML 검사',
+    'catalog_yaml_ok' => 'YAML 형식이 올바릅니다.',
+    'catalog_yaml_help' => '작성 예시',
+    'catalog_yaml_help_intro' => '아래 키들은 모두 선택입니다. 쓰지 않는 키는 적지 않아도 됩니다.',
+    'catalog_egg_missing' => 'egg ":egg" 가 이 패널에 없습니다 — 개설하려 할 때 실패합니다.',
+
+    // 고급 칸 의미 검사 (#81) — 문법이 아니라 "쓸 수 있는 설정인가"를 본다.
+    'catalog_check_ok' => '문제를 찾지 못했습니다.',
+    'catalog_check_errors' => '문제 :n건',
+    'catalog_check_warnings' => '경고 :n건',
+    'catalog_check_line' => ':line번째 줄',
+    'catalog_check_nowhere' => '위치 불명',
+    'catalog_check_form_key' => '`:key` 는 위쪽 칸에서 정하는 값입니다 — 여기 적은 것은 저장할 때 버려집니다.',
+    'catalog_check_unknown_key' => '`:key` 는 이 플러그인이 모르는 키입니다. 오타가 아닌지 확인하세요 (모르는 키도 저장은 됩니다).',
+    'catalog_check_wrong_type' => '`:key` 는 :expected 여야 하는데 :actual 이 왔습니다.',
+    'catalog_check_ports_count_missing' => 'ports 에 count 가 없습니다 — 포트를 몇 개 잡을지 알 수 없습니다.',
+    'catalog_check_ports_count' => 'ports.count 는 1 이상의 정수여야 합니다 (지금: :value).',
+    'catalog_check_protocol' => 'ports.protocol 에는 tcp 또는 udp 만 올 수 있습니다 (지금: :value).',
+    'catalog_check_derive_shape' => 'ports.derive :n번째 항목에 env 또는 index 가 없습니다.',
+    'catalog_check_derive_range' => 'ports.derive 의 :env 가 :index번째 할당을 가리키는데 count 는 :count 입니다 — 그런 할당은 없습니다.',
+    'catalog_check_step_type_missing' => 'post_install :n번째 절차에 type 이 없습니다.',
+    'catalog_check_step_type' => 'post_install :n번째: `:type` 은 모르는 절차입니다. file_replace 또는 json_vmarg 를 쓰세요.',
+    'catalog_check_step_missing' => 'post_install :n번째(:type)에 :field 가 없습니다.',
+    'catalog_check_secret_shape' => 'secrets :n번째 항목이 변수 이름이 아닙니다.',
+    'catalog_check_default_scalar' => 'defaults 의 :key 값은 한 줄짜리 값이어야 합니다 (egg 변수에 그대로 들어갑니다).',
+    'catalog_type_string' => '문자열',
+    'catalog_type_string_or_null' => '문자열 또는 비움',
+    'catalog_type_int' => '정수',
+    'catalog_type_map' => '키-값 묶음',
+    'catalog_type_list' => '목록',
+    'catalog_type_bool' => '참/거짓',
+    'catalog_type_null' => '비어 있음',
+    // 고급 칸 예시 (#81). 다른 플러그인이 있어야 동작하는 항목은 그렇다고 적는다 —
+    // 없는 채로 적어 두면 조용히 무시될 뿐 이유를 알 수 없다.
+    'catalog_yaml_example' => "# ─ 접속자 수 조회 ─  [Player Counter 플러그인 필요]\n"
+        . "#   없으면 이 설정은 무시되고, 접속자 수 대신 네트워크 사용량으로 유휴를 판단합니다.\n"
+        . "query: minecraft_java\n"
+        . "query_port_variable: QUERY_PORT\n"
+        . "\n"
+        . "# ─ 모드·플러그인 설치 ─  [Minecraft Modrinth / Rust uMod 플러그인 필요]\n"
+        . "#   없으면 에이전트가 \"관리자가 그 플러그인을 설치해야 한다\"고 안내합니다.\n"
+        . "mods:\n"
+        . "  supported: true\n"
+        . "  kind: plugin      # plugin · mod · addon · workshop_id · resource · config_ini\n"
+        . "  path: plugins/    # supported 가 true 면 반드시 필요\n"
+        . "\n"
+        . "# ─ 모델에게 가릴 값 ─  [플러그인 불필요 — 이 플러그인이 직접 가립니다]\n"
+        . "#   콘솔·설정 파일에 이 변수 값이 나오면 모델에게 보내기 전에 지웁니다.\n"
+        . "#   ⚠ 가리는 것과 저장은 다릅니다. 값을 암호화해 두려면 Secret Variables\n"
+        . "#      플러그인에서 그 변수를 managed 로 표시해야 합니다(여기 적는 것과 별개).\n"
+        . "secrets: [SERVER_PASSWORD, ADMIN_PASSWORD]\n"
+        . "\n"
+        . "# ─ 개설 때 고정으로 넣을 egg 변수 ─\n"
+        . "defaults:\n"
+        . "  BUILD_NUMBER: latest\n"
+        . "  SERVER_JARFILE: server.jar\n"
+        . "\n"
+        . "# ─ 필요한 포트 ─\n"
+        . "ports:\n"
+        . "  count: 2\n"
+        . "  protocol: [tcp, udp]\n"
+        . "  derive:                       # 2번째 할당 포트를 이 변수에 넣습니다\n"
+        . "    - { env: QUERY_PORT, from: allocation, index: 1 }\n"
+        . "\n"
+        . "# ─ 설치 직후 자동 처리 ─\n"
+        . "post_install:\n"
+        . "  - type: file_replace          # path · from · to 가 필요\n"
+        . "    path: eula.txt\n"
+        . "    from: eula=false\n"
+        . "    to: eula=true\n"
+        . "    reason: 동의하지 않으면 첫 기동이 조용히 실패한다\n"
+        . "\n"
+        . "# ─ 설치 완료 판정 기준 용량(MB) ─\n"
+        . "install_min_mb: 300\n",
+    'catalog_check_secret_undeclared' => 'egg 에 비밀로 보이는 변수가 있는데 secrets 에 없습니다: :vars. 이름 패턴 안전망이 가려 주기는 하지만, 게임별로 무엇이 비밀인지 아는 곳은 카탈로그뿐입니다.',
+    'catalog_check_env_unknown' => ':env 는 egg ":egg" 에 없는 변수입니다 — 이 값은 조용히 무시됩니다.',
+    'catalog_doc_title' => '고급 항목 문서',
+    'catalog_doc_intro' => '모든 키는 선택입니다. 편집기는 이 문서의 형태와 고른 egg 양쪽에 맞춰 검사합니다.',
 ];

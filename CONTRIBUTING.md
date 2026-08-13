@@ -19,9 +19,9 @@ src/
                                  message/tool contract lives in LlmProvider)
   Tools/AgentToolbox.php         the 37 tools the model can call
   Services/ServerProvisioner     server creation
-  Catalog/GameCatalog.php        reads resources/catalog/games.yaml
+  Catalog/GameCatalog.php        reads the catalog (concierge_games table)
   Support/SecretMasker.php       redaction before text reaches the model
-resources/catalog/games.yaml     what the assistant knows about each game
+resources/catalog/games.yaml     seed for a fresh install; the live catalog is in the database
 config/concierge.php   seed defaults + admin dropdown choices
 ```
 
@@ -95,9 +95,11 @@ $resp = app(Illuminate\Contracts\Http\Kernel::class)
 echo $resp->getStatusCode();
 ```
 
-For the catalog, `scripts/validate-catalog.py` compares it against a dump of your panel's
-eggs — egg variables change upstream, and a wrong variable name fails silently (the value
-is ignored and the egg default is used).
+For the catalog, the admin screen flags any game whose egg is missing on this panel.
+That does not cover variable names: egg variables change upstream, and a wrong one fails
+silently (the value is ignored and the egg default is used). `scripts/validate-catalog.py`
+still checks a YAML catalog against a dump of your panel's eggs, which is useful when
+preparing the shipped seed.
 
 ## Coding standards
 
