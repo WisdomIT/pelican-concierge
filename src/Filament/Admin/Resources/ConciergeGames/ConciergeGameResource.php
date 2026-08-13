@@ -9,9 +9,12 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Repeater;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\ViewField;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -184,65 +187,17 @@ class ConciergeGameResource extends Resource
                 ->description(trans('concierge::strings.catalog_section_advanced_help'))
                 ->collapsed()
                 ->schema([
-                    Textarea::make('advanced_yaml')
+                    // 줄 번호 거터가 달린 편집기(concierge::filament.forms.yaml-editor) —
+                    // 검사 결과가 "3번째 줄"이라고 말하는데 편집기에서 세어야 한다면
+                    // 그 안내는 반쪽이다. 문제가 있는 줄은 거터에서 색으로도 보인다.
+                    ViewField::make('advanced_yaml')
                         ->hiddenLabel()
-                        ->rows(14)
+                        ->view('concierge::filament.forms.yaml-editor')
                         ->helperText(trans('concierge::strings.catalog_help_advanced'))
-                        // YAML 은 들여쓰기가 곧 구조다 — 가변폭 글꼴에서는 어긋난 줄이 안 보인다.
-                        ->extraInputAttributes([
-                            'style' => 'font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;'
-                                . 'font-size: .8125rem; line-height: 1.55; white-space: pre; overflow-x: auto;',
-                            'spellcheck' => 'false',
-                        ])
-                        // 저장할 때만 알려 주면 늦다 — 쓰는 중에 확인할 수 있어야 한다.
-                        // 예시도 **가까이** 둔다: 형식을 찾으러 문서로 나가야 하면 이 칸은
-                        // 아예 손대지 않게 된다. 둘 다 칸 아래, 알아보기 쉬운 버튼으로.
-                        ->belowContent([
-                            Action::make('check_yaml')
-                                ->label(trans('concierge::strings.catalog_yaml_check'))
-                                ->button()
-                                ->color('gray')
-                                ->action(function (Get $get, Action $action): void {
-                                    $issues = AdvancedYaml::issues((string) $get('advanced_yaml'));
-
-                                    if ($issues === []) {
-                                        Notification::make()
-                                            ->success()
-                                            ->title(trans('concierge::strings.catalog_check_ok'))
-                                            ->send();
-
-                                        return;
-                                    }
-
-                                    // 문제는 목록으로 보여준다 — 어느 줄의 무엇인지가 함께 있어야
-                                    // 고칠 수 있다. 알림 한 줄로는 담기지 않는다.
-                                    $action->modalHeading(self::issueHeading($issues))
-                                        ->modalContent(new HtmlString(self::issueList($issues)))
-                                        ->modalSubmitAction(false)
-                                        ->modalCancelActionLabel(trans('concierge::strings.card_cancel'))
-                                        ->modal();
-                                }),
-
-                            Action::make('yaml_help')
-                                ->label(trans('concierge::strings.catalog_yaml_help'))
-                                ->button()
-                                ->color('gray')
-                                ->modalHeading(trans('concierge::strings.catalog_section_advanced'))
-                                ->modalDescription(trans('concierge::strings.catalog_yaml_help_intro'))
-                                ->modalContent(new HtmlString(self::codeBlock(self::advancedExample())))
-                                ->modalSubmitAction(false)
-                                ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
-                        ])
-                        // ⚠ dehydrated(false) 로 두면 안 된다 — 폼 데이터에 값이 실리지 않아
-                        //   저장 때 빈 YAML 로 읽히고, **기술 항목이 통째로 지워진다**(실측:
-                        //   post_install·ports·secrets 10개가 날아갔다). 값은 그대로 싣고
-                        //   HandlesAdvancedYaml 이 저장 직전에 advanced 로 접어 넣는다.
-                        ->afterStateHydrated(function (Textarea $component, ?Model $record): void {
+                        ->afterStateHydrated(function (ViewField $component, ?Model $record): void {
                             $advanced = $record?->advanced ?: [];
                             $component->state($advanced === [] ? '' : Yaml::dump($advanced, 6, 2));
                         })
-                        // 여기서 검증하지 않으면 잘못된 YAML 이 조용히 빈 값으로 저장된다 —
-                        // 개설 절차(post_install)가 통째로 사라지는 종류의 사고다.
                         // 저장을 막는 것은 **오류**뿐이다. 모르는 키 같은 경고는 통과시킨다 —
                         // 막으면 플러그인이 따라잡을 때까지 그 배포는 아무것도 못 고친다.
                         ->rules([
@@ -252,6 +207,43 @@ class ConciergeGameResource extends Resource
                                 }
                             },
                         ]),
+
+                    // 검사 결과는 **칸 바로 아래**에 늘 보인다. 버튼을 눌러야만 알 수 있으면
+                    // 대개 누르지 않고, 문제는 저장할 때에야 드러난다.
+                    Text::make(fn (Get $get) => new HtmlString(
+                        self::issueList(AdvancedYaml::issues((string) $get('advanced_yaml')))
+                    ))
+                        ->visible(fn (Get $get) => AdvancedYaml::issues((string) $get('advanced_yaml')) !== []),
+
+                    // ⚠ 필드의 belowContent 로 붙이면 **페이지 맨 끝**(저장·취소 옆)으로 밀려난다
+                    //   — 실측. 검사 버튼은 고치는 칸 바로 아래 있어야 의미가 있으므로
+                    //   섹션 안에 액션 컴포넌트로 넣는다.
+                    Actions::make([
+                        Action::make('check_yaml')
+                            ->label(trans('concierge::strings.catalog_yaml_check'))
+                            ->button()
+                            ->color('gray')
+                            // 결과는 **열 때** 만든다. action() 안에서 모달을 붙이면 이미 실행이
+                            // 끝난 뒤라 아무것도 열리지 않는다(실측).
+                            ->modalHeading(fn (Get $get) => self::issueHeading(
+                                AdvancedYaml::issues((string) $get('advanced_yaml'))
+                            ))
+                            ->modalContent(fn (Get $get) => new HtmlString(self::issueList(
+                                AdvancedYaml::issues((string) $get('advanced_yaml'))
+                            )))
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
+
+                        Action::make('yaml_help')
+                            ->label(trans('concierge::strings.catalog_yaml_help'))
+                            ->button()
+                            ->color('gray')
+                            ->modalHeading(trans('concierge::strings.catalog_section_advanced'))
+                            ->modalDescription(trans('concierge::strings.catalog_yaml_help_intro'))
+                            ->modalContent(new HtmlString(self::codeBlock(self::advancedExample())))
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
+                    ])->key('advanced_actions'),
                 ]),
         ]);
     }
