@@ -10,7 +10,7 @@
 @php
     $statePath = $getStatePath();
     // 문제가 있는 줄은 거터에서 바로 보인다 — 목록과 편집기를 눈으로 잇는 부분이다.
-    $issues = \WisdomIT\Concierge\Catalog\AdvancedYaml::issues((string) $getState());
+    $issues = \WisdomIT\Concierge\Catalog\AdvancedYaml::issues((string) $getState(), (string) $getRecord()?->egg);
     $errorLines = collect($issues)->where('severity', 'error')->pluck('line')->filter()->unique()->values()->all();
     $warningLines = collect($issues)->where('severity', 'warning')->pluck('line')->filter()->unique()->values()->all();
 @endphp

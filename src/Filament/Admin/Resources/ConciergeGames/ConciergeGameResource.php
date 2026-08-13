@@ -205,8 +205,8 @@ class ConciergeGameResource extends Resource
                         // 저장을 막는 것은 **오류**뿐이다. 모르는 키 같은 경고는 통과시킨다 —
                         // 막으면 플러그인이 따라잡을 때까지 그 배포는 아무것도 못 고친다.
                         ->rules([
-                            fn () => function (string $attribute, $value, \Closure $fail) {
-                                foreach (AdvancedYaml::errors((string) $value) as $issue) {
+                            fn (Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                foreach (AdvancedYaml::errors((string) $value, (string) $get('egg')) as $issue) {
                                     $fail(self::issueText($issue));
                                 }
                             },
@@ -217,7 +217,7 @@ class ConciergeGameResource extends Resource
                     // 토스트에 기대지 않는 이유이기도 하다: 사이드바가 떠 있는 화면에서는
                     // 알림이 어디에 뜨는지 장담할 수 없지만, 이 줄은 늘 같은 자리에 있다.
                     Text::make(fn (Get $get) => new HtmlString(
-                        self::checkPanel(AdvancedYaml::issues((string) $get('advanced_yaml')))
+                        self::checkPanel(AdvancedYaml::issues((string) $get('advanced_yaml'), (string) $get('egg')))
                     )),
 
                     // ⚠ 필드의 belowContent 로 붙이면 **페이지 맨 끝**(저장·취소 옆)으로 밀려난다
@@ -231,7 +231,7 @@ class ConciergeGameResource extends Resource
                             // 결과는 알림 한 번으로 끝낸다. 문제가 없을 때도 반드시 알린다 —
                             // 아무것도 안 뜨면 "정상"인지 "검사가 안 돈 것"인지 알 수 없다.
                             ->action(function (Get $get): void {
-                                $issues = AdvancedYaml::issues((string) $get('advanced_yaml'));
+                                $issues = AdvancedYaml::issues((string) $get('advanced_yaml'), (string) $get('egg'));
 
                                 if ($issues === []) {
                                     Notification::make()

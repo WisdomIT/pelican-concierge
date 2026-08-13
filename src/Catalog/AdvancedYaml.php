@@ -2,6 +2,7 @@
 
 namespace WisdomIT\Concierge\Catalog;
 
+use App\Models\Egg;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -19,6 +20,9 @@ use Symfony\Component\Yaml\Yaml;
  */
 final class AdvancedYaml
 {
+    /** SecretMasker 의 안전망과 **같은 패턴** — 두 곳이 갈리면 검사가 거짓말을 한다. */
+    private const SECRET_NAME_PATTERN = '/(PASSWORD|PASSWD|SECRET|TOKEN|LICENSE|APIKEY|API_KEY|_KEY|^KEY$|PASS)/i';
+
     /** 폼이 이미 다루는 칸 — 여기 적으면 저장할 때 버려지므로 미리 알려 준다. */
     private const FORM_KEYS = [
         'id', 'name', 'summary', 'egg', 'available', 'unavailable_reason', 'sizes', 'ask',
@@ -46,7 +50,7 @@ final class AdvancedYaml
      * @return array<int, array{line: ?int, message: string, severity: string}>
      *         빈 배열 = 이상 없음. severity: error(저장 불가) | warning(저장은 된다)
      */
-    public static function issues(string $yaml): array
+    public static function issues(string $yaml, ?string $eggName = null): array
     {
         if (blank(trim($yaml))) {
             return [];
@@ -96,13 +100,111 @@ final class AdvancedYaml
             $issues = array_merge($issues, self::inspect((string) $key, $value, $yaml, $line));
         }
 
+        return array_merge($issues, self::againstEgg($parsed, $yaml, $eggName));
+    }
+
+    /**
+     * egg 와 대조한다 — 카탈로그만 봐서는 알 수 없는 것들이다(scripts/validate-catalog.py
+     * 가 하던 일을 화면 안으로 들였다).
+     *
+     * 둘 다 **경고**다: egg 는 나중에 갈릴 수 있고, 저장을 막으면 egg 를 고치는 동안
+     * 카탈로그를 손댈 수 없게 된다.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array<string, mixed>>
+     */
+    private static function againstEgg(array $parsed, string $yaml, ?string $eggName): array
+    {
+        if (blank($eggName)) {
+            return [];
+        }
+
+        $egg = Egg::query()->where('name', $eggName)->first();
+
+        if ($egg === null) {
+            return [];
+        }
+
+        $vars = $egg->variables->pluck('env_variable')->all();
+        $issues = [];
+
+        // 1) 이름만 봐도 비밀인데 선언되지 않은 변수. 이름 패턴 안전망이 가려 주긴 하지만,
+        //    게임별로 무엇이 비밀인지 아는 곳은 카탈로그뿐이다 — 안전망은 최후의 방어선이지
+        //    선언을 대신하지 않는다. (실측: 6종이 선언 없이 안전망에만 기대고 있었다.)
+        $declared = (array) ($parsed['secrets'] ?? []);
+        $undeclared = array_values(array_filter(
+            $vars,
+            fn (string $v) => preg_match(self::SECRET_NAME_PATTERN, $v) && !in_array($v, $declared, true),
+        ));
+
+        if ($undeclared !== []) {
+            $issues[] = self::issue(
+                self::lineOfPath($yaml, ['secrets']),
+                'catalog_check_secret_undeclared',
+                ['vars' => implode(', ', $undeclared)],
+                'warning',
+            );
+        }
+
+        // 2) 없는 egg 변수를 가리키는 값 — 조용히 무시되므로 눈으로는 못 찾는다.
+        foreach (self::envReferences($parsed) as [$path, $env]) {
+            if (!in_array($env, $vars, true)) {
+                $issues[] = self::issue(
+                    self::lineOfPath($yaml, $path),
+                    'catalog_check_env_unknown',
+                    ['env' => $env, 'egg' => $eggName],
+                    'warning',
+                );
+            }
+        }
+
         return $issues;
     }
 
-    /** 저장을 막아야 하는 문제만. */
-    public static function errors(string $yaml): array
+    /**
+     * egg 변수 이름이 들어가는 자리 전부.
+     *
+     * @param  array<string, mixed>  $parsed
+     * @return array<int, array{0: array<int, string|int>, 1: string}>
+     */
+    private static function envReferences(array $parsed): array
     {
-        return array_values(array_filter(self::issues($yaml), fn (array $i) => $i['severity'] === 'error'));
+        $refs = [];
+
+        foreach (['player_var', 'java_from', 'query_port_variable'] as $key) {
+            if (is_string($parsed[$key] ?? null) && $parsed[$key] !== '') {
+                $refs[] = [[$key], $parsed[$key]];
+            }
+        }
+
+        foreach (['caps', 'defaults'] as $key) {
+            foreach ((array) ($parsed[$key] ?? []) as $env => $ignored) {
+                $refs[] = [[$key, (string) $env], (string) $env];
+            }
+        }
+
+        foreach ((array) ($parsed['secrets'] ?? []) as $i => $env) {
+            if (is_string($env)) {
+                $refs[] = [['secrets', $i], $env];
+            }
+        }
+
+        foreach ((array) ($parsed['ports']['derive'] ?? []) as $i => $derive) {
+            if (is_string($derive['env'] ?? null)) {
+                $refs[] = [['ports', 'derive', $i], $derive['env']];
+            }
+        }
+
+        return $refs;
+    }
+
+    /** 저장을 막아야 하는 문제만. */
+    public static function errors(string $yaml, ?string $eggName = null): array
+    {
+        return array_values(array_filter(
+            self::issues($yaml, $eggName),
+            fn (array $i) => $i['severity'] === 'error',
+        ));
     }
 
     /**

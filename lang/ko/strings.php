@@ -748,4 +748,6 @@ return [
         . "\n"
         . "# ─ 설치 완료 판정 기준 용량(MB) ─\n"
         . "install_min_mb: 300\n",
+    'catalog_check_secret_undeclared' => 'egg 에 비밀로 보이는 변수가 있는데 secrets 에 없습니다: :vars. 이름 패턴 안전망이 가려 주기는 하지만, 게임별로 무엇이 비밀인지 아는 곳은 카탈로그뿐입니다.',
+    'catalog_check_env_unknown' => ':env 는 egg ":egg" 에 없는 변수입니다 — 이 값은 조용히 무시됩니다.',
 ];

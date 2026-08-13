@@ -214,7 +214,7 @@ games:
       count: 3
       contiguous: true      # 연속 3개 필요
       protocol: [udp]
-    secrets: [PASSWORD]
+    secrets: [PASSWORD, SRCDS_BETAPASS]
     mods: { supported: false }
 
   # ────────────────────────────────────────────────────────────────
@@ -388,7 +388,7 @@ games:
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [tcp] }
-    secrets: []
+    secrets: [PASSWORD]
     mods: { supported: false, note: "모드는 tModLoader egg 가 따로 있다" }
     # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
     #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
@@ -408,7 +408,7 @@ games:
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [udp] }
-    secrets: []
+    secrets: [RCON_PASSWORD, SERVER_TOKEN, SERVER_PASSWORD]
     # ⚠ 공개 서버 목록 등록에는 Factorio 계정 토큰이 필요하다(실측: "auth error: Token doesn't match").
     #   **직접 접속은 정상 동작**하므로 친구들끼리 쓰는 데는 문제없다.
     notes:
@@ -432,7 +432,7 @@ games:
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [udp] }
-    secrets: []
+    secrets: [SERVER_PASSWORD]
     # ⚠ 첫 설치가 288MB 에서 불완전하게 끝나고 Pelican 이 installed 로 표시한 사례가 있다.
     #   재설치하면 574MB 로 정상 완료된다. 용량이 작으면 재설치할 것.
     mods: { supported: false }
@@ -466,7 +466,7 @@ games:
         - { env: QUERY_PORT, from: allocation, index: 2 }
     query: source
     query_port_variable: QUERY_PORT
-    secrets: []
+    secrets: [ADMIN_PASS, SERVER_PASS]
     mods: { supported: false }
     # 설치 완료 판정 하한(MB, du -sh 기준). 실측값의 약 70%.
     #  ⚠ Pelican 은 중간에 끊긴 설치도 installed 로 표시한다 — 용량이 유일한 단서다.
@@ -568,7 +568,7 @@ games:
     # 실측 확인 (0/10 파싱). 게임 포트 ±1 은 무응답이다.
     query: source
     query_port_variable: QUERY_PORT
-    secrets: [ARK_PASSWORD, ARK_ADMIN_PASSWORD]
+    secrets: [ARK_PASSWORD, ARK_ADMIN_PASSWORD, SRCDS_BETAPASS]
     # ⚠ egg 는 RCON 이 붙을 때까지 "waiting for rcon connection..." 을 반복 출력한다.
     #   이건 **로딩 중 정상 출력**이다. 첫 기동 10분+ 소요.
     #   기동 확인은 로그가 아니라 RCON 을 직접 찔러본다:
