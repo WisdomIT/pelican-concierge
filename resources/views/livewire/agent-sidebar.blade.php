@@ -113,7 +113,13 @@
 
     /* 대화 로그만 늘어나고 머리말·입력은 제자리에 있어야 한다. */
     .cg-chat { display: flex; flex-direction: column; gap: 1rem; min-height: 0; flex: 1 1 auto; }
-    .cg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    {{-- column-reverse 가 스크롤 좌표계를 뒤집는다: **scrollTop 0 = 바닥**. 첫 렌더든
+         @persist 재부착이든 bfcache 복원이든, 브라우저가 스크롤을 리셋하면 그 0 이
+         곧 최근 대화다 — "바닥으로 맞출 순간"을 쫓을 필요가 없어진다(#84).
+         바닥(0)에 있는 동안은 내용이 늘어도 브라우저가 알아서 붙잡아 두고, 위로
+         올렸다면(음수) 그 자리를 보존한다 — 둘 다 네이티브 동작이다. --}}
+    .cg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column-reverse; }
+    .cg-scroll > .cg-log { flex-shrink: 0; }
 
     .cg-log { display: flex; flex-direction: column; gap: .75rem; }
 
@@ -544,101 +550,27 @@
             </div>
             </div>
 
-            {{-- 로그만 늘어나고 스크롤한다. 스트리밍은 Livewire 재렌더 없이 DOM 을 직접
-                 고치므로, 스크롤 추적은 MutationObserver 로 해야 따라온다(#84).
-
-                 세 가지를 구분한다:
-                  1. **첫 그림** — 옵저버는 *이후* 변경에만 반응한다. 긴 이력이 한 번에
-                     그려지는 최초 렌더가 바로 고정이 필요한 순간인데 거기서 아무 일도
-                     일어나지 않아, 다시 열면 맨 위(가장 오래된 말)를 보고 있었다.
-                  2. **확인 카드** — 카드가 뜨면 바닥이 아니라 **카드**를 보여준다.
-                     바닥을 쫓으면 시야가 카드 아래 텍스트에 머물러, 대화를 멈춰 세운
-                     카드를 못 보고 지나친다.
-                  3. **사용자가 위로 올려 읽는 중** — 그때까지 바닥으로 끌어내리면
-                     이력을 읽을 수가 없다. 바닥 근처일 때만 따라간다. --}}
+            {{-- 스크롤 위치는 CSS(column-reverse)가 지킨다 — 위 .cg-scroll 규칙 참고.
+                 바닥 고정·복원·이력 읽기 보존이 전부 브라우저 네이티브 동작이라
+                 시점을 쫓는 JS 가 필요 없다. JS 에 남은 일은 둘뿐이다:
+                  · 확인 카드가 뜨면 바닥이 아니라 **카드 머리**를 보여준다 — 카드는
+                    로그의 마지막 요소라, 바닥엔 버튼만 남고 제목은 위로 밀려난다.
+                  · 내가 발화하면 어디를 보고 있었든 대화 끝(0)으로 돌아간다. --}}
             <div class="cg-scroll"
-                 x-data="{
-                     shown: null,
-                     stick: true,
-                     /* ⚠ 우리가 옮긴 스크롤도 scroll 이벤트를 낸다. 그걸 사용자의 조작으로
-                        읽으면 — 특히 새 내용이 아직 배치되지 않은 찰나에 계산하면 —
-                        stick 이 꺼진 채 영영 돌아오지 않는다(실측). 우리가 움직이는 동안은
-                        이벤트를 무시한다. */
-                     pinning: false,
-                     /* 이 여유 안에 있으면 '바닥을 보고 있다'로 친다 — 한 줄 남짓. */
-                     nearBottom() { return $el.scrollHeight - $el.scrollTop - $el.clientHeight < 80 },
-                     onScroll() { if (this.pinning) { return; } this.stick = this.nearBottom(); },
-                     pin(move) {
-                         this.pinning = true;
-                         move();
-                         /* scroll 이벤트는 다음 프레임 전에 전달된다 — 그 뒤에 푼다. */
-                         requestAnimationFrame(() => { this.pinning = false });
-                     },
-                     toBottom() { this.pin(() => { $el.scrollTop = $el.scrollHeight }) },
-                     /* 한 번 맞춰서는 모자란 순간들이 있다 — 첫 그림, 그리고 캐시에서 복원된
-                        페이지. 높이가 몇 프레임에 걸쳐 잡히므로 그동안 계속 바닥에 붙인다.
-                        (도중에 pinning 이 유지돼 우리 스크롤이 추적을 끄지도 않는다) */
-                     settle(frames = 12) {
-                         const step = () => {
-                             this.follow();
-                             if (--frames > 0) { requestAnimationFrame(step); }
-                         };
-
-                         requestAnimationFrame(step);
-                     },
-                     /* ⚠ 관측 대상은 **지금 화면에 있는** .cg-log 여야 한다. 페이지가 복원되면
-                        옛 노드가 떨어져 나가 관측이 조용히 멎는다 — 그래서 다시 붙인다. */
-                     watch() {
-                         this.ro?.disconnect();
-                         this.ro = new ResizeObserver(() => this.follow());
-                         this.ro.observe($el.querySelector('.cg-log') ?? $el);
-                     },
-                     ro: null,
-                     follow() {
+                 x-data="{ shown: null }"
+                 x-on:cg-sent.window="shown = null; $nextTick(() => { $el.scrollTop = 0 })"
+                 x-init="new MutationObserver(() => {
                          const card = $el.querySelector('.cg-card');
 
-                         if (card) {
-                             if (card !== this.shown) {
-                                 this.shown = card;
-                                 /* 카드는 로그의 마지막 요소다 — 바닥에 붙이면 화면에 남는 건
-                                    버튼뿐이고 제목은 위로 밀려난다. 카드 **머리**를 보여줘야
-                                    무엇을 묻고 있는지가 읽힌다. */
-                                 /* 부드러운 스크롤은 애니메이션 내내 scroll 이벤트를 쏟아낸다 —
-                                    그 사이 값으로 stick 을 다시 계산하면 어긋난다. 즉시 옮긴다. */
-                                 this.pin(() => card.scrollIntoView({ block: 'start' }));
-                                 /* 카드가 떠 있는 동안은 바닥을 쫓지 않는다 — 뒤늦게 도착한
-                                    타자기 글자가 카드를 다시 밀어내면 안 된다. */
-                                 this.stick = false;
-                             }
-
-                             return;
+                         if (card && card !== shown) {
+                             shown = card;
+                             card.scrollIntoView({ block: 'start' });
+                         } else if (! card && shown) {
+                             /* 카드가 결정돼 사라졌다 — 대화가 다시 흐르므로 끝으로. */
+                             shown = null;
+                             $el.scrollTop = 0;
                          }
-
-                         if (this.shown) {
-                             /* 카드가 결정돼 사라졌다 — 대화가 다시 흐르므로 따라간다. */
-                             this.shown = null;
-                             this.stick = true;
-                         }
-
-                         if (this.stick) { this.toBottom(); }
-                     },
-                 }"
-                 {{-- 사용자가 발화하면 어디를 보고 있었든 대화 끝으로 되돌린다. --}}
-                 x-on:cg-sent.window="stick = true; shown = null; $nextTick(() => toBottom())"
-                 {{-- ⚠ 페이지를 옮겨도 이 컴포넌트는 @persist 로 살아남아 **x-init 이 다시 돌지
-                      않는다**. 그런데 요소가 새 문서로 옮겨 붙으면서 scrollTop 은 0 으로
-                      돌아간다 — 그래서 이동 후에는 맨 위(가장 오래된 말)를 보고 있었다.
-                      이동을 신호로 다시 맞춘다. --}}
-                 x-on:livewire:navigated.document="stick = true; shown = null;
-                     $nextTick(() => { toBottom(); watch(); settle(); })"
-                 x-init="
-                     /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. 그 시점의 높이는
-                        아직 확정이 아니라(마크다운·폰트·코드블록이 뒤늦게 자리를 잡는다)
-                        몇 프레임 더 따라붙는다. */
-                     $nextTick(() => { toBottom(); watch(); settle(); });
-                     $el.addEventListener('scroll', () => onScroll(), { passive: true });
-                     new MutationObserver(() => follow())
-                         .observe($el, { subtree: true, childList: true, characterData: true })">
+                     }).observe($el, { subtree: true, childList: true })">
                 <div class="cg-log">
             @forelse ($this->messages as $message)
                 @if ($message['role'] === 'user')
