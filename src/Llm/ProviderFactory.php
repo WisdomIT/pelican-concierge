@@ -2,6 +2,7 @@
 
 namespace WisdomIT\Concierge\Llm;
 
+use Illuminate\Support\Facades\Cache;
 use WisdomIT\Concierge\Llm\Providers\AnthropicProvider;
 use WisdomIT\Concierge\Llm\Providers\GeminiProvider;
 use WisdomIT\Concierge\Llm\Providers\OpenAiCompatibleProvider;
@@ -75,19 +76,88 @@ final class ProviderFactory
     }
 
     /**
-     * 모델 선택지. 이름은 고유명사라 config 가, "(권장)" 표시는 번역이 만든다(#79).
+     * 모델 선택지 (#80). **공급자가 실제로 주는 목록**을 쓴다 — 그래야 플러그인보다 새로
+     * 나온 모델도 고를 수 있고, 공급자가 내린 모델이 목록에 남지 않는다.
+     * (실제로 겪었다: gemini-3-pro-preview 가 회수되자 모든 대화가 404 로 죽었다.)
+     *
+     * 조회가 안 되면(키 없음·엔드포인트 불통·요청 실패) 배포본 목록으로 물러난다 —
+     * 설정 화면이 비어 있는 상태로 끝나는 일은 없어야 한다.
+     *
+     * 이름은 공급자가 주는 표시 이름(없으면 id)을, "(권장)" 표시는 번역이 만든다(#79).
      *
      * @return array<string, string> id => 표시 문구
      */
-    public static function modelOptions(string $provider): array
+    public static function modelOptions(string $provider, ?string $apiKey = null, ?string $baseUrl = null): array
     {
-        $recommended = config("concierge.providers.{$provider}.default_model");
+        $shipped = (array) config("concierge.providers.{$provider}.models", []);
+        $fetched = self::fetchModels($provider, $apiKey, $baseUrl);
+        $recommended = (string) config("concierge.providers.{$provider}.default_model");
 
-        return collect((array) config("concierge.providers.{$provider}.models", []))
+        // 조회 성공이면 공급자 목록이 사실이다. 우리 권장 모델이 거기 없다면 정말로 사라진
+        // 것이므로 되살리지 않는다 — 없는 id 를 고르게 두면 404 가 대화에서 터진다.
+        $models = $fetched !== [] ? $fetched : $shipped;
+
+        return collect($models)
             ->map(fn (string $name, string $id) => $id === $recommended
                 ? $name . ' ' . trans('concierge::strings.option_recommended')
                 : $name)
             ->all();
+    }
+
+    /**
+     * 저장 시 검증에 쓸 id 목록. 화면이 보여준 것과 같은 근거여야 한다 —
+     * 배포본 목록으로만 검사하면 **방금 고른 새 모델이 저장 때 되돌려진다**.
+     *
+     * @return array<int, string>
+     */
+    public static function modelIds(string $provider, ?string $apiKey = null, ?string $baseUrl = null): array
+    {
+        return array_keys(self::modelOptions($provider, $apiKey, $baseUrl));
+    }
+
+    /**
+     * 공급자 조회 결과. 설정 폼은 상호작용마다 다시 그려지므로 **매번 부르면 안 된다** —
+     * 짧게 캐시한다. 키·주소가 바뀌면 캐시 키가 달라져 자동으로 새로 받는다.
+     *
+     * @return array<string, string>
+     */
+    private static function fetchModels(string $provider, ?string $apiKey, ?string $baseUrl): array
+    {
+        $key = $apiKey ?? ConciergeSettings::current()->apiKeyValueFor($provider);
+
+        // ⚠ base_url 은 **로컬 엔드포인트 전용** 칸이다. 그대로 넘기면 호스팅 공급자에게도
+        //   그 주소를 쓴다 — 실측에서 Anthropic 만 목록이 오고 OpenAI·Gemini 는 조용히
+        //   빈 목록이 됐다(로컬 주소로 /models 를 찌르고 있었다).
+        $base = $provider === 'openai-compatible'
+            ? ($baseUrl ?? ConciergeSettings::current()->base_url)
+            : null;
+
+        if (blank($key) && $provider !== 'openai-compatible') {
+            return [];
+        }
+
+        return Cache::remember(
+            self::modelsCacheKey($provider, $key, $base),
+            now()->addMinutes(10),
+            fn () => ProviderProbe::models($provider, $key, $base),
+        );
+    }
+
+    /** 캐시된 목록을 버린다 — "연결 확인" 직후처럼 지금 상태로 다시 봐야 할 때. */
+    public static function forgetModels(string $provider, ?string $apiKey = null, ?string $baseUrl = null): void
+    {
+        $key = $apiKey ?: ConciergeSettings::current()->apiKeyValueFor($provider);
+        // fetchModels 와 **같은 규칙**으로 키를 만들어야 실제로 지워진다.
+        $base = $provider === 'openai-compatible'
+            ? ($baseUrl ?: ConciergeSettings::current()->base_url)
+            : null;
+
+        Cache::forget(self::modelsCacheKey($provider, $key, $base));
+    }
+
+    private static function modelsCacheKey(string $provider, ?string $apiKey, ?string $baseUrl): string
+    {
+        return 'concierge:models:' . $provider . ':' . md5((string) $apiKey . '|' . (string) $baseUrl);
     }
 
     /**
