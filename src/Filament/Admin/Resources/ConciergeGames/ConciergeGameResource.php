@@ -24,6 +24,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Symfony\Component\Yaml\Yaml;
+use WisdomIT\Concierge\Catalog\AdvancedYaml;
 use WisdomIT\Concierge\Models\ConciergeGame;
 
 /**
@@ -194,38 +195,44 @@ class ConciergeGameResource extends Resource
                             'spellcheck' => 'false',
                         ])
                         // 저장할 때만 알려 주면 늦다 — 쓰는 중에 확인할 수 있어야 한다.
-                        ->hintAction(
+                        // 예시도 **가까이** 둔다: 형식을 찾으러 문서로 나가야 하면 이 칸은
+                        // 아예 손대지 않게 된다. 둘 다 칸 아래, 알아보기 쉬운 버튼으로.
+                        ->belowContent([
                             Action::make('check_yaml')
                                 ->label(trans('concierge::strings.catalog_yaml_check'))
-                                ->icon('tabler-check')
-                                ->action(function (Get $get): void {
-                                    $error = self::yamlError((string) $get('advanced_yaml'));
+                                ->button()
+                                ->color('gray')
+                                ->action(function (Get $get, Action $action): void {
+                                    $issues = AdvancedYaml::issues((string) $get('advanced_yaml'));
 
-                                    Notification::make()
-                                        ->title($error ?? trans('concierge::strings.catalog_yaml_ok'))
-                                        ->status($error === null ? 'success' : 'danger')
-                                        ->send();
-                                })
-                        )
-                        // 예시는 **가까이** 있어야 한다 — 형식을 찾으러 문서로 나가야 하면
-                        // 이 칸은 아예 손대지 않게 된다.
-                        ->belowContent(
+                                    if ($issues === []) {
+                                        Notification::make()
+                                            ->success()
+                                            ->title(trans('concierge::strings.catalog_check_ok'))
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    // 문제는 목록으로 보여준다 — 어느 줄의 무엇인지가 함께 있어야
+                                    // 고칠 수 있다. 알림 한 줄로는 담기지 않는다.
+                                    $action->modalHeading(self::issueHeading($issues))
+                                        ->modalContent(new HtmlString(self::issueList($issues)))
+                                        ->modalSubmitAction(false)
+                                        ->modalCancelActionLabel(trans('concierge::strings.card_cancel'))
+                                        ->modal();
+                                }),
+
                             Action::make('yaml_help')
                                 ->label(trans('concierge::strings.catalog_yaml_help'))
-                                ->icon('tabler-help')
-                                ->link()
+                                ->button()
+                                ->color('gray')
                                 ->modalHeading(trans('concierge::strings.catalog_section_advanced'))
                                 ->modalDescription(trans('concierge::strings.catalog_yaml_help_intro'))
-                                ->modalContent(new HtmlString(
-                                    '<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;'
-                                    . 'font-size:.8125rem;line-height:1.6;white-space:pre;overflow-x:auto;'
-                                    . 'padding:.9rem;border-radius:.5rem;background:rgba(127,127,127,.12)">'
-                                    . e(self::advancedExample())
-                                    . '</pre>'
-                                ))
+                                ->modalContent(new HtmlString(self::codeBlock(self::advancedExample())))
                                 ->modalSubmitAction(false)
-                                ->modalCancelActionLabel(trans('concierge::strings.card_cancel'))
-                        )
+                                ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
+                        ])
                         // ⚠ dehydrated(false) 로 두면 안 된다 — 폼 데이터에 값이 실리지 않아
                         //   저장 때 빈 YAML 로 읽히고, **기술 항목이 통째로 지워진다**(실측:
                         //   post_install·ports·secrets 10개가 날아갔다). 값은 그대로 싣고
@@ -236,12 +243,12 @@ class ConciergeGameResource extends Resource
                         })
                         // 여기서 검증하지 않으면 잘못된 YAML 이 조용히 빈 값으로 저장된다 —
                         // 개설 절차(post_install)가 통째로 사라지는 종류의 사고다.
+                        // 저장을 막는 것은 **오류**뿐이다. 모르는 키 같은 경고는 통과시킨다 —
+                        // 막으면 플러그인이 따라잡을 때까지 그 배포는 아무것도 못 고친다.
                         ->rules([
                             fn () => function (string $attribute, $value, \Closure $fail) {
-                                $error = self::yamlError((string) $value);
-
-                                if ($error !== null) {
-                                    $fail($error);
+                                foreach (AdvancedYaml::errors((string) $value) as $issue) {
+                                    $fail(self::issueText($issue));
                                 }
                             },
                         ]),
@@ -291,25 +298,56 @@ class ConciergeGameResource extends Resource
             ->toolbarActions([DeleteBulkAction::make()]);
     }
 
-    /**
-     * 고급 칸의 YAML 을 검사한다 — 저장 검증과 "YAML 검사" 버튼이 **같은 판단**을 쓴다.
-     * 둘이 갈리면 버튼이 통과시킨 값을 저장이 막는 일이 생긴다.
-     *
-     * @return ?string null = 이상 없음. 아니면 사람이 읽을 사유.
-     */
-    public static function yamlError(string $yaml): ?string
+    /** 문제 하나를 "3번째 줄 — …" 한 줄로. */
+    private static function issueText(array $issue): string
     {
-        if (blank($yaml)) {
-            return null;
-        }
+        $where = $issue['line'] === null
+            ? trans('concierge::strings.catalog_check_nowhere')
+            : trans('concierge::strings.catalog_check_line', ['line' => $issue['line']]);
 
-        try {
-            $parsed = Yaml::parse($yaml);
-        } catch (\Throwable $exception) {
-            return trans('concierge::strings.catalog_yaml_invalid', ['error' => $exception->getMessage()]);
-        }
+        return $where . ' — ' . $issue['message'];
+    }
 
-        return is_array($parsed) ? null : trans('concierge::strings.catalog_yaml_not_map');
+    /** @param array<int, array<string, mixed>> $issues */
+    private static function issueHeading(array $issues): string
+    {
+        $errors = count(array_filter($issues, fn ($i) => $i['severity'] === 'error'));
+        $warnings = count($issues) - $errors;
+
+        return implode(' · ', array_filter([
+            $errors > 0 ? trans('concierge::strings.catalog_check_errors', ['n' => $errors]) : null,
+            $warnings > 0 ? trans('concierge::strings.catalog_check_warnings', ['n' => $warnings]) : null,
+        ]));
+    }
+
+    /** @param array<int, array<string, mixed>> $issues */
+    private static function issueList(array $issues): string
+    {
+        // 오류를 먼저 — 저장을 막는 것이 무엇인지가 가장 급하다.
+        usort($issues, fn ($a, $b) => ($a['severity'] === 'error' ? 0 : 1) <=> ($b['severity'] === 'error' ? 0 : 1));
+
+        $rows = array_map(function (array $issue) {
+            $error = $issue['severity'] === 'error';
+            $where = $issue['line'] === null
+                ? trans('concierge::strings.catalog_check_nowhere')
+                : trans('concierge::strings.catalog_check_line', ['line' => $issue['line']]);
+
+            return '<li style="display:flex;gap:.6rem;padding:.5rem 0;border-top:1px solid rgba(127,127,127,.22)">'
+                . '<span style="flex:none;font-family:ui-monospace,monospace;font-size:.75rem;padding:.1rem .45rem;'
+                . 'border-radius:.35rem;white-space:nowrap;'
+                . ($error ? 'background:rgba(239,68,68,.18);color:#b91c1c' : 'background:rgba(245,158,11,.18);color:#b45309')
+                . '">' . e($where) . '</span>'
+                . '<span style="font-size:.875rem;line-height:1.5">' . e($issue['message']) . '</span></li>';
+        }, $issues);
+
+        return '<ul style="margin:0;padding:0;list-style:none">' . implode('', $rows) . '</ul>';
+    }
+
+    private static function codeBlock(string $code): string
+    {
+        return '<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;'
+            . 'font-size:.8125rem;line-height:1.6;white-space:pre;overflow-x:auto;'
+            . 'padding:.9rem;border-radius:.5rem;background:rgba(127,127,127,.12)">' . e($code) . '</pre>';
     }
 
     /** 도움말 모달에 보여줄 예시. 실제로 쓰는 키만 담는다 — 지어낸 형식을 보여주지 않는다. */
