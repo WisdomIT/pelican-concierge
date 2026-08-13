@@ -560,9 +560,21 @@
                  x-data="{
                      shown: null,
                      stick: true,
+                     /* ⚠ 우리가 옮긴 스크롤도 scroll 이벤트를 낸다. 그걸 사용자의 조작으로
+                        읽으면 — 특히 새 내용이 아직 배치되지 않은 찰나에 계산하면 —
+                        stick 이 꺼진 채 영영 돌아오지 않는다(실측). 우리가 움직이는 동안은
+                        이벤트를 무시한다. */
+                     pinning: false,
                      /* 이 여유 안에 있으면 '바닥을 보고 있다'로 친다 — 한 줄 남짓. */
                      nearBottom() { return $el.scrollHeight - $el.scrollTop - $el.clientHeight < 80 },
-                     toBottom() { $el.scrollTop = $el.scrollHeight },
+                     onScroll() { if (this.pinning) { return; } this.stick = this.nearBottom(); },
+                     pin(move) {
+                         this.pinning = true;
+                         move();
+                         /* scroll 이벤트는 다음 프레임 전에 전달된다 — 그 뒤에 푼다. */
+                         requestAnimationFrame(() => { this.pinning = false });
+                     },
+                     toBottom() { this.pin(() => { $el.scrollTop = $el.scrollHeight }) },
                      follow() {
                          const card = $el.querySelector('.cg-card');
 
@@ -572,7 +584,9 @@
                                  /* 카드는 로그의 마지막 요소다 — 바닥에 붙이면 화면에 남는 건
                                     버튼뿐이고 제목은 위로 밀려난다. 카드 **머리**를 보여줘야
                                     무엇을 묻고 있는지가 읽힌다. */
-                                 card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                                 /* 부드러운 스크롤은 애니메이션 내내 scroll 이벤트를 쏟아낸다 —
+                                    그 사이 값으로 stick 을 다시 계산하면 어긋난다. 즉시 옮긴다. */
+                                 this.pin(() => card.scrollIntoView({ block: 'start' }));
                                  /* 카드가 떠 있는 동안은 바닥을 쫓지 않는다 — 뒤늦게 도착한
                                     타자기 글자가 카드를 다시 밀어내면 안 된다. */
                                  this.stick = false;
@@ -590,10 +604,12 @@
                          if (this.stick) { this.toBottom(); }
                      },
                  }"
+                 {{-- 사용자가 발화하면 어디를 보고 있었든 대화 끝으로 되돌린다. --}}
+                 x-on:cg-sent.window="stick = true; shown = null; $nextTick(() => toBottom())"
                  x-init="
                      /* 첫 그림은 가장 최근 말이 보이는 자리에서 시작한다. */
                      $nextTick(() => { toBottom(); follow(); });
-                     $el.addEventListener('scroll', () => { stick = nearBottom() }, { passive: true });
+                     $el.addEventListener('scroll', () => onScroll(), { passive: true });
                      new MutationObserver(() => follow())
                          .observe($el, { subtree: true, childList: true, characterData: true })">
                 <div class="cg-log">
@@ -762,7 +778,9 @@
                 </div>
             @endif
 
-            <form wire:submit="send" x-data="{}" class="cg-form">
+            {{-- 내가 말을 걸었으면 이력을 올려다보던 중이라도 대화 끝으로 돌아간다(#84) —
+                 방금 보낸 말과 그 답을 보려고 보낸 것이니까. --}}
+            <form wire:submit="send" x-data="{}" x-on:submit="$dispatch('cg-sent')" class="cg-form">
             {{-- ⚠ 입력창은 **disable 하지 않는다.** wire:loading 에 target 없이 disabled 를
                  걸었더니 30초(진행 중 5초) 폴링마다 입력창이 잠기며 **포커스가 풀려 타이핑이
                  끊겼다**(실측, #26). 전송 중 중복 제출은 보내기 버튼과 send() 의 빈 입력
