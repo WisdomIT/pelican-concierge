@@ -61,6 +61,12 @@ return [
     'tool_get_panel_health' => '패널 상태 확인 중',
     'tool_get_activity_log' => '활동 기록 확인 중',
     'tool_get_usage_stats' => '사용량 통계 확인 중',
+    // 카탈로그 도구 (#91)
+    'tool_list_catalog_games' => '게임 카탈로그 확인 중',
+    'tool_get_catalog_game' => '카탈로그 항목 확인 중',
+    'tool_create_catalog_game' => '카탈로그에 게임 추가하는 중',
+    'tool_update_catalog_game' => '카탈로그 항목 고치는 중',
+    'tool_delete_catalog_game' => '카탈로그 항목 지우는 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
@@ -754,4 +760,15 @@ return [
     'catalog_check_env_unknown' => ':env 는 egg ":egg" 에 없는 변수입니다 — 이 값은 조용히 무시됩니다.',
     'catalog_doc_title' => '고급 항목 문서',
     'catalog_doc_intro' => '모든 키는 선택입니다. 편집기는 이 문서의 형태와 고른 egg 양쪽에 맞춰 검사합니다.',
+    // 카탈로그 도구 카드 (#91)
+    'card_title_create_catalog_game' => '이 게임을 카탈로그에 추가할까요?',
+    'card_confirm_create_catalog_game' => '추가하기',
+    'card_title_update_catalog_game' => '이 카탈로그 항목을 바꿀까요?',
+    'card_confirm_update_catalog_game' => '바꾸기',
+    'card_title_delete_catalog_game' => '이 항목을 카탈로그에서 지울까요?',
+    'card_confirm_delete_catalog_game' => '지우기',
+    'card_catalog_unavailable' => '에이전트가 개설하지 않음',
+    'card_note_catalog_create' => '에이전트가 이 게임을 사용자에게 제안하게 됩니다. 이미 만들어진 서버에는 영향이 없습니다.',
+    'card_note_catalog_update' => '이 항목으로 **앞으로** 만들 서버에 적용됩니다. 이미 만들어진 서버는 그대로입니다.',
+    'card_note_catalog_delete' => '카탈로그에서만 사라집니다 — **이 게임으로 만든 서버는 그대로 남습니다.** 잠시 제안만 멈추려는 것이라면 삭제 대신 개설 허용을 끄세요(이유도 함께 적을 수 있습니다).',
 ];

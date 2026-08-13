@@ -61,6 +61,12 @@ return [
     'tool_get_panel_health' => 'Checking panel health',
     'tool_get_activity_log' => 'Checking activity log',
     'tool_get_usage_stats' => 'Checking usage statistics',
+    // Catalogue tools (#91)
+    'tool_list_catalog_games' => 'Checking the game catalogue',
+    'tool_get_catalog_game' => 'Checking a catalogue entry',
+    'tool_create_catalog_game' => 'Adding a game to the catalogue',
+    'tool_update_catalog_game' => 'Updating a catalogue entry',
+    'tool_delete_catalog_game' => 'Removing a catalogue entry',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',
@@ -754,4 +760,15 @@ return [
     'catalog_check_env_unknown' => ':env is not a variable on egg ":egg" — this value is silently ignored.',
     'catalog_doc_title' => 'Advanced field reference',
     'catalog_doc_intro' => 'Every key is optional. The editor checks what you write against this reference and against the egg you picked.',
+    // Catalogue tool cards (#91)
+    'card_title_create_catalog_game' => 'Add this game to the catalogue?',
+    'card_confirm_create_catalog_game' => 'Add',
+    'card_title_update_catalog_game' => 'Change this catalogue entry?',
+    'card_confirm_update_catalog_game' => 'Apply',
+    'card_title_delete_catalog_game' => 'Remove this entry from the catalogue?',
+    'card_confirm_delete_catalog_game' => 'Remove',
+    'card_catalog_unavailable' => 'the assistant will not create it',
+    'card_note_catalog_create' => 'The assistant will start offering this game to users. Existing servers are unaffected.',
+    'card_note_catalog_update' => 'Applies to servers created **from now on**. Servers already created stay as they are.',
+    'card_note_catalog_delete' => 'Only the catalogue entry goes — **servers created from it are untouched.** If you just want to stop offering it, turn off creation instead, which also lets you say why.',
 ];
