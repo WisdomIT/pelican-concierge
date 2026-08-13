@@ -371,44 +371,13 @@ class ConciergeGameResource extends Resource
             . 'padding:.9rem;border-radius:.5rem;background:rgba(127,127,127,.12)">' . e($code) . '</pre>';
     }
 
-    /** 도움말 모달에 보여줄 예시. 실제로 쓰는 키만 담는다 — 지어낸 형식을 보여주지 않는다. */
+    /**
+     * 도움말 모달의 예시. 문구는 번역이 갖는다 — 다른 플러그인이 있어야 동작하는 항목을
+     * 표시하는 것이 이 예시의 절반이고(#81), 그건 사람이 읽는 설명이다.
+     */
     private static function advancedExample(): string
     {
-        return <<<'YAML'
-        # 접속자 수 조회 방식 (Player Counter 가 있을 때)
-        query: minecraft_java
-        query_port_variable: QUERY_PORT
-
-        # 개설할 때 사용자에게 묻지 않고 고정으로 넣을 egg 변수
-        defaults:
-          BUILD_NUMBER: latest
-          SERVER_JARFILE: server.jar
-
-        # 이 게임이 필요로 하는 포트 수와 프로토콜
-        ports:
-          count: 1
-          protocol: [tcp, udp]
-
-        # 모델에게 보이지 않게 가릴 변수 (비밀번호·라이선스 키)
-        secrets: [SERVER_PASSWORD, ADMIN_PASSWORD]
-
-        # 모드·플러그인 설치 지원 여부
-        mods:
-          supported: true
-          kind: plugin
-          path: plugins/
-
-        # 설치 직후 자동으로 처리할 일
-        post_install:
-          - type: file_replace
-            path: eula.txt
-            from: eula=false
-            to: eula=true
-            reason: 동의하지 않으면 첫 기동이 조용히 실패한다
-
-        # 설치가 끝났는지 판단할 최소 용량(MB)
-        install_min_mb: 300
-        YAML;
+        return (string) trans('concierge::strings.catalog_yaml_example');
     }
 
     public static function getPages(): array

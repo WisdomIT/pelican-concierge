@@ -47,7 +47,8 @@ class EditConciergeGame extends EditRecord
 
             // 이 패널은 삭제 액션에 hiddenLabel 을 기본으로 건다 — 저장·취소는 글자인데
             // 삭제만 아이콘이면 같은 줄에서 종류가 달라 보인다. 라벨을 되살린다.
-            DeleteAction::make()->button()->hiddenLabel(false),
+            // 저장·취소에는 아이콘이 없다 — 삭제에만 있으면 한 줄에서 종류가 달라 보인다.
+            DeleteAction::make()->button()->hiddenLabel(false)->icon(null),
         ];
     }
 
