@@ -67,7 +67,10 @@ class ConciergeGameResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        // ⚠ 리소스 폼의 기본 그리드는 2열이라 섹션이 좌우로 쌓인다. 이 폼은 섹션마다 높이가
+        //   크게 달라(기본 정보는 길고 크기·질문은 접혀 있다) 한쪽에 빈 공간이 길게 남는다.
+        //   섹션은 위에서 아래로 한 줄씩 놓는다.
+        return $schema->columns(1)->components([
             Section::make(trans('concierge::strings.catalog_section_basics'))
                 ->description(trans('concierge::strings.catalog_section_basics_help'))
                 ->schema([
@@ -95,7 +98,8 @@ class ConciergeGameResource extends Resource
                     Textarea::make('summary')
                         ->label(trans('concierge::strings.catalog_field_summary'))
                         ->helperText(trans('concierge::strings.catalog_help_summary'))
-                        ->rows(2),
+                        ->rows(2)
+                        ->columnSpanFull(),
 
                     // 로케일별 이름은 **선택**이다 — 단일 언어 패널 운영자에게 번역 작성을
                     // 강요하지 않는다. 비면 위의 기본 이름을 쓴다(#79·#81).
@@ -104,25 +108,30 @@ class ConciergeGameResource extends Resource
                         ->helperText(trans('concierge::strings.catalog_help_translations'))
                         ->keyLabel(trans('concierge::strings.catalog_locale'))
                         ->valueLabel(trans('concierge::strings.catalog_field_name'))
-                        ->addActionLabel(trans('concierge::strings.catalog_add_translation')),
+                        ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                        ->columnSpanFull(),
 
                     KeyValue::make('summary_translations')
                         ->label(trans('concierge::strings.catalog_field_summary_translations'))
                         ->keyLabel(trans('concierge::strings.catalog_locale'))
                         ->valueLabel(trans('concierge::strings.catalog_field_summary'))
-                        ->addActionLabel(trans('concierge::strings.catalog_add_translation')),
+                        ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                        ->columnSpanFull(),
 
                     Toggle::make('available')
                         ->label(trans('concierge::strings.catalog_field_available'))
                         ->helperText(trans('concierge::strings.catalog_help_available'))
                         ->default(true)
-                        ->live(),
+                        ->live()
+                        ->columnSpanFull(),
 
                     TextInput::make('unavailable_reason')
                         ->label(trans('concierge::strings.catalog_field_unavailable_reason'))
                         ->helperText(trans('concierge::strings.catalog_help_unavailable_reason'))
-                        ->visible(fn ($get) => ! $get('available')),
-                ]),
+                        ->visible(fn ($get) => ! $get('available'))
+                        ->columnSpanFull(),
+                // 짧은 칸(식별자·egg·이름)만 나란히 두고, 긴 것은 전체 폭을 쓴다.
+                ])->columns(2),
 
             Section::make(trans('concierge::strings.catalog_section_sizes'))
                 ->description(trans('concierge::strings.catalog_section_sizes_help'))
