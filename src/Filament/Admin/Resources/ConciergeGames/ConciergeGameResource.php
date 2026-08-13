@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Symfony\Component\Yaml\Yaml;
 use WisdomIT\Concierge\Catalog\AdvancedYaml;
+use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Models\ConciergeGame;
 
 /**
@@ -255,9 +256,12 @@ class ConciergeGameResource extends Resource
                             ->label(trans('concierge::strings.catalog_yaml_help'))
                             ->button()
                             ->color('gray')
-                            ->modalHeading(trans('concierge::strings.catalog_section_advanced'))
-                            ->modalDescription(trans('concierge::strings.catalog_yaml_help_intro'))
-                            ->modalContent(new HtmlString(self::codeBlock(self::advancedExample())))
+                            ->modalHeading(trans('concierge::strings.catalog_doc_title'))
+                            ->modalDescription(trans('concierge::strings.catalog_doc_intro'))
+                            // 저장소의 문서를 그대로 렌더한다 — 화면과 repo 가 **같은 파일**을
+                            // 본다. 둘로 나누면 한쪽만 고쳐지고, 그때부터 문서가 거짓말을 한다.
+                            ->modalContent(fn () => new HtmlString(self::advancedDoc()))
+                            ->modalWidth('4xl')
                             ->modalSubmitAction(false)
                             ->modalCancelActionLabel(trans('concierge::strings.card_cancel')),
                     ])->key('advanced_actions'),
@@ -376,12 +380,56 @@ class ConciergeGameResource extends Resource
     }
 
     /**
-     * 도움말 모달의 예시. 문구는 번역이 갖는다 — 다른 플러그인이 있어야 동작하는 항목을
-     * 표시하는 것이 이 예시의 절반이고(#81), 그건 사람이 읽는 설명이다.
+     * 고급 항목 문서(docs/catalog-advanced.<로케일>.md)를 렌더한다.
+     *
+     * 문서는 저장소에도 그대로 있다 — 화면에서 읽는 사람과 저장소에서 읽는 사람이 같은
+     * 글을 본다. 나중에 카탈로그를 다루는 에이전트(#91)도 이 파일을 그대로 쓸 수 있다.
      */
-    private static function advancedExample(): string
+    private static function advancedDoc(): string
     {
-        return (string) trans('concierge::strings.catalog_yaml_example');
+        $locale = app()->getLocale();
+
+        foreach ([$locale, 'en'] as $candidate) {
+            $path = plugin_path('concierge', 'docs', "catalog-advanced.{$candidate}.md");
+
+            if (is_file($path)) {
+                return '<div class="cg-doc">' . Markdown::render((string) file_get_contents($path)) . '</div>'
+                    . self::docStyles();
+            }
+        }
+
+        return '';
+    }
+
+    /** 모달 안에서 문서가 문서처럼 읽히도록 — 표·코드 블록·제목 간격. */
+    private static function docStyles(): string
+    {
+        return <<<'HTML'
+        <style>
+            .cg-doc { font-size: .875rem; line-height: 1.65; }
+            .cg-doc h1 { font-size: 1.25rem; font-weight: 700; margin: 0 0 .8rem; }
+            .cg-doc h2 { font-size: 1.05rem; font-weight: 650; margin: 1.6rem 0 .5rem; }
+            .cg-doc h3 { font-size: .95rem; font-weight: 600; margin: 1.2rem 0 .35rem;
+                         font-family: ui-monospace, Menlo, Consolas, monospace; }
+            .cg-doc p, .cg-doc ul, .cg-doc ol { margin: .5rem 0; }
+            .cg-doc ul, .cg-doc ol { padding-inline-start: 1.2rem; }
+            .cg-doc li { margin: .2rem 0; }
+            .cg-doc hr { margin: 1.4rem 0; border: 0; border-top: 1px solid rgba(127,127,127,.25); }
+            .cg-doc code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .8125rem;
+                           background: rgba(127,127,127,.14); padding: .05rem .3rem; border-radius: .25rem; }
+            .cg-doc pre { background: rgba(127,127,127,.12); padding: .8rem; border-radius: .5rem;
+                          overflow-x: auto; margin: .6rem 0; }
+            .cg-doc pre code { background: none; padding: 0; white-space: pre; }
+            /* 표가 문서의 절반이다 — 형태와 enum 값이 전부 여기 있다. */
+            .cg-doc table { width: 100%; border-collapse: collapse; margin: .6rem 0; font-size: .8125rem; }
+            .cg-doc th, .cg-doc td { text-align: start; padding: .35rem .6rem;
+                                     border-bottom: 1px solid rgba(127,127,127,.22); vertical-align: top; }
+            .cg-doc th { font-weight: 600; background: rgba(127,127,127,.08); }
+            .cg-doc blockquote { margin: .7rem 0; padding: .6rem .9rem; border-inline-start: 3px solid rgba(245,158,11,.6);
+                                 background: rgba(245,158,11,.08); border-radius: 0 .35rem .35rem 0; }
+            .cg-doc blockquote p { margin: 0; }
+        </style>
+        HTML;
     }
 
     public static function getPages(): array

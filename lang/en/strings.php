@@ -750,4 +750,6 @@ return [
         . "install_min_mb: 300\n",
     'catalog_check_secret_undeclared' => 'The egg has variables that look secret but are not in secrets: :vars. The name-pattern safety net masks them, but the catalogue is the only place that knows what is secret for this game.',
     'catalog_check_env_unknown' => ':env is not a variable on egg ":egg" — this value is silently ignored.',
+    'catalog_doc_title' => 'Advanced field reference',
+    'catalog_doc_intro' => 'Every key is optional. The editor checks what you write against this reference and against the egg you picked.',
 ];

@@ -34,6 +34,9 @@ final class AdvancedYaml
         'query' => 'string',
         'query_port_variable' => 'string',
         'java_from' => 'string',
+        // java_from 이 없을 때 쓰는 고정 이미지(ServerProvisioner::imageFor). 쓰는 게임은
+        // 아직 없지만 코드가 읽는다 — 빠뜨리면 쓴 사람에게 "모르는 키" 경고가 뜬다.
+        'image' => 'string',
         'player_var' => 'string_or_null',
         'install_min_mb' => 'int',
         'defaults' => 'map',

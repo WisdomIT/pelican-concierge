@@ -242,7 +242,10 @@ mapping shows up before someone tries to create that game.
 
 It lives in the database, so it survives plugin updates. The technical parts (ports,
 secret variables, post-install steps) are edited as YAML in one field — their shape
-differs per entry, which a form would only make harder to read.
+differs per entry, which a form would only make harder to read. Every key is documented in
+**[the advanced field reference](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/catalog-advanced.en.md)**
+([한국어](https://github.com/WisdomIT/pelican-concierge/blob/main/docs/catalog-advanced.ko.md)),
+which the editor also shows in place — the same file, so the two never drift apart.
 
 **About this deployment** *(settings screen, optional)* — free-form text appended to the
 system prompt. This is where deployment facts go: the hostname players connect to, which
