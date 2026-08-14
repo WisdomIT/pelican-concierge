@@ -44,6 +44,16 @@
     x-on:livewire:navigated.document="apply()"
     {{-- 트리거(#7)는 패널 크롬에 있어 이 컴포넌트 밖이다 — window 이벤트로 받는다. --}}
     x-on:concierge-toggle.window="open = ! open"
+    {{-- 화면 바깥에서 대화를 여는 통로 (#93).
+
+         지금까지 사이드바는 사용자가 열고 늘 비어 있었다 — 다른 화면의 버튼이 "이 대화는
+         무엇에 관한 것"이라고 말할 방법이 없었다. 그 배관이 이 줄이다: 어느 화면이든
+         `cg-start` 를 쏘면 사이드바가 열리고 그 시작점으로 대화가 시작된다.
+         (카탈로그 목록의 "에이전트에게 맡기기" 가 첫 사용처다 — #91)
+
+         ⚠ 프리셋 키만 넘긴다. 문장을 그대로 받으면 화면이 에이전트에게 아무 말이나 시킬 수
+           있게 되고, 그 문장이 사용자 발화로 기록된다. 키는 서버가 범위를 보고 풀어 준다. --}}
+    x-on:cg-start.window="open = true; $wire.usePreset($event.detail.preset)"
     {{-- 에이전트가 먼저 말을 거는 통로. 설치는 몇 분 걸리므로 사용자가 물을 때까지 기다리면
          늦는다. 평소 30초면 충분하고, **진행 중인 서버가 있을 때만** 5초로 당긴다 —
          켜지는 걸 지켜보는 중에 30초는 멈춘 것처럼 보인다. --}}
@@ -153,6 +163,22 @@
     }
 
     .cg-hint { font-size: .875rem; color: var(--gray-500, #6b7280); }
+    .cg-presets { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
+    .cg-preset {
+        font-size: .8125rem;
+        padding: .35rem .7rem;
+        border-radius: 999px;
+        border: 1px solid var(--gray-300, #d1d5db);
+        background: transparent;
+        color: var(--gray-700, #374151);
+        cursor: pointer;
+        transition: background .15s ease;
+    }
+    .cg-preset:hover { background: var(--gray-100, #f3f4f6); }
+    :where(.dark) .cg-preset { border-color: var(--gray-700, #374151); color: var(--gray-200, #e5e7eb); }
+    :where(.dark) .cg-preset:hover { background: var(--gray-800, #1f2937); }
+    /* 대화가 시작되면 시작점도 함께 사라진다 — 안내 문구와 같은 규칙. */
+    .cg-log:has(.cg-bubble:not(:empty)) .cg-presets { display: none; }
     {{-- 첫 발화의 스트리밍은 Livewire 재렌더 없이 DOM 에 직접 쓴다 — @forelse 가 다시
          돌기 전까지 "무엇을 도와줄까요?" 안내가 첫 대화 옆에 남아 있었다. 어떤 말풍선이든
          내용이 생기면 안내는 끝난 것이다. --}}
@@ -631,6 +657,19 @@
             @empty
                 {{-- 개설을 못 하는 사람에게 "서버 만들고 싶어" 예시는 막다른 길이다(#48). --}}
                 <p class="cg-hint">{{ trans('concierge::strings.' . ($this->canCreateServers ? 'empty' : 'empty_no_create')) }}</p>
+
+                {{-- 시작점(#93) — 빈 상자 대신 누를 것을 준다. 범위에 맞는 것만 온다:
+                     개설할 수 없는 사람에게 게임 목록을 내밀면 #48 이 없앤 막다른 길이
+                     되살아난다. 제안이지 레일이 아니므로 입력창은 그대로 있다. --}}
+                @if ($this->presets)
+                    <div class="cg-presets">
+                        @foreach ($this->presets as $preset)
+                            <button type="button" class="cg-preset"
+                                    wire:click="usePreset('{{ $preset['key'] }}')"
+                                    wire:loading.attr="disabled">{{ $preset['label'] }}</button>
+                        @endforeach
+                    </div>
+                @endif
             @endforelse
 
             {{--

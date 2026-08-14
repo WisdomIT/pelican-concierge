@@ -25,6 +25,7 @@ use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
 use WisdomIT\Concierge\Services\UsageLimiter;
 use WisdomIT\Concierge\Tools\AgentToolbox;
+use WisdomIT\Concierge\Tools\ChatPresets;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
@@ -960,6 +961,45 @@ class AgentSidebar extends Component
         $user = auth()->user();
 
         return $user !== null && (new AgentToolbox($user))->scope->canCreateServers();
+    }
+
+    /**
+     * 빈 대화에 보여줄 시작점 (#93). 범위에 맞는 것만 온다 — ChatPresets 참고.
+     *
+     * @return array<int, array{key: string, label: string, prompt: string}>
+     */
+    #[Computed]
+    public function presets(): array
+    {
+        $user = auth()->user();
+
+        return $user === null ? [] : ChatPresets::for((new AgentToolbox($user))->scope);
+    }
+
+    /**
+     * 시작점을 눌렀다 — 그 문장을 **사용자가 친 것처럼** 보낸다.
+     *
+     * 프리셋은 제안이지 특별한 통로가 아니다: 같은 send() 를 타므로 한도·카드·권한이
+     * 평소와 똑같이 적용된다.
+     */
+    public function usePreset(string $key): void
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return;
+        }
+
+        $prompt = ChatPresets::promptFor($key, (new AgentToolbox($user))->scope);
+
+        if ($prompt === null) {
+            // 범위 밖이거나 사라진 키 — 조용히 무시한다. 화면 바깥에서도 부를 수 있으므로
+            // 여기서 한 번 더 본다(#46 의 두 겹과 같은 이유).
+            return;
+        }
+
+        $this->draft = $prompt;
+        $this->send();
     }
 
     public function render(): View
