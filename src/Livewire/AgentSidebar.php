@@ -1002,9 +1002,13 @@ class AgentSidebar extends Component
         //    만들기")은 지금 열려 있는 대화와 아무 상관이 없다 — 하던 이야기 뒤에 붙이면
         //    맥락이 섞이고, 앞 대화가 길면 그 토큰도 함께 실려 간다.
         $this->startConversation();
-
         $this->draft = $prompt;
-        $this->send();
+
+        // ⚠ **여기서 send() 를 바로 부르면 안 된다.** 그러면 한 요청 안에서 턴 전체가
+        //   돌고, 화면 정리는 응답이 끝나야 반영된다 — 옛 대화가 그대로 보이는 채로 그
+        //   아래에 새 메시지가 붙었다가, 답변이 끝나는 순간 위쪽이 통째로 사라진다(실측).
+        //   요청을 둘로 나눠, 먼저 화면을 비우고 **그다음** 요청에서 말을 건다.
+        $this->js('$wire.send()');
     }
 
     public function render(): View
