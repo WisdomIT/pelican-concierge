@@ -36,13 +36,32 @@ games:
     # 이 게임에는 인원 변수가 없다 — 인원은 자원 배정으로만 표현된다.
     player_var: null
     sizes:
-      - { id: s, label: "4명 정도",  players: 4,  memory: 2048, disk: 8192,  cpu: 100 }
-      - { id: m, label: "8명 정도",  players: 8,  memory: 4096, disk: 15360, cpu: 200 }
-      - { id: l, label: "16명 정도", players: 16, memory: 8192, disk: 30720, cpu: 400 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 2048
+        disk: 8192
+        cpu: 100
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 4096
+        disk: 15360
+        cpu: 200
+      - id: "l"
+        label: "About 16 players"
+        label_translations: { ko: "16명 정도", en: "About 16 players" }
+        players: 16
+        memory: 8192
+        disk: 30720
+        cpu: 400
     # 사용자에게 물을 것 — egg 의 user_editable 중 **의미 있는 것만**.
     ask:
       - env: MINECRAFT_VERSION
-        label: 버전
+        label: "Version"
+        label_translations: { ko: "버전", en: "Version" }
         type: choice
         # egg 이 설치할 때 papermc API 에서 실시간으로 받아온다 → **최신을 넣어도 된다.**
         #  ⚠ 낡은 값만 두면 친구 런처(기본이 최신)로는 "Outdated server" 가 뜬다. 실제로 겪었다.
@@ -86,11 +105,24 @@ games:
     query: minecraft_java
     player_var: null
     sizes:
-      - { id: s, label: "4명 정도",  players: 4,  memory: 4096, disk: 10240, cpu: 200 }
-      - { id: m, label: "8명 정도",  players: 8,  memory: 6144, disk: 20480, cpu: 300 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 4096
+        disk: 10240
+        cpu: 200
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 6144
+        disk: 20480
+        cpu: 300
     ask:
       - env: MC_VERSION
-        label: 버전
+        label: "Version"
+        label_translations: { ko: "버전", en: "Version" }
         type: choice
         # Fabric meta API 도 실시간이다(위 Paper 주석 참고).
         choices: ["26.2", "1.21.11", "1.20.6"]
@@ -136,18 +168,35 @@ games:
     player_var: null
     sizes:
       # ⚠ 4096 은 OOM 난다(실측 OOMKilled=true). 최소 8192.
-      - { id: m, label: "8명 정도", players: 8, memory: 8192, disk: 12288, cpu: 300 }
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 8192
+        disk: 12288
+        cpu: 300
     ask:
-      - { env: SERVER_NAME,    label: 서버 이름, type: text,     default: "MyServer" }
-      - { env: ADMIN_PASSWORD, label: 관리자 비밀번호, type: password }
+      - env: "SERVER_NAME"
+        label: "Server name"
+        label_translations: { ko: "서버 이름", en: "Server name" }
+        type: "text"
+        default: "MyServer"
+      - env: "ADMIN_PASSWORD"
+        label: "Admin password"
+        label_translations: { ko: "관리자 비밀번호", en: "Admin password" }
+        type: "password"
       - env: STEAM_USER
-        label: 스팀 아이디
+        label: "Steam username"
+        label_translations: { ko: "스팀 아이디", en: "Steam username" }
         type: text
-        note: "좀보이드를 소유한 본인 스팀 계정이어야 하고, 설치(다운로드)에만 쓰입니다."
+        note: "Must be your own Steam account that owns the game; it is used only to download it."
+        note_translations: { ko: "좀보이드를 소유한 본인 스팀 계정이어야 하고, 설치(다운로드)에만 쓰입니다.", en: "Must be your own Steam account that owns the game; it is used only to download it." }
       - env: STEAM_PASS
-        label: 스팀 비밀번호
+        label: "Steam password"
+        label_translations: { ko: "스팀 비밀번호", en: "Steam password" }
         type: password
-        note: "Steam Guard(2단계 인증)가 켜져 있으면 설치가 실패할 수 있습니다 — 그때는 모바일 앱의 코드를 받아 다시 시도합니다."
+        note: "If Steam Guard is on, the install can fail — get the code from the mobile app and try again."
+        note_translations: { ko: "Steam Guard(2단계 인증)가 켜져 있으면 설치가 실패할 수 있습니다 — 그때는 모바일 앱의 코드를 받아 다시 시도합니다.", en: "If Steam Guard is on, the install can fail — get the code from the mobile app and try again." }
     defaults:
       ADMIN_USER: admin
       AUTO_UPDATE: "1"
@@ -200,12 +249,37 @@ games:
     egg: Valheim
     player_var: null
     sizes:
-      - { id: s, label: "4명 정도",  players: 4,  memory: 3072, disk: 8192,  cpu: 200 }
-      - { id: m, label: "10명 정도", players: 10, memory: 6144, disk: 12288, cpu: 300 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 3072
+        disk: 8192
+        cpu: 200
+      - id: "m"
+        label: "About 10 players"
+        label_translations: { ko: "10명 정도", en: "About 10 players" }
+        players: 10
+        memory: 6144
+        disk: 12288
+        cpu: 300
     ask:
-      - { env: SERVER_NAME, label: 서버 이름,   type: text,     default: "MyServer" }
-      - { env: PASSWORD,    label: 접속 비밀번호, type: password, min: 5, max: 20 }
-      - { env: WORLD,       label: 월드 이름,   type: text,     default: "Dedicated" }
+      - env: "SERVER_NAME"
+        label: "Server name"
+        label_translations: { ko: "서버 이름", en: "Server name" }
+        type: "text"
+        default: "MyServer"
+      - env: "PASSWORD"
+        label: "Join password"
+        label_translations: { ko: "접속 비밀번호", en: "Join password" }
+        type: "password"
+        min: 5
+        max: 20
+      - env: "WORLD"
+        label: "World name"
+        label_translations: { ko: "월드 이름", en: "World name" }
+        type: "text"
+        default: "Dedicated"
     defaults:
       PUBLIC_SERVER: "1"
       ENABLE_CROSSPLAY: "1"
@@ -226,12 +300,35 @@ games:
     egg: Palworld
     player_var: MAX_PLAYERS       # 이 게임은 인원 변수가 있다
     sizes:
-      - { id: s, label: "4명 정도",  players: 4,  memory: 8192,  disk: 20480, cpu: 300 }
-      - { id: m, label: "8명 정도",  players: 8,  memory: 16384, disk: 30720, cpu: 400 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 8192
+        disk: 20480
+        cpu: 300
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 16384
+        disk: 30720
+        cpu: 400
     ask:
-      - { env: SERVER_NAME,     label: 서버 이름,      type: text,     default: "MyServer" }
-      - { env: SERVER_PASSWORD, label: 접속 비밀번호,   type: password, optional: true }
-      - { env: ADMIN_PASSWORD,  label: 관리자 비밀번호, type: password }
+      - env: "SERVER_NAME"
+        label: "Server name"
+        label_translations: { ko: "서버 이름", en: "Server name" }
+        type: "text"
+        default: "MyServer"
+      - env: "SERVER_PASSWORD"
+        label: "Join password"
+        label_translations: { ko: "접속 비밀번호", en: "Join password" }
+        type: "password"
+        optional: True
+      - env: "ADMIN_PASSWORD"
+        label: "Admin password"
+        label_translations: { ko: "관리자 비밀번호", en: "Admin password" }
+        type: "password"
     defaults:
       AUTO_UPDATE: "1"
       # ✅ egg 의 시작 스크립트(PalworldServerConfigParser)가 이 환경 변수를 읽어
@@ -267,8 +364,20 @@ games:
     egg: Satisfactory
     player_var: MAX_PLAYERS
     sizes:
-      - { id: s, label: "4명 정도", players: 4, memory: 12288, disk: 30720, cpu: 300 }
-      - { id: m, label: "8명 정도", players: 8, memory: 16384, disk: 40960, cpu: 400 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 12288
+        disk: 30720
+        cpu: 300
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 16384
+        disk: 40960
+        cpu: 400
     ask: []                      # 서버 이름·비밀번호는 게임 내 Server Manager 에서 설정한다
     defaults:
       AUTO_UPDATE: "1"
@@ -296,10 +405,28 @@ games:
     egg: Core Keeper
     player_var: MAX_PLAYERS
     sizes:
-      - { id: s, label: "4명 정도",  players: 4,  memory: 2048, disk: 8192,  cpu: 100 }
-      - { id: m, label: "10명 정도", players: 10, memory: 4096, disk: 12288, cpu: 200 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 2048
+        disk: 8192
+        cpu: 100
+      - id: "m"
+        label: "About 10 players"
+        label_translations: { ko: "10명 정도", en: "About 10 players" }
+        players: 10
+        memory: 4096
+        disk: 12288
+        cpu: 200
     ask:
-      - { env: WORLD_NAME, label: 월드 이름, type: text, default: "MyWorld", min: 3, max: 100 }
+      - env: "WORLD_NAME"
+        label: "World name"
+        label_translations: { ko: "월드 이름", en: "World name" }
+        type: "text"
+        default: "MyWorld"
+        min: 3
+        max: 100
     defaults:
       AUTO_UPDATE: "1"
       WORLD_INDEX: "0"
@@ -321,11 +448,32 @@ games:
     egg: 7 Days To Die
     player_var: null             # egg 에 인원 변수가 없다
     sizes:
-      - { id: s, label: "4명 정도", players: 4, memory: 6144,  disk: 20480, cpu: 300 }
-      - { id: m, label: "8명 정도", players: 8, memory: 10240, disk: 30720, cpu: 400 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 6144
+        disk: 20480
+        cpu: 300
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 10240
+        disk: 30720
+        cpu: 400
     ask:
-      - { env: PASSWORD,        label: 접속 비밀번호, type: password, optional: true }
-      - { env: GAME_DIFFICULTY, label: 난이도, type: choice, choices: ["0","1","2","3","4","5"], default: "2" }
+      - env: "PASSWORD"
+        label: "Join password"
+        label_translations: { ko: "접속 비밀번호", en: "Join password" }
+        type: "password"
+        optional: True
+      - env: "GAME_DIFFICULTY"
+        label: "Difficulty"
+        label_translations: { ko: "난이도", en: "Difficulty" }
+        type: "choice"
+        choices: ['0', '1', '2', '3', '4', '5']
+        default: "2"
     # 유휴 판정용 접속자 쿼리(#18). 게임 포트에서 A2S 응답 — 실측 확인 (0/8 파싱).
     query: source
     defaults:
@@ -353,15 +501,32 @@ games:
     query: minecraft_java
     player_var: null
     sizes:
-      - { id: s, label: "4명 정도", players: 4, memory: 4096, disk: 12288, cpu: 200 }
-      - { id: m, label: "8명 정도", players: 8, memory: 8192, disk: 20480, cpu: 300 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 4096
+        disk: 12288
+        cpu: 200
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 8192
+        disk: 20480
+        cpu: 300
     ask:
       # 🔴 **다른 버전의 접두사가 되는 값을 넣으면 안 된다.** egg 이 promotions 를 찾을 때
       #   exact 가 아니라 `contains()` 로 맞춘다 — "1.21.1" 은 "1.21.10"·"1.21.11" 에도 걸려
       #   키가 3개가 되고, 여러 줄이 된 키로 조회해 `null` 이 된다. 그러면 설치가
       #   `Downloading forge version null` 로 끝나고 **텅 빈 볼륨이 installed 로 표시된다**(실측).
       #   validate.py 가 promotions_slim.json 으로 "유일하게 잡히는가"를 검사한다.
-      - { env: MC_VERSION, label: 버전, type: choice, choices: ["26.2","1.21.11","1.20.6"], default: "26.2" }
+      - env: "MC_VERSION"
+        label: "Version"
+        label_translations: { ko: "버전", en: "Version" }
+        type: "choice"
+        choices: ['26.2', '1.21.11', '1.20.6']
+        default: "26.2"
     defaults:
       BUILD_TYPE: recommended
       SERVER_JARFILE: server.jar
@@ -384,7 +549,13 @@ games:
     egg: Terraria Vanilla
     player_var: null
     sizes:
-      - { id: s, label: "8명 정도", players: 8, memory: 1024, disk: 4096, cpu: 100 }
+      - id: "s"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 1024
+        disk: 4096
+        cpu: 100
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [tcp] }
@@ -404,7 +575,13 @@ games:
     egg: Factorio
     player_var: null
     sizes:
-      - { id: s, label: "8명 정도", players: 8, memory: 2048, disk: 8192, cpu: 100 }
+      - id: "s"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 2048
+        disk: 8192
+        cpu: 100
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [udp] }
@@ -428,7 +605,13 @@ games:
     egg: Necesse
     player_var: null
     sizes:
-      - { id: s, label: "8명 정도", players: 8, memory: 2048, disk: 8192, cpu: 100 }
+      - id: "s"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 2048
+        disk: 8192
+        cpu: 100
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [udp] }
@@ -450,8 +633,20 @@ games:
     egg: The Forest
     player_var: null
     sizes:
-      - { id: s, label: "4명 정도", players: 4, memory: 4096, disk: 12288, cpu: 200 }
-      - { id: m, label: "8명 정도", players: 8, memory: 6144, disk: 20480, cpu: 300 }
+      - id: "s"
+        label: "About 4 players"
+        label_translations: { ko: "4명 정도", en: "About 4 players" }
+        players: 4
+        memory: 4096
+        disk: 12288
+        cpu: 200
+      - id: "m"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 6144
+        disk: 20480
+        cpu: 300
     ask: []
     defaults: {}
     # 🔴 스팀·쿼리 포트를 파생한다(#32). config.cfg 의 serverSteamPort/serverQueryPort 를
@@ -482,8 +677,20 @@ games:
     egg: Garrys Mod
     player_var: null
     sizes:
-      - { id: s, label: "8명 정도",  players: 8,  memory: 4096, disk: 20480, cpu: 200 }
-      - { id: m, label: "16명 정도", players: 16, memory: 6144, disk: 30720, cpu: 300 }
+      - id: "s"
+        label: "About 8 players"
+        label_translations: { ko: "8명 정도", en: "About 8 players" }
+        players: 8
+        memory: 4096
+        disk: 20480
+        cpu: 200
+      - id: "m"
+        label: "About 16 players"
+        label_translations: { ko: "16명 정도", en: "About 16 players" }
+        players: 16
+        memory: 6144
+        disk: 30720
+        cpu: 300
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [tcp, udp] }
@@ -505,14 +712,30 @@ games:
     egg: Rust
     player_var: null
     sizes:
-      - { id: m, label: "20명 정도", players: 20, memory: 8192,  disk: 20480, cpu: 300 }
-      - { id: l, label: "50명 정도", players: 50, memory: 12288, disk: 30720, cpu: 400 }
+      - id: "m"
+        label: "About 20 players"
+        label_translations: { ko: "20명 정도", en: "About 20 players" }
+        players: 20
+        memory: 8192
+        disk: 20480
+        cpu: 300
+      - id: "l"
+        label: "About 50 players"
+        label_translations: { ko: "50명 정도", en: "About 50 players" }
+        players: 50
+        memory: 12288
+        disk: 30720
+        cpu: 400
     ask:
-      - { env: RCON_PASS, label: 관리자(RCON) 비밀번호, type: password }   # 필수·기본값 없음
+      - env: "RCON_PASS"   # 필수·기본값 없음
+        label: "Admin (RCON) password"
+        label_translations: { ko: "관리자(RCON) 비밀번호", en: "Admin (RCON) password" }
+        type: "password"
       # uMod 플러그인 탭(Rust uMod)은 FRAMEWORK 가 oxide 일 때만 뜬다. 순정과 달리 서버에
       # 모드 프레임워크가 깔리므로 사용자가 고르게 한다. 기본은 oxide — 플러그인을 쓰라고 여는 것이다.
       - env: FRAMEWORK
-        label: 플러그인 지원 (uMod)
+        label: "Plugin support (uMod)"
+        label_translations: { ko: "플러그인 지원 (uMod)", en: "Plugin support (uMod)" }
         type: choice
         choices: ["oxide", "vanilla"]
         default: "oxide"
@@ -545,12 +768,34 @@ games:
     egg: "Ark: Survival Evolved"
     player_var: MAX_PLAYERS
     sizes:
-      - { id: m, label: "10명 정도", players: 10, memory: 14336, disk: 40960, cpu: 400 }
+      - id: "m"
+        label: "About 10 players"
+        label_translations: { ko: "10명 정도", en: "About 10 players" }
+        players: 10
+        memory: 14336
+        disk: 40960
+        cpu: 400
     ask:
-      - { env: SESSION_NAME, label: 서버 이름, type: text, default: "MyArk" }
-      - { env: ARK_PASSWORD, label: 접속 비밀번호, type: password, optional: true }
-      - { env: ARK_ADMIN_PASSWORD, label: 관리자 비밀번호, type: password }
-      - { env: SERVER_MAP, label: 맵, type: choice, choices: ["TheIsland","Ragnarok","TheCenter"], default: "TheIsland" }
+      - env: "SESSION_NAME"
+        label: "Server name"
+        label_translations: { ko: "서버 이름", en: "Server name" }
+        type: "text"
+        default: "MyArk"
+      - env: "ARK_PASSWORD"
+        label: "Join password"
+        label_translations: { ko: "접속 비밀번호", en: "Join password" }
+        type: "password"
+        optional: True
+      - env: "ARK_ADMIN_PASSWORD"
+        label: "Admin password"
+        label_translations: { ko: "관리자 비밀번호", en: "Admin password" }
+        type: "password"
+      - env: "SERVER_MAP"
+        label: "Map"
+        label_translations: { ko: "맵", en: "Map" }
+        type: "choice"
+        choices: ['TheIsland', 'Ragnarok', 'TheCenter']
+        default: "TheIsland"
     defaults:
       BATTLE_EYE: "0"        # 컨테이너에서 BattlEye 는 문제 소지 → 기본 끔
       AUTO_UPDATE: "0"
@@ -593,12 +838,23 @@ games:
     #   keymaster.fivem.net 에서 발급받는 값이고, 관리자가 채워 넘겨야 한다.
     #   ✅ 실측: 라이선스는 **실행 시점 검증**이라 재설치 없이 Start 만으로 반영된다.
     available: false
-    unavailable_reason: "Cfx.re 라이선스 키가 필요해 셀프서비스 개설 불가. 관리자가 대신 만들어야 한다"
+    unavailable_reason: "Needs a Cfx.re licence key, so it cannot be created through chat — an administrator has to make it."
+    unavailable_reason_translations: { ko: "Cfx.re 라이선스 키가 필요해 셀프서비스 개설 불가. 관리자가 대신 만들어야 한다", en: "Needs a Cfx.re licence key, so it cannot be created through chat — an administrator has to make it." }
     player_var: MAX_PLAYERS
     sizes:
-      - { id: m, label: "32명 정도", players: 32, memory: 4096, disk: 10240, cpu: 200 }
+      - id: "m"
+        label: "About 32 players"
+        label_translations: { ko: "32명 정도", en: "About 32 players" }
+        players: 32
+        memory: 4096
+        disk: 10240
+        cpu: 200
     ask:
-      - { env: SERVER_HOSTNAME, label: 서버 이름, type: text, default: "My FiveM Server" }
+      - env: "SERVER_HOSTNAME"
+        label: "Server name"
+        label_translations: { ko: "서버 이름", en: "Server name" }
+        type: "text"
+        default: "My FiveM Server"
     defaults:
       TXADMIN_ENABLE: "0"
       STEAM_WEBAPIKEY: "none"
@@ -626,10 +882,17 @@ games:
     #   ✅ 실측(#32): 설치는 익명으로 되고, 토큰만 있으면 정상 기동한다.
     #   ❌ 접속자 쿼리는 불가 확정 — 전 스키마 × 포트 스윕 전부 무응답(자체 프로토콜) → rx 판정.
     available: false
-    unavailable_reason: "Klei 클러스터 토큰이 필요해 셀프서비스 개설 불가"
+    unavailable_reason: "Needs a Klei cluster token, so it cannot be created through chat."
+    unavailable_reason_translations: { ko: "Klei 클러스터 토큰이 필요해 셀프서비스 개설 불가", en: "Needs a Klei cluster token, so it cannot be created through chat." }
     player_var: null
     sizes:
-      - { id: s, label: "6명 정도", players: 6, memory: 2048, disk: 8192, cpu: 200 }
+      - id: "s"
+        label: "About 6 players"
+        label_translations: { ko: "6명 정도", en: "About 6 players" }
+        players: 6
+        memory: 2048
+        disk: 8192
+        cpu: 200
     ask: []
     defaults: {}
     ports: { count: 1, protocol: [udp] }

@@ -62,6 +62,71 @@ are English — it measures ~40% cheaper in tokens. The reply language is chosen
 user's panel profile, and the directive appears at both the start and the end of the
 prompt (with it in only one place, replies leaked back to English mid-conversation).
 
+## Adding a tool
+
+A tool is not finished when the dispatcher runs it. Four places have to agree, and the
+compiler checks none of them:
+
+1. **The definition** — name, description, input schema
+2. **The dispatcher** — the `match` arm that runs it
+3. **The permission** — `ADMIN_TOOL_PERMISSIONS` for admin tools, `TOOL_PERMISSIONS` for
+   server tools. Checked twice: when exposing and when running
+4. **The label** — `tool_<name>` in every `lang/*/strings.php`. **Without it the sidebar
+   shows the raw translation key while the tool runs** — the user sees
+   `concierge::strings.tool_list_catalog_games` instead of "Checking the game catalogue"
+
+Two more when the tool changes something:
+
+5. **`CONFIRM_TOOLS`** — so it produces a confirmation card instead of acting
+6. **`ADMIN_CARD_TOOLS`** — if the card does not resolve a server. Miss this and the card
+   dies with `server is required`
+
+A quick check for 4, against the running panel:
+
+```php
+$tb = new AgentToolbox($user);
+foreach (collect($tb->definitions())->pluck('name') as $n) {
+    $k = "concierge::strings.tool_{$n}";
+    if (trans($k) === $k) { echo "missing label: {$n}\n"; }
+}
+```
+
+Run it for every locale — a label added to `ko` and forgotten in `en` fails the same way
+for English users.
+
+## Migrations
+
+Pelican's installer offers four databases — SQLite, MySQL, MariaDB, PostgreSQL — and this
+plugin shipped for months installable on exactly one of them. Two rules would have caught
+it, and both are cheap:
+
+- 🔴 **Panel tables are `INT UNSIGNED`.** `servers`, `users` and their siblings were
+  created with `$table->increments('id')`. Reference them with `unsignedInteger`, never
+  `foreignId()` — that emits `BIGINT UNSIGNED`, and MySQL rejects the foreign key with
+  errno 3780 while SQLite accepts it without comment. Worse, the rejection lands *after*
+  the `CREATE TABLE` in the same migration, and none of the three server engines has
+  transactional DDL: the table survives, the migration is never recorded, and every retry
+  from then on reports `1050 Table already exists`. One wrong column type makes the plugin
+  permanently uninstallable.
+- 🔴 **A migration that has shipped is history. Do not edit it.** Not to add a column, not
+  to extend a seed. `869bfcd` added a per-locale field to `024`'s seed while the column
+  itself arrived in `025` — every installed panel had both recorded so nothing re-ran, and
+  every new install died on it, on all four engines. New facts arrive as a new migration.
+
+```bash
+bash scripts/verify-migrations.sh        # PANEL=<container> to point at another panel
+```
+
+It stands up MySQL, MariaDB and PostgreSQL in throwaway containers, plus a fresh SQLite
+file, and runs the panel schema and then the plugin's chain through the same entry point
+the host uses (`PluginService::runPluginMigrations`). Then it checks what actually landed:
+the nine `concierge_*` tables, no leftovers under the two former names, the foreign keys
+really attached, and the seeds non-empty.
+
+⚠ **Our own panel cannot stand in for this.** Every migration is already recorded there,
+so nothing re-runs and a broken chain looks perfectly healthy. Both defects above were
+invisible on it. Run against an empty database or you have tested nothing.
+
 ## Measured pitfalls
 
 - 🔴 **Tenant global scopes.** Filament registers global scopes on tenant-panel models

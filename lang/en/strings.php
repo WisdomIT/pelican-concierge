@@ -60,6 +60,16 @@ return [
     'tool_list_api_keys' => 'Checking API keys',
     'tool_get_panel_health' => 'Checking panel health',
     'tool_get_activity_log' => 'Checking activity log',
+    'tool_get_usage_stats' => 'Checking usage statistics',
+    // Catalogue tools (#91)
+    'tool_list_catalog_games' => 'Checking the game catalogue',
+    'tool_get_catalog_game' => 'Checking a catalogue entry',
+    'tool_create_catalog_game' => 'Adding a game to the catalogue',
+    'tool_update_catalog_game' => 'Updating a catalogue entry',
+    'tool_delete_catalog_game' => 'Removing a catalogue entry',
+    // Importing eggs (#105)
+    'tool_list_importable_eggs' => 'Searching for eggs to import',
+    'tool_import_egg' => 'Importing an egg',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',
@@ -139,6 +149,17 @@ return [
     'card_note_create_node' => 'This only registers it on the panel — wings must be installed on that machine with this node\'s configuration before it works, and ports have to be added afterwards.',
     'card_node_address' => 'Address',
     'card_title_create_mount' => 'Create this mount?',
+    // Importing eggs (#105) — this brings in someone else's install script, so the card names the source.
+    'card_title_import_egg' => 'Import this egg?',
+    'card_confirm_import_egg' => 'Import',
+    'card_egg' => 'Egg',
+    'card_egg_source' => 'Source',
+    'card_egg_source_index' => 'Official index · :category',
+    'card_egg_source_url' => 'A url that is not in the official index',
+    'card_egg_url' => 'Url',
+    'card_egg_replaces' => 'Replaces',
+    'card_note_import_egg' => 'An egg carries install scripts and a startup command — importing it means whatever its author wrote will run on this panel. Importing does not make the assistant offer this game; that needs a catalogue entry of its own.',
+    'card_note_import_egg_unlisted' => '⚠ This url is not in the panel\'s official egg index. An egg carries install scripts and a startup command, so importing it means whatever its author wrote will run on this panel. Do not approve unless you checked the url yourself.',
     'card_confirm_create_mount' => 'Create',
     'card_note_create_mount' => 'Creating it is not enough — attach it to nodes and eggs on the mount screen for it to take effect.',
     'card_mount_name' => 'Name',
@@ -241,7 +262,10 @@ return [
     'search_unsupported' => 'This provider has no web search. The assistant will say so when a question needs current information.',
     'verify_key' => 'Verify connection',
     'verify_required' => 'Verification required',
-    'verify_required_body' => 'A new key or a new provider must pass "Verify connection" before saving. Verify first, then save again.',
+    // ⚠ With several entries, say which one — a collapsed list gives no clue otherwise.
+    'verify_required_body' => 'An entry with a new key must pass "Verify connection" before it can be saved — :entry. Expand it, press the button, then save again.',
+    // Shown under the field — no need to name the entry, the field is the entry.
+    'verify_required_inline' => 'Press "Verify connection" with this key before saving.',
     'verify_ok' => 'Connected — the key is valid.',
     'verify_failed' => 'Verification failed',
     'verify_no_key' => 'Nothing to verify — enter or save a key first.',
@@ -472,6 +496,23 @@ return [
     'empty_reply' => 'The reply came back empty. Please ask again.',
 
     // Known kinds of provider failure — say the reason and the next step, not the raw error (#3).
+    'entries_help' => 'Where the assistant does its talking. With more than one, the first is the primary and the rest are fallbacks in order — if the primary hits its quota or goes down, the next one takes over, and the primary is tried again shortly. A failover leaves a line in the conversation and notifies administrators.',
+    'entries_add' => 'Add a provider',
+    'entry_field_label' => 'Name',
+    'entry_help_label' => 'How this entry appears in the list, in notifications and in the usage log. Leave it empty to use the provider name — if you configure the same provider twice, give them names you can tell apart.',
+
+    // ── Failover (#89) ──
+    'failover_event' => ':from stopped answering, so :to took over (:reason). A different model is replying from here on.',
+    'failover_back_event' => ':to is answering again, so it is back in charge.',
+    'failover_reason_quota' => 'quota reached',
+    'failover_reason_down' => 'provider outage',
+    'failover_reason_unreachable' => 'could not connect',
+    'failover_reason_model_gone' => 'model withdrawn',
+    'failover_reason_auth' => 'API key refused',
+    'failover_reason_request' => 'request error',
+    'failover_notice_title' => ':from is not answering',
+    'failover_notice_body' => 'Reason: :reason. :to is answering instead — the assistant still works, but on a different model. :from will be tried again shortly.',
+
     'provider_quota' => 'The AI model\'s usage quota was exceeded. Try again shortly, and tell an administrator if it keeps happening — the API key may have no quota for the selected model (for example, Gemini\'s Pro preview models require a key with billing enabled).',
     'provider_model_gone' => 'The configured AI model is not offered by the provider. Tell an administrator — the model needs to be re-selected in settings.',
     'provider_auth' => 'The AI provider rejected the API key. Tell an administrator — the key needs to be checked in settings.',
@@ -524,13 +565,16 @@ return [
     'idle_snoozed' => 'Alright, leaving :server running. I will keep watching.',
 
     // ── Admin · settings ──
-    'settings_title' => 'AI Agent Settings',
-    'save' => 'Save',
     'saved' => 'Settings saved.',
 
-    'section_general' => 'General',
-    'section_connection' => 'Model connection',
-    'section_limits' => 'Limits and logging',
+    // Tab names (#103). Ordered by the kind of decision — nothing else matters until the
+    // connection works, and appearance changes no behaviour so it comes last.
+    'tab_connection' => 'Agent connection',
+    'tab_limits' => 'Usage limits',
+    'tab_features' => 'Features',
+    'tab_environment' => 'Environment',
+    'tab_presets' => 'Starting points',
+    'tab_appearance' => 'Appearance',
 
 
     'field_api_key_for' => ':provider API key',
@@ -630,6 +674,7 @@ return [
 
     // ── Game catalogue administration (#81) ──
     'catalog_title' => 'AI Agent game catalogue',
+    'catalog_ask_agent' => 'Build one with the assistant',
     'catalog_game' => 'Game',
     'catalog_section_basics' => 'Basics',
     'catalog_section_basics_help' => 'What users see this game called, and which egg it is created from.',
@@ -644,6 +689,9 @@ return [
     'catalog_field_name_translations' => 'Names by language',
     'catalog_field_summary_translations' => 'Summaries by language',
     'catalog_help_translations' => 'Optional. Leave empty and the default above is used — a single-language panel never needs these. Use language codes like ko, en.',
+    'catalog_field_label_translations' => 'Label by language',
+    'catalog_field_note_translations' => 'Explanation by language',
+    'catalog_field_reason_translations' => 'Reason by language',
     'catalog_locale' => 'Language code',
     'catalog_add_translation' => 'Add a language',
     'catalog_field_available' => 'Agent may create it',
@@ -753,4 +801,53 @@ return [
     'catalog_check_env_unknown' => ':env is not a variable on egg ":egg" — this value is silently ignored.',
     'catalog_doc_title' => 'Advanced field reference',
     'catalog_doc_intro' => 'Every key is optional. The editor checks what you write against this reference and against the egg you picked.',
+    // Catalogue tool cards (#91)
+    'card_title_create_catalog_game' => 'Add this game to the catalogue?',
+    'card_confirm_create_catalog_game' => 'Add',
+    'card_title_update_catalog_game' => 'Change this catalogue entry?',
+    'card_confirm_update_catalog_game' => 'Apply',
+    'card_title_delete_catalog_game' => 'Remove this entry from the catalogue?',
+    'card_confirm_delete_catalog_game' => 'Remove',
+    'card_catalog_unavailable' => 'the assistant will not create it',
+    'card_note_catalog_create' => 'The assistant will start offering this game to users. Existing servers are unaffected.',
+    'card_note_catalog_update' => 'Applies to servers created **from now on**. Servers already created stay as they are.',
+    'card_note_catalog_delete' => 'Only the catalogue entry goes — **servers created from it are untouched.** If you just want to stop offering it, turn off creation instead, which also lets you say why.',
+    // Conversation starting points (#93)
+    'preset_label_games' => 'What games can I make?',
+    'preset_prompt_games' => 'What game servers can I create? Tell me briefly what each one is.',
+    'preset_label_status' => 'How are my servers?',
+    'preset_prompt_status' => 'How are my servers doing right now? Tell me if anything is wrong.',
+    'preset_label_cannot_join' => "I can't connect to my server",
+    'preset_prompt_cannot_join' => 'My server is running but nobody can connect. Find out why.',
+    'preset_label_catalog_new' => 'Add a game to the catalogue',
+    'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
+    'preset_label_health' => 'Check the panel',
+    'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
+    'preset_label_egg_import' => 'Import an egg',
+    'preset_prompt_egg_import' => 'I want to add a game this panel does not have yet. Show me which eggs are imported, then find the one I want in the official index and bring it in.',
+    'preset_label_user_new' => 'Add a user',
+    'preset_prompt_user_new' => 'Create a new user for me. Ask me for whatever you need first.',
+
+    // ── Admin · editing starting points (#103) ──
+    'presets_help' => 'The buttons above the message box when a chat is first opened. Pressing one sends that sentence as if the user typed it — it is recorded as their speech and counts against their quota. Of the ones that pass every condition (visibility, permission, path), the first four are shown, so the order decides what appears.',
+    'presets_add' => 'Add a starting point',
+    'presets_new_item' => 'New starting point',
+    'presets_field_key' => 'Identifier',
+    'presets_help_key' => 'Lower-case letters, digits and underscores. This is the name used to open the starting point from outside the chat (the "Build it with the assistant" button on the catalogue list, for example) — change it and that button opens nothing.',
+    'presets_field_enabled' => 'Enabled',
+    'presets_field_label' => 'Button text',
+    'presets_help_label' => 'The short line written on the button. Word it the way a user would say it.',
+    'presets_field_label_translations' => 'Button text (per language)',
+    'presets_field_prompt' => 'Sentence to send',
+    'presets_help_prompt' => 'The question sent under the user\'s name when the button is pressed. Do not write the answer into it — put facts in ("the games you can create are A, B and C") and the assistant reads back something it never checked. Keep it a question and the assistant checks with its tools before answering.',
+    'presets_field_prompt_translations' => 'Sentence to send (per language)',
+    'presets_field_visibility' => 'Who sees it',
+    'presets_help_visibility' => 'Offering a starting point to someone who cannot use the tools behind it is a dead end.',
+    'presets_visibility_all' => 'Everyone',
+    'presets_visibility_create' => 'People who can create servers',
+    'presets_visibility_admin' => 'Administrators',
+    'presets_field_permission' => 'Extra permission (optional)',
+    'presets_help_permission' => 'Shown only to holders of this permission. Write it as-is, whether it is a panel permission (update egg) or one of this plugin\'s (viewList wisdomAgent). Leave it empty to skip the check.',
+    'presets_field_path' => 'Where it shows (optional)',
+    'presets_help_path' => 'Empty means every screen. Give a path pattern and it shows only there — for example *concierge-games*. ⚠ This decides whether the suggestion is worth making here, not who may use it. Keeping someone out is the job of the visibility and permission above.',
 ];

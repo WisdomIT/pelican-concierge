@@ -39,6 +39,12 @@ return new class extends Migration
 
             $table->boolean('available')->default(true);
             $table->string('unavailable_reason')->nullable();
+            // 🔴 원래는 025 가 뒤에 붙이던 칸이다. 그런데 #99 가 **이미 배포된 이 시드**에
+            //    번역을 끼워 넣으면서, 새 설치는 아직 없는 칸에 값을 넣으려다 죽었다
+            //    (엔진을 가리지 않는다 — #106). 이미 돌린 패널은 024·025 가 모두 기록돼
+            //    있어 아무 일도 겪지 않았고, 그래서 아무도 몰랐다.
+            //    칸을 여기서 만들고, 025 는 있으면 건너뛴다 — 두 경로가 같은 곳에 닿는다.
+            $table->json('unavailable_reason_translations')->nullable();
 
             // 크기·질문은 게임 안의 목록이라 JSON 이다. 화면에서는 반복 필드로 편집한다.
             $table->json('sizes')->nullable();
@@ -81,7 +87,7 @@ return new class extends Migration
         // 어느 하나도 잃지 않는다. 새 키가 생겨도 자동으로 따라온다.
         $columns = [
             'id', 'name', 'summary', 'egg', 'available', 'unavailable_reason', 'sizes', 'ask',
-            'name_translations', 'summary_translations',
+            'name_translations', 'summary_translations', 'unavailable_reason_translations',
         ];
 
         foreach (array_values($games) as $sort => $game) {
@@ -99,6 +105,9 @@ return new class extends Migration
                 'egg' => (string) ($game['egg'] ?? ''),
                 'available' => (bool) ($game['available'] ?? true),
                 'unavailable_reason' => $game['unavailable_reason'] ?? null,
+                'unavailable_reason_translations' => isset($game['unavailable_reason_translations'])
+                    ? json_encode($game['unavailable_reason_translations'], JSON_UNESCAPED_UNICODE)
+                    : null,
                 'sizes' => json_encode($game['sizes'] ?? [], JSON_UNESCAPED_UNICODE),
                 'ask' => json_encode($game['ask'] ?? [], JSON_UNESCAPED_UNICODE),
                 'advanced' => json_encode(

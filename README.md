@@ -75,7 +75,7 @@ from the requester's own permissions, so it differs per person.
 | Diagnose | node health and capacity, wings reachability, ports, users and what they own, roles and what each grants, eggs and their variables, mounts, database and backup hosts, webhooks, API keys, panel health, activity log |
 | Operate | maintenance mode, add or reclaim ports, suspend a server |
 | People | create an account, grant or revoke roles, transfer a server, edit an account, send a password reset link, clear a stuck two-factor, create roles and set their permissions |
-| Build | register a node or a mount |
+| Build | register a node or a mount; search the official egg index and import a game this panel does not have yet |
 | Delete | servers, accounts, roles, nodes, mounts — each behind the strongest confirmation in the product |
 
 ## What the assistant can do depends on who is asking
@@ -147,6 +147,8 @@ player query it counts players; otherwise it watches network traffic.
   **local OpenAI-compatible endpoints** (Ollama, vLLM, llama.cpp) are also supported.
   API usage is billed to your key. See *Cost* below.
 - A working queue worker (server creation and install checks run as background jobs)
+- Any database the panel supports — SQLite, MySQL, MariaDB or PostgreSQL. The migrations
+  are checked against all four before release
 
 The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 
@@ -169,25 +171,66 @@ The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 Keep the zip filename as-is — the panel derives the plugin folder name from it, and it
 has to match the `id` in `plugin.json`.
 
-Then open **Admin → Advanced → AI Agent Settings** and paste your API key.
+Then find Concierge on the panel's plugin list, press **Settings**, and paste your API key.
 
 ## Configuration
 
-Everything lives on the admin settings page; nothing needs an `.env` change.
+Everything lives in that settings dialog; nothing needs an `.env` change. It is split into
+six tabs, ordered by the kind of decision each one holds — **Agent connection** (nothing
+else matters until this works), **Usage limits**, **Features**, **Environment**,
+**Starting points**, **Appearance**. One save covers all six.
 
-| Setting | Default | Notes |
-|---|---|---|
-| LLM provider | Anthropic | OpenAI, Google (Gemini) and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
-| API key | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
-| Model | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
-| Effort | `medium` | How hard the model thinks. Higher costs more |
-| Max tokens | `8192` | Per reply |
-| Usage limit | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
-| Idle watch | off | Interval, and whether to stop the server or only ask |
-| Web search | off | Adds a per-search fee on top of tokens |
-| Conversation deletion | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
-| Sidebar colour | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
-| About this deployment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
+| Setting | Tab | Default | Notes |
+|---|---|---|---|
+| Providers | Connection | one entry | An ordered list. The first is the primary, the rest are fallbacks — see below. Anthropic, OpenAI, Google (Gemini) and local OpenAI-compatible endpoints; the same provider may appear more than once |
+| API key | Connection | — | Belongs to the entry, stored encrypted. Local endpoints usually need none. Leave the field empty to keep the stored key |
+| Model | Connection | `claude-opus-5` | Per entry. Choices come from the provider itself; local endpoints take a free-form name — pick one that supports tool calling |
+| Effort | Connection | `medium` | Per entry. How hard the model thinks. Higher costs more |
+| Max tokens | Connection | `8192` | Per entry, per reply |
+| Usage limit | Limits | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
+| Web search | Features | off | Adds a per-search fee on top of tokens |
+| Idle watch | Features | off | Interval, and whether to stop the server or only ask |
+| Conversation deletion | Features | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
+| About this deployment | Environment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
+| Starting points | Starting points | seven shipped | The buttons above the message box on an empty chat. Each carries a label and a sentence, both translatable, plus who sees it (everyone · can-create · admin), an optional permission, and an optional path pattern. See below |
+| Sidebar colour | Appearance | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
+
+### When a provider stops answering
+
+Configure more than one entry and the assistant keeps working when the first one does not.
+A quota reached, an outage, a withdrawn model, a refused key — the next entry takes over
+**at a turn boundary**, and the failed one is skipped for a while rather than dropped, so
+the primary comes back on its own once its quota clears.
+
+Three things happen when it does:
+
+- A line appears **in the conversation** — the answers are coming from a different, often
+  weaker model, and nobody should have to guess why the quality changed.
+- Administrators get a **notification**: which entry stopped, the reason, and what took
+  over. Once per episode, never once per message, and never containing a key.
+- The usage log records **which entry was billed**, so the cost breakdown stays honest
+  after a failover.
+
+A request the next provider would also reject — a malformed request, a tool-schema
+problem — is not failed over. It would burn tokens twice for the same error.
+
+### Starting points
+
+A starting point is a button that writes the user's first sentence for them. Pressing one
+sends that sentence **as if the user typed it** — it is recorded as their speech and counts
+against their quota.
+
+Two rules are worth knowing before you write one:
+
+- **Do not put the answer in the prompt.** "The games you can create are A, B and C" makes
+  the assistant read back something it never checked. Keep it a question; the assistant has
+  tools and will look.
+- **The path pattern decides relevance, not access.** It answers "is this worth suggesting
+  on this screen", so a catalogue suggestion does not surface on a server console. What
+  keeps someone out is the visibility level and the optional permission.
+
+Of the starting points that pass all three conditions, the first four appear — so the order
+you drag them into is what decides which ones are seen.
 
 Model and effort choices are listed in `config/concierge.php`. When Anthropic
 ships a new model you can add it there without touching code.

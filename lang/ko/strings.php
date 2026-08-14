@@ -60,6 +60,16 @@ return [
     'tool_list_api_keys' => 'API 키 확인 중',
     'tool_get_panel_health' => '패널 상태 확인 중',
     'tool_get_activity_log' => '활동 기록 확인 중',
+    'tool_get_usage_stats' => '사용량 통계 확인 중',
+    // 카탈로그 도구 (#91)
+    'tool_list_catalog_games' => '게임 카탈로그 확인 중',
+    'tool_get_catalog_game' => '카탈로그 항목 확인 중',
+    'tool_create_catalog_game' => '카탈로그에 게임 추가하는 중',
+    'tool_update_catalog_game' => '카탈로그 항목 고치는 중',
+    'tool_delete_catalog_game' => '카탈로그 항목 지우는 중',
+    // egg 가져오기 (#105)
+    'tool_list_importable_eggs' => '가져올 수 있는 egg 찾는 중',
+    'tool_import_egg' => 'egg 가져오는 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
@@ -139,6 +149,17 @@ return [
     'card_note_create_node' => '패널에 등록만 됩니다 — 그 서버에 wings 를 설치하고 이 노드의 설정을 넣어야 실제로 동작합니다. 그다음 포트도 추가해야 합니다.',
     'card_node_address' => '접속 주소',
     'card_title_create_mount' => '이 마운트를 만들까요?',
+    // egg 가져오기 (#105) — 남이 쓴 설치 스크립트를 들이는 일이라 출처를 카드에 적는다.
+    'card_title_import_egg' => '이 egg 를 가져올까요?',
+    'card_confirm_import_egg' => '가져오기',
+    'card_egg' => 'egg',
+    'card_egg_source' => '출처',
+    'card_egg_source_index' => '공식 목록 · :category',
+    'card_egg_source_url' => '공식 목록에 없는 주소',
+    'card_egg_url' => '주소',
+    'card_egg_replaces' => '덮어쓰는 egg',
+    'card_note_import_egg' => 'egg 에는 설치 스크립트와 시작 명령이 들어 있습니다 — 가져오면 그 작성자가 쓴 것이 이 패널에서 돌아갑니다. 가져와도 어시스턴트가 이 게임을 권하지는 않습니다. 그러려면 카탈로그 항목이 따로 필요합니다.',
+    'card_note_import_egg_unlisted' => '⚠ 이 주소는 패널의 공식 egg 목록에 없습니다. egg 에는 설치 스크립트와 시작 명령이 들어 있어, 가져오면 그 작성자가 쓴 것이 이 패널에서 돌아갑니다. 주소를 직접 확인하신 게 아니라면 승인하지 마세요.',
     'card_confirm_create_mount' => '만들기',
     'card_note_create_mount' => '만들기만 합니다 — 마운트 화면에서 노드와 게임(egg)에 연결해야 실제로 붙습니다.',
     'card_mount_name' => '이름',
@@ -241,7 +262,10 @@ return [
     'search_unsupported' => '이 공급자는 웹 검색이 없습니다. 최신 정보가 필요한 질문에는 어시스턴트가 그 사실을 말합니다.',
     'verify_key' => '연결 확인',
     'verify_required' => '연결 확인이 필요합니다',
-    'verify_required_body' => '새 키 또는 새 공급자는 "연결 확인"을 통과해야 저장됩니다. 버튼을 눌러 확인한 뒤 다시 저장하세요.',
+    // ⚠ 항목이 여럿이므로 **어느 항목인지** 밝힌다 — 목록이 접혀 있으면 어디가 문제인지 알 수 없다.
+    'verify_required_body' => '새 키를 넣은 항목은 "연결 확인"을 통과해야 저장됩니다 — :entry. 그 항목을 펼쳐 버튼을 누른 뒤 다시 저장하세요.',
+    // 칸 아래에 붙는 검증 메시지 — 어느 항목인지 말할 필요가 없다. 그 칸이 곧 그 항목이다.
+    'verify_required_inline' => '이 키로 "연결 확인"을 먼저 통과해야 합니다.',
     'verify_ok' => '연결 정상 — 키가 유효합니다.',
     'verify_failed' => '연결 확인 실패',
     'verify_no_key' => '확인할 키가 없습니다 — 키를 입력하거나 저장한 뒤 다시 시도하세요.',
@@ -473,6 +497,25 @@ return [
     'empty_reply' => '답변이 비어 있습니다. 다시 물어봐 주세요.',
 
     // 공급자 호출 실패의 아는 유형들 — 원문 대신 이유와 다음 행동을 말한다 (#3).
+    'entries_help' => '어시스턴트가 말을 거는 곳입니다. 여러 개를 두면 첫 번째가 주 공급자이고 나머지가 순서대로 대비책입니다 — 주 공급자가 쿼터에 걸리거나 장애로 답하지 못하면 다음 항목이 이어받고, 잠시 뒤 다시 주 공급자를 시도합니다. 넘어가면 대화에 한 줄이 남고 관리자에게 알림이 갑니다.',
+    'entries_add' => '공급자 추가',
+    'entry_field_label' => '이름',
+    'entry_help_label' => '목록과 알림, 사용 기록에 이 이름으로 나옵니다. 비우면 공급자 이름을 씁니다 — 같은 공급자를 둘 두면 구분할 이름을 적어 두세요.',
+
+    // ── 장애 조치 (#89) ──
+    // ⚠ 항목 이름은 운영자가 짓는 임의의 문자열이다 — 받침을 알 수 없어 은/는·이/가·로/으로를
+    //   붙일 수 없다. 이름 뒤에 조사가 오지 않는 문장으로 쓴다.
+    'failover_event' => '응답이 없어 다른 공급자로 넘어갔습니다 — :from → :to (:reason). 지금부터는 다른 모델이 답합니다.',
+    'failover_back_event' => '원래 공급자로 돌아왔습니다 — :to.',
+    'failover_reason_quota' => '사용량 한도',
+    'failover_reason_down' => '공급자 장애',
+    'failover_reason_unreachable' => '연결 실패',
+    'failover_reason_model_gone' => '모델 없음',
+    'failover_reason_auth' => 'API 키 거부',
+    'failover_reason_request' => '요청 오류',
+    'failover_notice_title' => '공급자가 응답하지 않습니다 — :from',
+    'failover_notice_body' => '이유: :reason. 지금은 다른 항목으로 답하고 있습니다 — :to. 어시스턴트는 계속 동작하지만 모델이 다릅니다. 잠시 뒤 원래 공급자를 다시 시도합니다.',
+
     'provider_quota' => 'AI 모델의 사용량 한도(쿼터)에 걸려 응답하지 못했습니다. 잠시 뒤 다시 시도해 보고, 계속 그러면 관리자에게 알려주세요 — 선택한 모델의 쿼터가 API 키에 없을 수 있습니다(예: Gemini 의 Pro 프리뷰 모델은 유료 결제가 연결된 키가 필요합니다).',
     'provider_model_gone' => '설정된 AI 모델을 공급자가 제공하지 않습니다. 관리자에게 알려주세요 — 설정에서 모델을 다시 골라야 합니다.',
     'provider_auth' => 'AI 공급자가 API 키를 거부했습니다. 관리자에게 알려주세요 — 설정에서 키를 확인해야 합니다.',
@@ -525,13 +568,16 @@ return [
     'idle_snoozed' => '알겠습니다. :server 는 그대로 두고 다시 지켜볼게요.',
 
     // ── 관리자 · 설정 ──
-    'settings_title' => 'AI Agent 설정',
-    'save' => '저장',
     'saved' => '설정을 저장했습니다.',
 
-    'section_general' => '일반',
-    'section_connection' => '모델 연결',
-    'section_limits' => '한도와 로그',
+    // 탭 이름(#103). 순서는 결정의 성격을 따른다 — 연결 없이는 나머지가 의미 없고,
+    // 모양은 동작을 바꾸지 않으므로 마지막이다.
+    'tab_connection' => '에이전트 연결',
+    'tab_limits' => '사용 한도',
+    'tab_features' => '기능',
+    'tab_environment' => '환경 정보',
+    'tab_presets' => '대화 시작점',
+    'tab_appearance' => '모양',
 
 
     'field_api_key_for' => ':provider API 키',
@@ -631,6 +677,7 @@ return [
 
     // ── 게임 카탈로그 관리 (#81) ──
     'catalog_title' => 'AI Agent 게임 카탈로그',
+    'catalog_ask_agent' => '에이전트와 함께 만들기',
     'catalog_game' => '게임',
     'catalog_section_basics' => '기본 정보',
     'catalog_section_basics_help' => '사용자에게 보이는 이름과, 이 게임이 어떤 egg 로 만들어지는지를 정합니다.',
@@ -645,6 +692,9 @@ return [
     'catalog_field_name_translations' => '언어별 이름',
     'catalog_field_summary_translations' => '언어별 설명',
     'catalog_help_translations' => '선택 사항입니다. 비워 두면 위의 기본값을 씁니다 — 한 가지 언어만 쓰는 패널이라면 채울 필요가 없습니다. 언어 코드는 ko, en 처럼 적습니다.',
+    'catalog_field_label_translations' => '언어별 라벨',
+    'catalog_field_note_translations' => '언어별 안내',
+    'catalog_field_reason_translations' => '언어별 사유',
     'catalog_locale' => '언어 코드',
     'catalog_add_translation' => '언어 추가',
     'catalog_field_available' => '에이전트 개설 허용',
@@ -753,4 +803,53 @@ return [
     'catalog_check_env_unknown' => ':env 는 egg ":egg" 에 없는 변수입니다 — 이 값은 조용히 무시됩니다.',
     'catalog_doc_title' => '고급 항목 문서',
     'catalog_doc_intro' => '모든 키는 선택입니다. 편집기는 이 문서의 형태와 고른 egg 양쪽에 맞춰 검사합니다.',
+    // 카탈로그 도구 카드 (#91)
+    'card_title_create_catalog_game' => '이 게임을 카탈로그에 추가할까요?',
+    'card_confirm_create_catalog_game' => '추가하기',
+    'card_title_update_catalog_game' => '이 카탈로그 항목을 바꿀까요?',
+    'card_confirm_update_catalog_game' => '바꾸기',
+    'card_title_delete_catalog_game' => '이 항목을 카탈로그에서 지울까요?',
+    'card_confirm_delete_catalog_game' => '지우기',
+    'card_catalog_unavailable' => '에이전트가 개설하지 않음',
+    'card_note_catalog_create' => '에이전트가 이 게임을 사용자에게 제안하게 됩니다. 이미 만들어진 서버에는 영향이 없습니다.',
+    'card_note_catalog_update' => '이 항목으로 **앞으로** 만들 서버에 적용됩니다. 이미 만들어진 서버는 그대로입니다.',
+    'card_note_catalog_delete' => '카탈로그에서만 사라집니다 — **이 게임으로 만든 서버는 그대로 남습니다.** 잠시 제안만 멈추려는 것이라면 삭제 대신 개설 허용을 끄세요(이유도 함께 적을 수 있습니다).',
+    // 대화 시작점 (#93)
+    'preset_label_games' => '어떤 게임을 만들 수 있어?',
+    'preset_prompt_games' => '어떤 게임 서버를 만들 수 있어? 각각 어떤 게임인지도 짧게 알려줘.',
+    'preset_label_status' => '내 서버 상태 알려줘',
+    'preset_prompt_status' => '내 서버들 지금 상태가 어때? 문제 있는 게 있으면 알려줘.',
+    'preset_label_cannot_join' => '서버에 접속이 안 돼',
+    'preset_prompt_cannot_join' => '서버가 켜져 있는데 접속이 안 돼. 원인을 찾아줘.',
+    'preset_label_catalog_new' => '카탈로그에 게임 추가',
+    'preset_prompt_catalog_new' => '카탈로그에 새 게임을 추가하고 싶어. 지금 카탈로그에 뭐가 있고 아직 항목이 없는 egg 는 뭐가 있는지 알려줘. 그다음 하나 골라서 같이 만들자.',
+    'preset_label_health' => '패널 상태 점검',
+    'preset_prompt_health' => '패널이랑 노드 상태를 점검해줘. 문제가 될 만한 게 있으면 짚어줘.',
+    'preset_label_egg_import' => 'egg 가져오기',
+    'preset_prompt_egg_import' => '이 패널에 없는 게임을 추가하고 싶어. 지금 어떤 egg 가 들어와 있는지 보여주고, 없는 게임은 공식 목록에서 찾아서 가져와줘.',
+    'preset_label_user_new' => '새 사용자 추가',
+    'preset_prompt_user_new' => '새 사용자를 만들어줘. 필요한 게 있으면 물어보고 진행해줘.',
+
+    // ── 관리자 · 대화 시작점 편집 (#103) ──
+    'presets_help' => '채팅을 처음 열었을 때 입력창 위에 놓이는 버튼들입니다. 누르면 그 문장을 사용자가 직접 친 것처럼 보냅니다 — 그 사람의 말로 기록되고 그 사람의 한도에서 깎입니다. 조건(노출 범위·권한·경로)을 모두 통과한 것 중 위에서부터 최대 4개가 보이므로, 순서가 곧 무엇을 보일지입니다.',
+    'presets_add' => '시작점 추가',
+    'presets_new_item' => '새 시작점',
+    'presets_field_key' => '식별자',
+    'presets_help_key' => '영문 소문자·숫자·밑줄. 화면 밖에서 이 시작점을 여는 이름입니다(카탈로그 목록의 "에이전트와 함께 만들기" 버튼 등) — 바꾸면 그 버튼이 아무것도 열지 않습니다.',
+    'presets_field_enabled' => '사용함',
+    'presets_field_label' => '버튼 문구',
+    'presets_help_label' => '버튼에 적히는 짧은 말입니다. 사용자가 할 법한 말투로 적으세요.',
+    'presets_field_label_translations' => '버튼 문구 (언어별)',
+    'presets_field_prompt' => '보낼 문장',
+    'presets_help_prompt' => '눌렀을 때 사용자 이름으로 전송되는 질문입니다. 답을 미리 적지 마세요 — "만들 수 있는 게임은 A·B·C 야" 처럼 사실을 넣으면 에이전트가 확인하지도 않은 것을 되읽습니다. 묻는 문장으로 두면 에이전트가 도구로 확인해 답합니다.',
+    'presets_field_prompt_translations' => '보낼 문장 (언어별)',
+    'presets_field_visibility' => '누구에게',
+    'presets_help_visibility' => '개설·관리 도구를 쓸 수 없는 사람에게 그 시작점을 보여주면 막다른 길이 됩니다.',
+    'presets_visibility_all' => '모두',
+    'presets_visibility_create' => '서버를 개설할 수 있는 사람',
+    'presets_visibility_admin' => '관리자',
+    'presets_field_permission' => '추가 권한 (선택)',
+    'presets_help_permission' => '이 권한이 있어야 보입니다. 패널 권한(update egg)이든 이 플러그인 권한(viewList wisdomAgent)이든 그대로 적으면 됩니다. 비우면 검사하지 않습니다.',
+    'presets_field_path' => '보일 화면 (선택)',
+    'presets_help_path' => '비우면 모든 화면에서 보입니다. 경로 패턴을 적으면 그 화면에서만 보입니다 — 예: *concierge-games*. ⚠ 이것은 접근 제어가 아니라 "지금 화면에서 할 만한 일인가"를 정하는 것입니다. 못 쓰게 막는 일은 위의 노출 범위와 권한이 합니다.',
 ];

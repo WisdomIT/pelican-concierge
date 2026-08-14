@@ -23,17 +23,33 @@ final class ProviderError
      */
     public static function userMessage(Throwable $exception): ?string
     {
+        $kind = self::kind($exception);
+
+        return $kind === ProviderFailure::Request
+            ? null
+            : trans('concierge::strings.provider_' . $kind->value);
+    }
+
+    /**
+     * 실패의 갈래 (#89).
+     *
+     * 🔴 **사용자 문구와 장애 조치가 같은 판정을 본다.** 예전에는 이 match 가 곧바로
+     *    문구를 만들었는데, 그러면 "채팅에는 쿼터라고 뜨는데 넘어가지는 않는" 어긋남이
+     *    생길 수 있다. 갈래를 먼저 정하고 문구는 거기서 파생시킨다.
+     */
+    public static function kind(Throwable $exception): ProviderFailure
+    {
         $status = self::statusOf($exception);
 
         return match (true) {
-            $status === 429 => trans('concierge::strings.provider_quota'),
-            $status === 404 => trans('concierge::strings.provider_model_gone'),
+            $status === 429 => ProviderFailure::Quota,
+            $status === 404 => ProviderFailure::ModelGone,
             in_array($status, [400, 401, 403], true) && self::looksLikeAuth($exception)
-                => trans('concierge::strings.provider_auth'),
-            $status !== null && $status >= 500 => trans('concierge::strings.provider_down'),
+                => ProviderFailure::Auth,
+            $status !== null && $status >= 500 => ProviderFailure::Down,
             $exception instanceof ConnectException,
-            $exception instanceof APIConnectionException => trans('concierge::strings.provider_unreachable'),
-            default => null,
+            $exception instanceof APIConnectionException => ProviderFailure::Unreachable,
+            default => ProviderFailure::Request,
         };
     }
 
