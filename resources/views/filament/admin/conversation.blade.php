@@ -159,13 +159,19 @@
         <div><span>{{ trans('concierge::strings.field_input_tokens') }}</span> <b>{{ number_format($totalIn) }}</b></div>
         <div><span>{{ trans('concierge::strings.field_output_tokens') }}</span> <b>{{ number_format($totalOut) }}</b></div>
         <div><span>{{ trans('concierge::strings.total_tokens') }}</span> <b>{{ number_format($totalIn + $totalOut) }}</b></div>
-        {{-- 공급자(#3) 다음에 모델 — 대화 중간에 바뀌었을 수 있어 전부 나열한다. --}}
+        {{-- 공급자(#3) 다음에 모델 — 대화 중간에 바뀌었을 수 있어 전부 나열한다.
+             🔴 장애 조치(#89)가 있으면 실제로 여럿이다. 어느 항목으로 청구됐는지가
+                provider_entry 에 있으므로 그것을 먼저 쓴다 — 같은 공급자를 둘 두면
+                공급자 이름만으로는 어느 쪽인지 알 수 없다. --}}
         <div><span>{{ trans('concierge::strings.field_provider') }}</span> <b>{{
-            $messages->pluck('provider')->filter()->unique()
-                ->map(fn ($p) => \WisdomIT\Concierge\Llm\ProviderFactory::badge($p) ?: $p)
-                ->implode(', ') ?: 'Anthropic'
+            $messages->map(fn ($m) => filled($m->provider_entry)
+                    ? $m->provider_entry
+                    : (\WisdomIT\Concierge\Llm\ProviderFactory::badge((string) $m->provider) ?: $m->provider))
+                ->filter()->unique()->implode(', ') ?: 'Anthropic'
         }}</b></div>
-        <div><span>{{ trans('concierge::strings.field_model') }}</span> <b>{{ $messages->first()?->model }}</b></div>
+        <div><span>{{ trans('concierge::strings.field_model') }}</span> <b>{{
+            $messages->pluck('model')->filter()->unique()->implode(', ')
+        }}</b></div>
     </div>
 
     <div class="wac-log">

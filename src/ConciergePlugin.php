@@ -3,6 +3,7 @@
 namespace WisdomIT\Concierge;
 
 use App\Contracts\Plugins\HasPluginSettings;
+use Closure;
 use Filament\Contracts\Plugin;
 use App\Enums\PluginStatus;
 use Filament\Forms\Components\Checkbox;
@@ -29,7 +30,9 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\VerticalAlignment;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Llm\ProviderProbe;
@@ -100,16 +103,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         }
 
         return [
-            // api_key 는 절대 되돌려 채우지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
-            'api_key' => '',
-            'clear_api_key' => false,
-            'provider' => $settings->provider ?? 'anthropic',
-            'key_verified' => '',
-            'base_url' => $settings->base_url,
-            'model' => $settings->model,
-            'model_free' => $settings->model,
-            'effort' => $settings->effort,
-            'max_tokens' => $settings->max_tokens,
+            // 🔴 키는 절대 되돌려 채우지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
+            //    항목마다 빈 칸으로 두고, 저장 때 비어 있으면 저장된 키를 그대로 쓴다(#89).
+            'provider_entries' => $this->entryRows(),
             'limit_metric' => UsageLimiter::rules($settings)[0]['metric'] ?? 'messages',
             'limit_scope' => UsageLimiter::rules($settings)[0]['scope'] ?? 'user',
             'limit_period' => UsageLimiter::rules($settings)[0]['period'] ?? 'day',
@@ -126,6 +122,33 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'deployment_knowledge' => $settings->deployment_knowledge,
             'presets' => $this->presetRows(),
         ];
+    }
+
+    /**
+     * 항목 목록을 폼 배열로 (#89).
+     *
+     * 🔴 **키는 싣지 않는다.** 폼 상태는 브라우저로 나가고 Livewire 왕복마다 오간다 —
+     *    저장된 키는 빈 칸으로 두고, 비어 있으면 그대로 둔다는 뜻으로 읽는다.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function entryRows(): array
+    {
+        try {
+            return array_map(fn (array $entry) => [
+                'id' => (string) ($entry['id'] ?? ''),
+                'label' => (string) ($entry['label'] ?? ''),
+                'provider' => (string) ($entry['provider'] ?? 'anthropic'),
+                'api_key' => '',
+                'verified' => '',
+                'base_url' => $entry['base_url'] ?? null,
+                'model' => (string) ($entry['model'] ?? ''),
+                'effort' => (string) ($entry['effort'] ?? ''),
+                'max_tokens' => (int) ($entry['max_tokens'] ?? config('concierge.max_tokens')),
+            ], ConciergeSettings::current()->entries());
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -165,33 +188,6 @@ class ConciergePlugin implements Plugin, HasPluginSettings
      *
      * @return Component[]
      */
-    /** @var array<string, array<string, string>> 폼 렌더 한 번에 엔드포인트를 여러 번 찌르지 않게 */
-    private static array $localModels = [];
-
-    /**
-     * 로컬 엔드포인트의 모델 목록 (#3 후속). 폼 렌더 경로라 요청당 한 번만 조회하고,
-     * 실패는 [] — 그러면 자유 입력 필드가 대신 보인다.
-     *
-     * @return array<string, string>
-     */
-    private function localModelOptions(Get $get): array
-    {
-        if ((string) $get('provider') !== 'openai-compatible') {
-            return [];
-        }
-
-        $baseUrl = (string) ($get('base_url') ?: (ConciergeSettings::current()->base_url ?? ''));
-
-        if ($baseUrl === '') {
-            return [];
-        }
-
-        return self::$localModels[$baseUrl] ??= ProviderProbe::localModels(
-            $baseUrl,
-            ConciergeSettings::current()->apiKeyValueFor('openai-compatible'),
-        );
-    }
-
     /**
      * "연결 확인" 통과의 지문 (#3 후속). 무엇을 확인했는지(공급자·폼에 친 키·주소)를
      * 담는다 — 확인만 눌러 놓고 값을 바꿔 저장하는 우회를 막는 근거다.
@@ -199,16 +195,6 @@ class ConciergePlugin implements Plugin, HasPluginSettings
     private static function verifyFingerprint(string $provider, string $typedKey, string $baseUrl): string
     {
         return sha1($provider . '|' . $typedKey . '|' . $baseUrl);
-    }
-
-    /** 폼 표시용 — 마이그레이션 전(설치 직후) 구간에도 죽지 않는다. */
-    private function hasApiKeyFor(string $provider): bool
-    {
-        try {
-            return ConciergeSettings::current()->hasApiKeyFor($provider);
-        } catch (Throwable) {
-            return false; // "미설정"으로 보이면 충분하다.
-        }
     }
 
     /**
@@ -266,182 +252,257 @@ class ConciergePlugin implements Plugin, HasPluginSettings
     private function connectionFields(): array
     {
         return [
-                    // LLM 공급자(#3). 바꿔도 다른 공급자의 키·모델 선택은 스냅샷에 남는다.
-                    Select::make('provider')
-                        ->label(trans('concierge::strings.field_provider'))
-                        ->options(ProviderFactory::options())
-                        ->helperText(trans('concierge::strings.help_provider'))
-                        ->native(false)
-                        ->default(fn () => ConciergeSettings::current()->provider ?? 'anthropic')
-                        ->live()
-                        // 공급자를 바꾸면 모델·effort 도 그 공급자의 권장값으로 함께 바뀐다 —
-                        // 이전 공급자의 모델이 남아 있으면 저장 때까지 잘못된 조합으로 보인다.
-                        ->afterStateUpdated(function (Set $set, ?string $state): void {
-                            $set('model', (string) config("concierge.providers.{$state}.default_model", ''));
-                            $set('model_free', '');
-                            $set('effort', (string) (config("concierge.providers.{$state}.default_effort") ?? ''));
-                            // 다른 공급자에 대한 확인은 무효다.
-                            $set('key_verified', '');
-                        })
-                        ->required()
-                        ->columnSpanFull(),
+            Text::make(trans('concierge::strings.entries_help'))
+                ->columnSpanFull(),
 
-                    // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
-                    // 키보다 먼저 — 연결 대상(주소)을 정한 뒤 자격(키)을 묻는 순서가 자연스럽다.
-                    TextInput::make('base_url')
-                        ->label(trans('concierge::strings.field_base_url'))
-                        ->helperText(trans('concierge::strings.help_base_url'))
-                        ->placeholder('http://localhost:11434/v1')
-                        ->url()
-                        // 주소를 치고 벗어나면 아래 모델 드롭다운이 그 엔드포인트의 목록으로 채워진다.
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(fn (Set $set) => $set('key_verified', '')) // 다른 주소에 대한 확인은 무효
-                        ->default(fn () => ConciergeSettings::current()->base_url)
-                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
-                        ->columnSpanFull(),
+            // 확인 버튼의 배치 보정. 항목마다 넣으면 목록 길이만큼 복제되므로 탭에 한 번만 둔다.
+            //  · 버튼 쪽 padding 으로 키 칸과 높이를 맞춘다(왼쪽은 0 — 키 칸에 붙어야 한다)
+            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것을 눌러 둔다
+            // (둘 사이 간격은 Repeater 의 gap(false) 가 이미 없앤다 — 여기서 또 지우지 않는다.)
+            Text::make(new HtmlString(
+                '<style>'
+                . '.cg-verify{padding:.75rem .75rem .75rem 0}'
+                . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
+                . '</style>'
+            )),
 
-                    // 키 입력 + 우측 "연결 확인" 버튼. 아이콘 suffix 는 아무도 용도를 모른다 —
-                    // 라벨 있는 버튼으로 뺀다. 확인이 통과하면 지문(key_verified)이 찍히고,
-                    // 새 키·키 없는 공급자 전환은 그 지문 없이는 저장되지 않는다(아래 saveSettings).
-                    Flex::make([
-                        TextInput::make('api_key')
-                            // 키 라벨은 선택된 공급자를 따른다 — 전부 "Anthropic API 키"면 오해를 부른다.
-                            ->label(function (Get $get) {
-                                $short = (string) config('concierge.providers.' . $get('provider') . '.short', '');
-
-                                return $short !== ''
-                                    ? trans('concierge::strings.field_api_key_for', ['provider' => $short])
-                                    : trans('concierge::strings.field_api_key_generic');
-                            })
-                            ->password()
-                            ->revealable()
-                            ->autocomplete(false)
-                            ->default('')
-                            // 키를 새로 치면 이전 확인은 무효다 — 지문을 지워 재확인을 강제한다.
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(fn (Set $set) => $set('key_verified', ''))
-                            // "저장돼 있음" 표시는 **선택된 공급자**의 키를 본다 — 활성 키 하나만
-                            // 보면 Claude 키가 있을 때 다른 공급자에도 저장됨이 떠서 오해를 부른다.
-                            ->placeholder(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider'))
-                                ? trans('concierge::strings.api_key_set')
-                                : trans('concierge::strings.api_key_unset'))
-                            ->helperText(trans('concierge::strings.help_api_key')),
-
-                        FormActions::make([
-                            // GET /models — 토큰을 안 쓰는 가장 싼 인증 검사. 폼에 친 키가
-                            // 있으면 그걸, 없으면 그 공급자의 저장된 키로 확인한다.
-                            Action::make('verify_key')
-                                ->label(trans('concierge::strings.verify_key'))
-                                // 명시하지 않으면 아이콘 버튼으로 렌더된다 — 아이콘이 없어
-                                // 투명한 클릭 영역만 남으므로 라벨 버튼을 강제한다.
-                                ->button()
-                                ->color('gray')
-                                ->action(function (Get $get, Set $set): void {
-                                    $provider = (string) $get('provider');
-                                    $typed = trim((string) $get('api_key'));
-                                    $key = $typed !== ''
-                                        ? $typed
-                                        : ConciergeSettings::current()->apiKeyValueFor($provider);
-                                    $baseUrl = (string) $get('base_url');
-
-                                    $error = ProviderProbe::verify($provider, $key, $baseUrl);
-
-                                    // 확인을 눌렀다는 것은 "지금 상태로 다시 봐 달라"는 뜻이다 —
-                                    // 캐시된 모델 목록을 버려 방금 통한 키의 목록을 받게 한다(#80).
-                                    ProviderFactory::forgetModels($provider, $key, $baseUrl);
-
-                                    if ($error === null) {
-                                        $set('key_verified', self::verifyFingerprint($provider, $typed, $baseUrl));
-                                        Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
-                                    } else {
-                                        $set('key_verified', '');
-                                        Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
-                                    }
-                                }),
-                        ])
-                            ->grow(false)
-                            ->extraAttributes(['class' => 'cg-verify'])
-                            // 하단 정렬은 input 아래 helperText 높이까지 끌려 내려간다 —
-                            // 상단 정렬 + label 높이만큼의 빈 라벨로 input 본체와 나란히 맞춘다.
-                            // 라벨에 스타일을 함께 싣는다 — 별도 컴포넌트로 넣으면 그리드
-                            // 칸이 하나 생겨 간격이 틀어진다. 보정 내용:
-                            //  · 빈 라벨과 실제 field 라벨의 4px 높이 차이
-                            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것
-                            ->label(new HtmlString(
-                                '<style>'
-                                . '.cg-verify{margin-top:-4px}'
-                                . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
-                                . '</style>&nbsp;'
-                            )),
-                    ])->verticalAlignment(VerticalAlignment::Start)->columnSpanFull(),
-
-                    // 확인 통과의 지문 — 무엇을(공급자·키·주소) 확인했는지까지 담아,
-                    // 확인 후 값을 바꾸는 우회를 막는다.
-                    Hidden::make('key_verified')->default(''),
-
-                    // 전용 페이지 시절의 "키 삭제" 버튼을 대신한다 — 플러그인 설정 모달에는
-                    // 임의 액션 버튼을 놓을 자리가 없어 체크박스로 받는다.
-                    Checkbox::make('clear_api_key')
-                        ->label(trans('concierge::strings.field_clear_api_key'))
-                        ->default(false)
-                        ->visible(fn (Get $get) => $this->hasApiKeyFor((string) $get('provider')))
-                        ->columnSpanFull(),
-
-                    // 선택지가 정의된 공급자는 드롭다운으로 —
-                    Select::make('model')
-                        ->label(trans('concierge::strings.field_model'))
-                        ->options(fn (Get $get) => ProviderFactory::modelOptions(
-                            (string) $get('provider'),
-                            // 아직 저장하지 않은 키로도 목록을 받아 온다 — 키를 넣자마자
-                            // 그 키가 쓸 수 있는 모델이 보이는 게 자연스럽다(#80).
-                            trim((string) $get('api_key')) ?: null,
-                            (string) $get('base_url') ?: null,
-                        ))
-                        // 공급자가 주는 목록은 길다(OpenAI 70여 개) — 찾아 고르게 한다.
-                        ->searchable()
-                        ->helperText(trans('concierge::strings.help_model'))
-                        ->native(false)
-                        ->default(fn () => ConciergeSettings::current()->model)
-                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== [])
-                        ->required(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) !== []),
-
-                    // — 로컬 엔드포인트는 `GET /models` 로 목록을 받아 고른다. 엔드포인트가
-                    //   안 닿으면(주소 미입력·서버 꺼짐) 자유 입력으로 물러난다.
-                    Select::make('model_free')
-                        ->label(trans('concierge::strings.field_model'))
-                        ->options(fn (Get $get) => $this->localModelOptions($get))
-                        ->helperText(trans('concierge::strings.help_model_local'))
-                        ->native(false)
-                        ->searchable()
-                        ->default(fn () => ConciergeSettings::current()->model)
-                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []
-                            && $this->localModelOptions($get) !== []),
-
-                    TextInput::make('model_free')
-                        ->label(trans('concierge::strings.field_model'))
-                        ->helperText(trans('concierge::strings.help_model_free'))
-                        ->placeholder('llama3.3:70b')
-                        ->default(fn () => ConciergeSettings::current()->model)
-                        ->visible(fn (Get $get) => (array) config('concierge.providers.' . $get('provider') . '.models', []) === []
-                            && $this->localModelOptions($get) === []),
-
-                    Select::make('effort')
-                        ->label(trans('concierge::strings.field_effort'))
-                        ->options(fn (Get $get) => ProviderFactory::effortOptions((string) $get('provider')))
-                        ->helperText(trans('concierge::strings.help_effort'))
-                        ->native(false)
-                        ->default(fn () => ConciergeSettings::current()->effort)
-                        ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->supportsEffort),
-
-                    TextInput::make('max_tokens')
-                        ->label(trans('concierge::strings.field_max_tokens'))
-                        ->helperText(trans('concierge::strings.help_max_tokens'))
-                        ->numeric()
-                        ->minValue(256)
-                        ->maxValue(64000)
-                        ->default(fn () => ConciergeSettings::current()->max_tokens)
-                        ->required(),
+            Repeater::make('provider_entries')
+                ->hiddenLabel()
+                ->addActionLabel(trans('concierge::strings.entries_add'))
+                ->reorderable()
+                ->collapsible()
+                ->collapsed()
+                ->minItems(1)
+                ->itemLabel(fn (array $state): string => self::entryItemLabel($state))
+                ->schema($this->entryFields())
+                ->columns(2)
+                // 칸마다 이미 제 여백이 있다 — 격자 간격까지 더하면 한 항목이 필요 이상으로
+                // 길어지고, 접었다 펴는 목록에서 그 길이가 곧 읽기 비용이다.
+                ->gap(false)
+                ->columnSpanFull(),
         ];
+    }
+
+    /**
+     * 목록에서 접힌 항목의 한 줄. **첫 항목이 주 공급자**라는 사실이 여기서 보여야 한다 —
+     * 순서가 곧 우선순위인데 그 말이 어디에도 없으면 끌어 옮길 이유를 알 수 없다.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private static function entryItemLabel(array $state): string
+    {
+        $label = trim((string) ($state['label'] ?? ''));
+
+        if ($label === '') {
+            $label = ProviderFactory::label((string) ($state['provider'] ?? ''));
+        }
+
+        return $label . (filled($state['model'] ?? null) ? ' · ' . $state['model'] : '');
+    }
+
+    /**
+     * 항목 하나의 칸들 (#89).
+     *
+     * 🔴 **모든 값이 항목에 속한다** — 공급자·키·주소·모델·effort·응답 상한. 예전에는
+     *    활성 칸 한 벌을 공유하고 공급자별 스냅샷으로 오갔는데, 그 모양으로는 "같은 공급자
+     *    두 개"(키 둘, 혹은 호스팅 하나와 로컬 하나)를 표현할 수 없다.
+     *
+     * @return Component[]
+     */
+    private function entryFields(): array
+    {
+        return [
+            // 항목의 신원. 이름이 바뀌어도 쉬는 상태가 따라가도록 id 를 들고 다닌다.
+            Hidden::make('id')->default(fn () => (string) Str::ulid()),
+            // 이 항목에 대해 "연결 확인"을 통과한 지문. 새 키를 친 항목은 이게 있어야 저장된다.
+            Hidden::make('verified')->default(''),
+
+            TextInput::make('label')
+                ->label(trans('concierge::strings.entry_field_label'))
+                ->helperText(trans('concierge::strings.entry_help_label'))
+                ->maxLength(60)
+                ->placeholder(fn (Get $get) => ProviderFactory::label((string) $get('provider')))
+                ->columnSpanFull(),
+
+            Select::make('provider')
+                ->label(trans('concierge::strings.field_provider'))
+                ->options(ProviderFactory::options())
+                ->native(false)
+                ->default('anthropic')
+                ->live()
+                // 공급자를 바꾸면 모델·effort 도 그 공급자의 권장값으로 함께 바뀐다 —
+                // 이전 공급자의 모델이 남아 있으면 저장 때까지 잘못된 조합으로 보인다.
+                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                    $set('model', (string) config("concierge.providers.{$state}.default_model", ''));
+                    $set('effort', (string) (config("concierge.providers.{$state}.default_effort") ?? ''));
+                    $set('verified', ''); // 다른 공급자에 대한 확인은 무효다
+                })
+                ->required()
+                ->columnSpanFull(),
+
+            // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
+            TextInput::make('base_url')
+                ->label(trans('concierge::strings.field_base_url'))
+                ->helperText(trans('concierge::strings.help_base_url'))
+                ->placeholder('http://localhost:11434/v1')
+                ->url()
+                ->live(onBlur: true)
+                ->afterStateUpdated(fn (Set $set) => $set('verified', ''))
+                ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
+                ->columnSpanFull(),
+
+            // 키 입력과 "연결 확인"은 **한 줄에** 둔다 — 버튼이 아래로 내려가면 무엇을
+            // 확인하는 버튼인지 눈으로 이어지지 않는다.
+            Flex::make([
+                TextInput::make('api_key')
+                    ->label(fn (Get $get) => trans('concierge::strings.field_api_key_for', [
+                        'provider' => (string) config('concierge.providers.' . $get('provider') . '.short', ''),
+                    ]))
+                    ->password()
+                    ->revealable()
+                    ->autocomplete(false)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Set $set) => $set('verified', ''))
+                    // 🔴 저장된 키는 폼으로 되돌리지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
+                    //    비워 두면 그대로 둔다는 뜻이고, 그 사실을 자리 표시로 말한다.
+                    ->placeholder(fn (Get $get) => $this->entryHasStoredKey((string) $get('id'))
+                        ? trans('concierge::strings.api_key_set')
+                        : trans('concierge::strings.api_key_unset'))
+                    ->helperText(trans('concierge::strings.help_api_key'))
+                    // 🔴 **연결 확인 게이트는 폼 검증으로 건다** (#89).
+                    //
+                    //    저장 쪽에서 막을 수는 없다: 호스트의 Plugin::saveSettings() 가
+                    //    `catch (Exception) {}` 로 **모든 예외를 삼킨다**. Filament 가 모달을
+                    //    열어 두는 근거인 Halt 도 Exception 이라 거기서 사라지고, 화면은
+                    //    성공한 것처럼 닫힌다 — 오류를 띄워 놓고 고칠 화면을 치우는 꼴이었다.
+                    //
+                    //    검증은 액션이 불리기 **전에** 돌고, 실패하면 모달이 그대로 남으면서
+                    //    문제가 난 칸에 빨간 글씨가 붙는다. 어느 항목인지 찾을 필요도 없다.
+                    ->rule(static fn (Get $get) => static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                        $typed = trim((string) $value);
+
+                        // 빈 칸은 "그대로 두기" — 저장된 키를 다시 확인시킬 이유가 없다.
+                        if ($typed === '') {
+                            return;
+                        }
+
+                        $expected = self::verifyFingerprint(
+                            (string) $get('provider'),
+                            $typed,
+                            (string) $get('base_url'),
+                        );
+
+                        if ((string) $get('verified') !== $expected) {
+                            $fail(trans('concierge::strings.verify_required_inline'));
+                        }
+                    }),
+
+                Actions::make([
+                    Action::make('verify_entry')
+                        ->label(trans('concierge::strings.verify_key'))
+                        // 명시하지 않으면 아이콘 버튼으로 렌더된다 — 아이콘이 없어
+                        // 투명한 클릭 영역만 남으므로 라벨 버튼을 강제한다.
+                        ->button()
+                        ->color('gray')
+                        ->action(function (Get $get, Set $set): void {
+                            $provider = (string) $get('provider');
+                            $typed = trim((string) $get('api_key'));
+                            // 폼에 새 키가 없으면 저장된 키로 확인한다 — 다른 값을 고칠 때마다
+                            // 키를 다시 치게 하지 않는다.
+                            $key = $typed !== '' ? $typed : $this->entryStoredKey((string) $get('id'));
+                            $baseUrl = (string) $get('base_url');
+
+                            $error = ProviderProbe::verify($provider, $key, $baseUrl);
+                            ProviderFactory::forgetModels($provider, $key, $baseUrl);
+
+                            if ($error === null) {
+                                $set('verified', self::verifyFingerprint($provider, $typed, $baseUrl));
+                                Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
+                            } else {
+                                $set('verified', '');
+                                Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
+                            }
+                        }),
+                ])
+                    ->grow(false)
+                    // ⚠ 빈 라벨을 두지 않는다. 라벨 자리로 높이를 맞추는 수법은 키 칸이
+                    //   **위에** 있을 때 이야기고, 지금은 옆에 있어 죽은 여백만 남는다.
+                    //   높이는 cg-verify 의 padding 이 맞춘다.
+                    ->extraAttributes(['class' => 'cg-verify']),
+            ])
+                ->verticalAlignment(VerticalAlignment::Start)
+                // 이름·공급자·주소·키는 한 행을 통째로 쓴다 — 반씩 나누면 값이 길어
+                // 잘려 보이고, 좌우로 읽을 이유도 없다(모델·effort·상한만 짝을 이룬다).
+                ->columnSpanFull(),
+
+            // 선택지가 정의된 공급자는 드롭다운으로, 로컬은 조회 결과 또는 자유 입력으로.
+            Select::make('model')
+                ->label(trans('concierge::strings.field_model'))
+                ->options(fn (Get $get) => ProviderFactory::modelOptions(
+                    (string) $get('provider'),
+                    trim((string) $get('api_key')) ?: $this->entryStoredKey((string) $get('id')),
+                    (string) $get('base_url') ?: null,
+                ))
+                ->searchable()
+                ->helperText(trans('concierge::strings.help_model'))
+                ->native(false)
+                ->required()
+                // 로컬 엔드포인트는 목록이 안 잡힐 수 있다 — 그때는 자유 입력으로 물러난다.
+                ->visible(fn (Get $get) => ProviderFactory::modelOptions(
+                    (string) $get('provider'),
+                    trim((string) $get('api_key')) ?: $this->entryStoredKey((string) $get('id')),
+                    (string) $get('base_url') ?: null,
+                ) !== []),
+
+            TextInput::make('model')
+                ->label(trans('concierge::strings.field_model'))
+                ->helperText(trans('concierge::strings.help_model_free'))
+                ->placeholder('llama3.3:70b')
+                ->required()
+                ->visible(fn (Get $get) => ProviderFactory::modelOptions(
+                    (string) $get('provider'),
+                    trim((string) $get('api_key')) ?: $this->entryStoredKey((string) $get('id')),
+                    (string) $get('base_url') ?: null,
+                ) === []),
+
+            Select::make('effort')
+                ->label(trans('concierge::strings.field_effort'))
+                ->options(fn (Get $get) => ProviderFactory::effortOptions((string) $get('provider')))
+                ->helperText(trans('concierge::strings.help_effort'))
+                ->native(false)
+                ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->supportsEffort),
+
+            TextInput::make('max_tokens')
+                ->label(trans('concierge::strings.field_max_tokens'))
+                ->helperText(trans('concierge::strings.help_max_tokens'))
+                ->numeric()
+                ->minValue(256)
+                ->maxValue(64000)
+                ->default(fn () => (int) config('concierge.max_tokens'))
+                ->required(),
+        ];
+    }
+
+    /** 이 항목에 저장된 키가 있는가 — 폼에는 키를 되돌리지 않으므로 id 로 확인한다. */
+    private function entryHasStoredKey(string $id): bool
+    {
+        return filled($this->entryStoredKey($id));
+    }
+
+    /** 저장된 키 값. 확인 버튼과 모델 조회만 쓴다 — 서버 밖으로 내보내지 말 것. */
+    private function entryStoredKey(string $id): ?string
+    {
+        try {
+            foreach (ConciergeSettings::current()->entries() as $entry) {
+                if ((string) ($entry['id'] ?? '') === $id) {
+                    return $entry['api_key'] ?? null;
+                }
+            }
+        } catch (Throwable) {
+            // 마이그레이션 전이거나 APP_KEY 가 바뀐 경우 — "없음"으로 보이면 충분하다.
+        }
+
+        return null;
     }
 
     /**
@@ -808,73 +869,28 @@ class ConciergePlugin implements Plugin, HasPluginSettings
     /** @param array<mixed, mixed> $data */
     public function saveSettings(array $data): void
     {
-        $apiKey = trim((string) ($data['api_key'] ?? ''));
-        $clearApiKey = (bool) ($data['clear_api_key'] ?? false);
-        unset($data['api_key'], $data['clear_api_key']);
-
         // 시작점은 제 테이블에 있다 — settings 행에 fill 되지 않게 먼저 뺀다(#103).
         $presets = $data['presets'] ?? null;
         unset($data['presets']);
 
         $settings = ConciergeSettings::current();
 
-        // ── 공급자 전환 (#3) ──────────────────────────────────────
-        $provider = (string) ($data['provider'] ?? $settings->provider ?? 'anthropic');
-        unset($data['provider']);
+        // ── 공급자 목록 (#89) ─────────────────────────────────────
+        // 통과하지 못하면 Halt 가 올라온다 — 창이 열린 채로 남아 고칠 수 있다.
+        $entries = $this->normalizeEntries((array) ($data['provider_entries'] ?? []), $settings);
+        unset($data['provider_entries']);
 
-        // ── 연결 확인 게이트 (#3 후속) ────────────────────────────
-        // 새 키를 쳤거나, 키가 등록되지 않은 공급자로 바꾸는 저장은 "연결 확인"을
-        // 통과한 지문이 있어야 한다 — 틀린 키로 조용히 저장돼 채팅이 죽는 것을 막는다.
-        $fingerprint = (string) ($data['key_verified'] ?? '');
-        unset($data['key_verified']);
+        $data['provider_entries'] = $entries;
 
-        $providerChanged = $provider !== ($settings->provider ?? 'anthropic');
-        $needsVerify = $apiKey !== '' || ($providerChanged && !$settings->hasApiKeyFor($provider));
-
-        if ($needsVerify && $fingerprint !== self::verifyFingerprint($provider, $apiKey, (string) ($data['base_url'] ?? ''))) {
-            Notification::make()
-                ->danger()
-                ->title(trans('concierge::strings.verify_required'))
-                ->body(trans('concierge::strings.verify_required_body'))
-                ->send();
-
-            return;
-        }
-
-        if ($provider !== ($settings->provider ?? 'anthropic')) {
-            // 이전 공급자의 키·모델을 스냅샷에 넣고, 새 공급자의 스냅샷(또는 기본값)을
-            // 활성 값으로 적재한다 — 아래 fill 이 폼에서 온 값으로 덮는다(폼이 이긴다).
-            $settings->switchProvider($provider);
-        }
-
-        // 어느 입력을 쓰는 공급자인가는 **config 가** 정한다 — 로컬 엔드포인트는 모델 이름이
-        // 설치마다 달라 자유 입력이다. 조회 결과로 판단하면 안 된다: 로컬 엔드포인트가
-        // 살아 있어 목록이 돌아온 순간 자유 입력 값이 버려진다.
-        $isFreeForm = (array) config("concierge.providers.{$provider}.models", []) === [];
-
-        if ($isFreeForm) {
-            $data['model'] = trim((string) ($data['model_free'] ?? ''));
-        }
-
-        unset($data['model_free']);
-
-        // 공급자를 바꾼 직후 폼의 모델·effort 가 이전 공급자의 값일 수 있다 —
-        // 그 공급자의 선택지에 없는 값은 기본값으로 되돌린다(404 를 설정 화면에서 막는다).
-        //
-        // ⚠ 검증 근거는 **화면이 보여준 목록**이어야 한다(#80). 배포본 목록으로만 검사하면
-        //   방금 고른 새 모델(플러그인이 모르는 최신 모델)이 저장 때 조용히 되돌려진다.
-        $models = $isFreeForm ? [] : ProviderFactory::modelIds($provider);
-
-        if ($models !== [] && !in_array($data['model'] ?? '', $models, true)) {
-            $data['model'] = (string) config("concierge.providers.{$provider}.default_model", $settings->model);
-        }
-
-        // efforts 는 id 목록이다(설명문은 lang 이 만든다 — #79). 값이 곧 id 다.
-        $efforts = array_values((array) config("concierge.providers.{$provider}.efforts", []));
-
-        if ($efforts !== [] && !in_array($data['effort'] ?? '', $efforts, true)) {
-            $data['effort'] = (string) (config("concierge.providers.{$provider}.default_effort") ?? $efforts[0]);
-        }
+        // 🔴 첫 항목을 활성 칸에도 그대로 둔다. isConfigured()·모델 조회·사이드바 배지처럼
+        //    "지금 설정" 하나를 보는 곳이 여럿이고, 그 값이 목록의 주 공급자와 갈리면
+        //    화면이 거짓말한다. 활성 칸은 이제 **주 공급자의 사본**이다.
+        $primary = $entries[0];
+        $data['provider'] = $primary['provider'];
+        $data['base_url'] = $primary['base_url'];
+        $data['model'] = $primary['model'];
+        $data['effort'] = $primary['effort'];
+        $data['max_tokens'] = $primary['max_tokens'];
 
         // 커스텀 색(#10): 토글이 꺼져 있으면 "패널을 따른다" = null. 색 값이 남아 있으면
         // 토글을 다시 켰을 때 이전 색이 돌아오는 게 아니라, 꺼짐 = 값 없음으로 둔다.
@@ -894,18 +910,7 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         unset($data['limit_metric'], $data['limit_scope'], $data['limit_period'], $data['limit_amount']);
 
         $settings->fill($data);
-
-        // 빈 입력은 "그대로 두기"다 — 다른 설정만 고칠 때 키를 다시 칠 필요가 없어야 한다.
-        // 새 키와 삭제가 동시에 오면 새 키가 이긴다(치고 나서 체크박스를 되돌리지 않은 경우).
-        // 공급자를 바꾼 경우 "그대로"의 기준은 switchProvider 가 적재한 그 공급자의 스냅샷 키다.
-        if ($apiKey !== '') {
-            $settings->api_key = $apiKey;
-        } elseif ($clearApiKey) {
-            $settings->api_key = null;
-        }
-
-        // 활성 값이 확정됐다 — 현재 공급자의 스냅샷도 같은 값으로 맞춰 둔다.
-        $settings->stashProviderSnapshot();
+        $settings->api_key = $primary['api_key'];
 
         $settings->save();
         ConciergeSettings::forgetCached();
@@ -918,6 +923,79 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             ->title(trans('concierge::strings.saved'))
             ->success()
             ->send();
+    }
+
+    /**
+     * 폼의 항목 목록을 저장할 모양으로 (#89).
+     *
+     * @param  array<mixed, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws Halt 연결 확인을 통과하지 못했을 때 — 창을 닫지 않고 멈춘다
+     */
+    private function normalizeEntries(array $rows, ConciergeSettings $settings): array
+    {
+        $stored = [];
+
+        foreach ($settings->entries() as $entry) {
+            $stored[(string) ($entry['id'] ?? '')] = $entry;
+        }
+
+        $entries = [];
+
+        foreach ($rows as $row) {
+            $provider = (string) ($row['provider'] ?? '');
+
+            if ($provider === '') {
+                continue;
+            }
+
+            $id = (string) ($row['id'] ?? '') ?: (string) Str::ulid();
+            $typed = trim((string) ($row['api_key'] ?? ''));
+            $baseUrl = trim((string) ($row['base_url'] ?? '')) ?: null;
+
+            // 빈 입력은 "그대로 두기"다 — 다른 값만 고칠 때 키를 다시 칠 필요가 없어야 한다.
+            $key = $typed !== '' ? $typed : ($stored[$id]['api_key'] ?? null);
+
+            // ── 연결 확인 게이트 (#3 후속, 항목별) ──
+            // 🔴 새 키를 친 항목은 확인을 통과해야 저장된다. 틀린 키가 조용히 들어가면
+            //    그 항목은 매번 실패하고, 장애 조치가 그것을 가려 아무도 모르게 된다 —
+            //    대비책이 늘어난 만큼 잘못된 설정도 더 오래 숨는다.
+            if ($typed !== '' && (string) ($row['verified'] ?? '') !== self::verifyFingerprint($provider, $typed, (string) $baseUrl)) {
+                Notification::make()
+                    ->danger()
+                    ->title(trans('concierge::strings.verify_required'))
+                    ->body(trans('concierge::strings.verify_required_body', ['entry' => trim((string) ($row['label'] ?? '')) ?: ProviderFactory::label($provider)]))
+                    ->send();
+
+                // 🔴 **Halt 를 던진다. 그냥 return 하면 창이 닫힌다.** 호스트의 액션은
+                //    이 메서드가 정상으로 끝나면 성공으로 보고 모달을 내린다 — 오류를
+                //    띄워 놓고 고칠 화면을 치워 버리는 꼴이었다(실측). Filament 는 Halt 를
+                //    잡으면 unmountAction() 을 건너뛰므로 창이 그대로 남는다.
+                throw new Halt();
+            }
+
+            $efforts = array_values((array) config("concierge.providers.{$provider}.efforts", []));
+            $effort = (string) ($row['effort'] ?? '');
+
+            if ($efforts !== [] && !in_array($effort, $efforts, true)) {
+                $effort = (string) (config("concierge.providers.{$provider}.default_effort") ?? $efforts[0]);
+            }
+
+            $entries[] = [
+                'id' => $id,
+                'label' => trim((string) ($row['label'] ?? '')) ?: ProviderFactory::label($provider),
+                'provider' => $provider,
+                'api_key' => $key,
+                'base_url' => $baseUrl,
+                'model' => trim((string) ($row['model'] ?? '')),
+                'effort' => $effort,
+                'max_tokens' => (int) ($row['max_tokens'] ?? config('concierge.max_tokens')),
+            ];
+        }
+
+        // 하나도 남지 않으면 지금 것을 지킨다 — 목록이 비면 어시스턴트가 말을 못 한다.
+        return $entries !== [] ? $entries : $settings->entries();
     }
 
     /**

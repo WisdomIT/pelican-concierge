@@ -5,10 +5,15 @@ namespace WisdomIT\Concierge\Services;
 use App\Models\Egg;
 use App\Models\User;
 use Closure;
+use RuntimeException;
 use Throwable;
 use WisdomIT\Concierge\Llm\LlmProvider;
+use WisdomIT\Concierge\Llm\ProviderChain;
 use WisdomIT\Concierge\Llm\ProviderFactory;
+use WisdomIT\Concierge\Llm\ProviderFailure;
 use WisdomIT\Concierge\Llm\StopKind;
+use WisdomIT\Concierge\Llm\TurnResult;
+use WisdomIT\Concierge\Notifications\FailoverNotice;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Tools\AgentToolbox;
 use WisdomIT\Concierge\Tools\ToolGroup;
@@ -64,11 +69,24 @@ final class ChatService
     public function __construct(
         private readonly ConciergeSettings $settings,
         private readonly User $user,
+        /**
+         * 장애 조치가 일어났을 때 화면에 한 줄 남긴다 (#89) — 지금 답하는 모델이
+         * 바뀌었다는 사실은 사용자가 알아야 한다. 답이 갑자기 나빠진 이유를 짐작하게
+         * 두지 않는다. 기본은 아무것도 하지 않기 — 배경 작업에서도 부를 수 있어야 한다.
+         *
+         * @var ?Closure(string): void
+         */
+        private readonly ?Closure $onEvent = null,
     ) {}
 
     private ?AgentToolbox $toolbox = null;
 
     private ?LlmProvider $provider = null;
+
+    /** 지금 말하고 있는 항목 (#89). 사용 기록이 "무엇으로 청구됐는가"를 이걸로 적는다. */
+    private ?array $entry = null;
+
+    private ?ProviderChain $chain = null;
 
     /**
      * @param  array<int, array{role: string, text: string}>  $history  마지막 항목이 이번 사용자 발화
@@ -181,7 +199,7 @@ final class ChatService
             // 3) 상한을 넘기면 도구를 빼고 한 번만 더 불러 말로 끝내게 한다.
             $isFinalRound = $state['round'] >= self::MAX_TOOL_ROUNDS;
 
-            $turn = $this->provider()->runTurn(
+            $turn = $this->runTurnWithFailover(
                 $state['messages'],
                 $this->systemPrompt($isFinalRound),
                 $isFinalRound ? [] : $this->toolbox()->definitions(),
@@ -366,9 +384,111 @@ final class ChatService
         );
     }
 
+    private function chain(): ProviderChain
+    {
+        return $this->chain ??= new ProviderChain($this->settings);
+    }
+
+    /** 지금 말하고 있는 항목 — 사용 기록이 어디로 청구됐는지 적을 때 쓴다(#89). */
+    public function currentEntry(): array
+    {
+        return $this->entry ??= $this->chain()->attempts()[0] ?? $this->settings->activeAsEntry();
+    }
+
     private function provider(): LlmProvider
     {
-        return $this->provider ??= ProviderFactory::for($this->settings);
+        // 항목의 값(키·주소·모델·effort·상한)만 갈아 끼운 사본으로 어댑터를 만든다.
+        return $this->provider ??= ProviderFactory::for($this->settings->forEntry($this->currentEntry()));
+    }
+
+    /**
+     * 한 번의 모델 호출을, 안 되면 다음 항목으로 (#89).
+     *
+     * 🔴 **넘어가는 자리는 턴 경계다.** 진행 중인 턴에는 도구 호출과 부분 텍스트가 이미
+     *    실려 있을 수 있고, 그 이력을 어떻게 표현하는지는 공급자마다 다르다(#53 — Gemini 는
+     *    자기 서명이 없는 도구 이력을 거부한다). 같은 messages 로 **그 호출만** 다시 부르는
+     *    것이 유일하게 안전하게 따져 볼 수 있는 형태다.
+     *
+     * ⚠ 부분 텍스트가 이미 흘렀어도 안전하다: onText 는 **누적 텍스트**로 불리므로
+     *   (LlmProvider 계약) 다음 항목의 결과가 앞의 것을 덮어쓴다. 이어 붙지 않는다.
+     *
+     * ⚠ 실패한 시도가 태운 토큰은 세지 않는다 — TurnResult 가 오지 않아 셀 것이 없다.
+     *   공급자 쪽 기록에는 남는다.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     * @param  array<int, array<string, mixed>>  $tools
+     */
+    private function runTurnWithFailover(
+        array $messages,
+        string $system,
+        array $tools,
+        string $accumulatedText,
+        Closure $onText,
+        Closure $onThinking,
+    ): TurnResult {
+        $attempts = $this->chain()->attempts();
+        $last = count($attempts) - 1;
+
+        foreach ($attempts as $index => $entry) {
+            // 이미 이 항목으로 말하고 있으면 그대로, 아니면 갈아 끼운다.
+            if ($this->entry === null || ProviderChain::idOf($this->entry) !== ProviderChain::idOf($entry)) {
+                $this->entry = $entry;
+                $this->provider = null;
+            }
+
+            try {
+                $result = $this->provider()->runTurn($messages, $system, $tools, $accumulatedText, $onText, $onThinking);
+
+                // 대비책에서 주 공급자로 **돌아온** 순간도 알 만한 일이다 — 답의 성격이
+                // 다시 바뀐다. 넘어갈 때와 같은 자리에 조용히 한 줄 남긴다.
+                $previous = $this->chain()->noteSuccess($entry);
+
+                if ($previous !== null && $this->onEvent !== null && $this->chain()->isPrimary($entry)) {
+                    ($this->onEvent)(trans('concierge::strings.failover_back_event', [
+                        'to' => ProviderChain::labelOf($entry),
+                    ]));
+                }
+
+                return $result;
+            } catch (Throwable $exception) {
+                $kind = $this->chain()->noteFailure($entry, $exception);
+
+                // 마지막이거나, 넘어가서 될 일이 아니면 그대로 올린다 — 위에서 사용자에게
+                // 이유를 말하고 기록에 남긴다(AgentSidebar::run).
+                if ($index === $last || !$kind->shouldFailOver()) {
+                    throw $exception;
+                }
+
+                report($exception);
+                $this->announceFailover($entry, $attempts[$index + 1], $kind);
+            }
+        }
+
+        // 도달할 수 없다 — attempts() 는 최소 한 개를 준다. 형식을 맞추기 위한 것.
+        throw new RuntimeException('No provider entry was available.');
+    }
+
+    /**
+     * 넘어갔다는 사실을 화면과 관리자에게 알린다 (#89).
+     *
+     * 🔴 키는 어디에도 적지 않는다 — 갈래(쿼터·장애·키 거부…)와 항목 이름뿐이다.
+     */
+    private function announceFailover(array $from, array $to, ProviderFailure $kind): void
+    {
+        $labels = [
+            'from' => ProviderChain::labelOf($from),
+            'to' => ProviderChain::labelOf($to),
+            'reason' => trans('concierge::strings.failover_reason_' . $kind->value),
+        ];
+
+        if ($this->onEvent !== null) {
+            ($this->onEvent)(trans('concierge::strings.failover_event', $labels));
+        }
+
+        // 한 사건에 한 번만 — 패널 전체가 안 되는 동안 대화가 백 번 일어나도 알림은 한 번이다.
+        if ($this->chain()->claimNotice($from, $kind)) {
+            FailoverNotice::send($labels, $kind);
+        }
     }
 
     private function toolbox(): AgentToolbox

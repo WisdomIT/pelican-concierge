@@ -55,6 +55,9 @@ class ConciergeUsage extends Model
         // 대화를 묶는 ULID = `concierge_conversations.id`.
         'conversation_id',
         'provider',
+        // 어느 항목으로 청구됐는가 (#89) — 같은 공급자를 둘 두면 provider·model 로는
+        // 구분되지 않는다. 항목이 지워져도 읽히도록 id 가 아니라 이름을 적는다.
+        'provider_entry',
         'model',
         'effort',
         'input_tokens',
@@ -119,6 +122,8 @@ class ConciergeUsage extends Model
             'user_id' => $userId,
             // 어느 공급자의 지출인지 행마다 남는다(#3) — 단가·집계가 공급자별로 다르다.
             'provider' => $settings->provider ?? 'anthropic',
+            // 목록의 어느 항목인가 (#89). 같은 공급자가 둘일 수 있어 provider 만으로는 모자란다.
+            'provider_entry' => $settings->entryLabel,
             'model' => $settings->model,
             'effort' => $settings->effort,
             ...$attributes,

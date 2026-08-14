@@ -1371,15 +1371,23 @@ class AgentSidebar extends Component
         /** @var User $user */
         $user = auth()->user();
 
+        // 장애 조치가 일어나면 대화에 한 줄 남긴다 (#89) — 지금 답하는 모델이 바뀌었다는
+        // 사실을 사용자가 알아야 한다. 'event' 는 화면 전용이라 API 로 나가지 않는다.
+        $service = new ChatService($settings, $user, function (string $text): void {
+            $this->messages[] = ['role' => 'event', 'text' => $text];
+        });
+
         try {
-            $result = $call(new ChatService($settings, $user));
+            $result = $call($service);
         } catch (Throwable $exception) {
             // 원문은 로그(관리자만 봄)에만 남긴다. 친구들에게 API 오류 문자열을 보여줄
             // 이유가 없다 — 대신 아는 유형(쿼터·모델 없음·키 거부…)이면 이유를 말해준다.
             report($exception);
 
             $this->finish(
-                $settings, $userId, $userMessage, $previousState,
+                // 🔴 마지막으로 시도한 항목으로 적는다 — 장애 조치 뒤에는 주 공급자가 아니라
+                //    그때 말하던 곳의 실패다. 주 공급자로 적으면 기록이 거짓말한다(#89).
+                $this->billedSettings($settings, $service), $userId, $userMessage, $previousState,
                 ConciergeUsage::STATUS_ERROR,
                 ProviderError::userMessage($exception) ?? trans('concierge::strings.error'),
                 0, 0, [],
@@ -1390,7 +1398,7 @@ class AgentSidebar extends Component
         }
 
         if ($result->needsConfirmation()) {
-            $this->pauseForCard($result, $settings, $userId, $userMessage, $previousState);
+            $this->pauseForCard($result, $this->billedSettings($settings, $service), $userId, $userMessage, $previousState);
 
             return;
         }
@@ -1399,7 +1407,7 @@ class AgentSidebar extends Component
         // 텍스트 유무가 아니라 stop_reason 을 봐야 한다.
         if ($result->isRefusal()) {
             $this->finish(
-                $settings, $userId, $userMessage, $previousState,
+                $this->billedSettings($settings, $service), $userId, $userMessage, $previousState,
                 ConciergeUsage::STATUS_ERROR,
                 trans('concierge::strings.refused'),
                 $result->inputTokens, $result->outputTokens, $result->toolCalls,
@@ -1410,12 +1418,24 @@ class AgentSidebar extends Component
         }
 
         $this->finish(
-            $settings, $userId, $userMessage, $previousState,
+            $this->billedSettings($settings, $service), $userId, $userMessage, $previousState,
             ConciergeUsage::STATUS_OK,
             trim($result->text) !== '' ? $result->text : trans('concierge::strings.empty_reply'),
             $result->inputTokens, $result->outputTokens, $result->toolCalls,
             null, $result->searchCount, $result->secretValues,
         );
+    }
+
+    /**
+     * 실제로 말한 항목의 설정 (#89).
+     *
+     * 장애 조치가 일어나면 이 발화는 주 공급자가 아니라 다른 항목으로 나갔다 — 사용 기록의
+     * 공급자·모델·effort 는 **거기** 것이어야 한다. 주 공급자로 적으면 장애 조치 뒤 비용
+     * 내역이 조용히 거짓말한다.
+     */
+    private function billedSettings(ConciergeSettings $settings, ChatService $service): ConciergeSettings
+    {
+        return $settings->forEntry($service->currentEntry());
     }
 
     /**
