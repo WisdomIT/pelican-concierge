@@ -37,13 +37,32 @@
         history: false,
         open: localStorage.getItem('cg-open') === '1',
         apply() { document.documentElement.classList.toggle('cg-open', this.open) },
+
+        /* 지금 경로 (#93). 시작점은 화면에 따라 다르다 — 카탈로그 제안이 서버 콘솔에서
+           뜨면 안내가 아니라 방해다.
+
+           ⚠ 이 안의 주석은 **JS 주석이지 Blade 주석이 아니다.** Blade 는 속성값 안에서도
+             앳(at) 기호로 시작하는 낱말을 디렉티브로 컴파일한다 — persist 를 그렇게 적었다가
+             그 자리에 persist 코드가 박혀 화면이 통째로 죽었다(실측: `e()` 인자 부족).
+             **이 속성 안에서는 앳 기호로 시작하는 낱말을 쓰지 않는다.** */
+        here() { return location.pathname.replace(/^\/+/, '') },
+
+        /* ⚠ **아무 때나 보내지 않는다.** 사이드바는 persist 되어 페이지를 넘어 살아 있어서
+             서버가 아는 경로는 마운트 시점에 굳는다. 그렇다고 이동할 때마다 알리면 대화가
+             긴 사용자는 화면을 옮길 때마다 사이드바 전체를 다시 그린다 — 보이지도 않는
+             시작점 때문에. **시작점이 실제로 화면에 있을 때만** 맞춘다. */
+        syncPath() {
+            if (! this.open || ! this.$el.querySelector('.cg-presets')) return
+            if (this.$wire.path !== this.here()) this.$wire.set('path', this.here())
+        },
     }"
     x-effect="localStorage.setItem('cg-open', open ? '1' : '0'); apply();
               document.documentElement.classList.toggle('cg-unread', ! open && $wire.unread);
               if (open && $wire.unread) $wire.markRead()"
-    x-on:livewire:navigated.document="apply()"
+    x-on:livewire:navigated.document="apply(); syncPath()"
     {{-- 트리거(#7)는 패널 크롬에 있어 이 컴포넌트 밖이다 — window 이벤트로 받는다. --}}
-    x-on:concierge-toggle.window="open = ! open"
+    {{-- 열 때도 경로를 맞춘다: 닫힌 채로 몇 페이지를 돌아다녔다면 서버가 아는 경로는 옛것이다. --}}
+    x-on:concierge-toggle.window="open = ! open; $nextTick(() => syncPath())"
     {{-- 화면 바깥에서 대화를 여는 통로 (#93).
 
          지금까지 사이드바는 사용자가 열고 늘 비어 있었다 — 다른 화면의 버튼이 "이 대화는
@@ -543,8 +562,9 @@
                 <x-filament::icon-button
                     size="sm" color="gray" icon="tabler-plus"
                     :label="trans('concierge::strings.new_conversation')"
-                    wire:click="startConversation"
-                    x-on:click="history = false"
+                    {{-- 새 대화는 곧 시작점이 뜬다는 뜻이므로 지금 경로를 이 요청에 실어
+                         보낸다 — 그래야 경로를 맞추려고 한 번 더 왕복하지 않는다 (#93). --}}
+                    x-on:click="history = false; $wire.startConversation(here())"
                 />
 
                 <x-filament::icon-button

@@ -2,6 +2,8 @@
 
 namespace WisdomIT\Concierge\Tools;
 
+use WisdomIT\Concierge\Models\ConciergePreset;
+
 /**
  * 대화의 시작점 (#93).
  *
@@ -9,8 +11,11 @@ namespace WisdomIT\Concierge\Tools;
  * 그래서 첫 문장을 쓰는 데 시간이 든다. 시작점은 그 첫 문장을 거들 뿐이다 —
  * **누른 뒤에는 평범한 대화다.**
  *
- * 🔴 **범위에 맞는 것만 보여준다.** 개설할 수 없는 사람에게 게임 목록을 내미는 것은 #48 이
- *    없앤 막다른 길이고, 프리셋으로 그게 되살아나면 안 된다. 목록은 RequesterScope 가 정한다.
+ * 🔴 **범위와 화면에 맞는 것만 보여준다.** 개설할 수 없는 사람에게 게임 목록을 내미는 것은
+ *    #48 이 없앤 막다른 길이고, 카탈로그를 고칠 수 없는 사람에게 "게임을 추가하자" 는
+ *    같은 막다른 길이다. 여기에 하나 더: **지금 보고 있는 화면에서 할 만한 일**이어야 한다.
+ *    서버 콘솔을 보는 중에 카탈로그 제안이 뜨면 그건 안내가 아니라 방해다.
+ *    무엇을 보일지는 ConciergePreset 이 정한다(visibility · permission · path 셋 다 통과).
  *
  * ⚠ 프리셋은 **제안이지 레일이 아니다.** 여기 없는 것을 물어도 그대로 동작해야 한다 — 이건
  *   입력창을 대신하는 게 아니라 첫 문장을 거들 뿐이다.
@@ -27,28 +32,29 @@ final class ChatPresets
     private const LIMIT = 4;
 
     /**
-     * 이 사람에게 보여줄 시작점.
+     * 이 사람에게, 이 화면에서 보여줄 시작점.
      *
+     * @param  ?string  $path  지금 보고 있는 경로(예: `admin/concierge-games`).
      * @return array<int, array{key: string, label: string, prompt: string}>
      */
-    public static function for(RequesterScope $scope): array
+    public static function for(RequesterScope $scope, ?string $path = null): array
     {
-        $presets = [];
+        $presets = self::enabled()
+            ->filter(fn (ConciergePreset $preset) => $preset->allowedFor($scope) && $preset->matchesPath($path))
+            // 🔴 **이 화면 전용이 글로벌보다 앞선다.** 자리가 넷뿐이라 순서가 곧 노출 여부다 —
+            //    카탈로그 화면까지 왔는데 "내 서버 상태 알려줘" 에 밀려 카탈로그 시작점이
+            //    잘려 나가면(실측: 그렇게 잘렸다) 경로를 붙인 의미가 없다. 같은 급끼리는
+            //    운영자가 정한 sort 를 지킨다(sortBy 는 안정 정렬이다).
+            ->sortBy(fn (ConciergePreset $preset) => blank($preset->path_pattern) ? 1 : 0)
+            ->take(self::LIMIT)
+            ->map(fn (ConciergePreset $preset) => [
+                'key' => $preset->preset_key,
+                'label' => $preset->localizedLabel(),
+                // 프롬프트는 **사용자가 친 것처럼** 보내진다 — 그래서 문장이어야 하고, 번역된다.
+                'prompt' => $preset->localizedPrompt(),
+            ]);
 
-        // 관리자 — 시작하기 어려운 일부터. 카탈로그는 #91 이 도구를 열어 둔 자리다.
-        if ($scope->has(ToolGroup::Admin)) {
-            $presets = array_merge($presets, self::adminPresets($scope));
-        }
-
-        if ($scope->has(ToolGroup::Create)) {
-            $presets[] = self::preset('games');
-        }
-
-        // 서버를 돌보는 사람 모두에게. 개설 여부와 무관하다.
-        $presets[] = self::preset('status');
-        $presets[] = self::preset('cannot_join');
-
-        return array_slice($presets, 0, self::LIMIT);
+        return $presets->values()->all();
     }
 
     /**
@@ -57,46 +63,29 @@ final class ChatPresets
      * 🔴 **여기서도 범위를 다시 본다.** 버튼은 화면이 내주지만, 그 화면에 접근할 수 있다는
      *    것과 이 대화를 시작할 수 있다는 것은 별개다 — 도구가 두 겹으로 검사하는 것과 같은
      *    이유다(#46).
+     *
+     * ⚠ 경로는 **묻지 않는다.** 버튼을 누른 화면과 그 요청이 도착했을 때의 경로가 같다고
+     *   보장할 수 없고(사이드바는 페이지를 넘어 살아 있다), 경로는 권한이 아니라 **적절함**의
+     *   조건이다. 막아야 하는 것은 권한이고, 그건 아래에서 그대로 본다.
      */
     public static function promptFor(string $key, RequesterScope $scope): ?string
     {
-        foreach (self::for($scope) as $preset) {
-            if ($preset['key'] === $key) {
-                return $preset['prompt'];
-            }
-        }
+        $preset = ConciergePreset::query()->where('preset_key', $key)->first();
 
-        return null;
+        return $preset !== null && $preset->allowedFor($scope) ? $preset->localizedPrompt() : null;
     }
 
     /**
-     * @return array<int, array{key: string, label: string, prompt: string}>
+     * 켜져 있는 시작점들. 정렬은 운영자가 정한 순서(sort) 그대로다.
+     *
+     * @return \Illuminate\Support\Collection<int, ConciergePreset>
      */
-    private static function adminPresets(RequesterScope $scope): array
+    private static function enabled(): \Illuminate\Support\Collection
     {
-        $presets = [];
-
-        // 카탈로그를 고칠 수 있는 사람에게만. 조회만 되는 관리자에게 "게임을 추가하자" 는
-        // 막다른 길이다.
-        if ($scope->can(\App\Enums\RolePermissionPrefixes::Update, \App\Enums\RolePermissionModels::Egg)) {
-            $presets[] = self::preset('catalog_new');
-        }
-
-        $presets[] = self::preset('health');
-
-        return $presets;
-    }
-
-    /**
-     * @return array{key: string, label: string, prompt: string}
-     */
-    private static function preset(string $key): array
-    {
-        return [
-            'key' => $key,
-            'label' => trans("concierge::strings.preset_label_{$key}"),
-            // 프롬프트는 **사용자가 친 것처럼** 보내진다 — 그래서 문장이어야 하고, 번역된다.
-            'prompt' => trans("concierge::strings.preset_prompt_{$key}"),
-        ];
+        return ConciergePreset::query()
+            ->where('enabled', true)
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get();
     }
 }

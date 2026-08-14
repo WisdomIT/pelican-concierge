@@ -130,6 +130,16 @@ class AgentSidebar extends Component
     public array $watching = [];
 
     /**
+     * 사용자가 지금 보고 있는 경로. 시작점을 고르는 데만 쓴다 (#93).
+     *
+     * ⚠ **이 값은 브라우저가 준다 — 권한 판단에 쓰면 안 된다.** 사이드바는 페이지를 넘어
+     *   살아 있어서(`wire:navigate` + `@persist`) 서버가 아는 경로는 마운트 시점의 것으로
+     *   굳는다. 그래서 화면 이동 때 브라우저가 알려 주는데, 그 말은 사용자가 아무 값이나
+     *   넣을 수 있다는 뜻이다. 경로는 *적절함*의 조건일 뿐이고, *허용*은 권한이 정한다.
+     */
+    public string $path = '';
+
+    /**
      * 마지막으로 쓰던 대화를 열어준다. 없으면 새 대화로 시작한다.
      *
      * 상시 사이드바가 되면 "화면을 옮길 때마다 처음부터"는 쓸 수 없다 — 서버 콘솔 페이지는
@@ -137,6 +147,8 @@ class AgentSidebar extends Component
      */
     public function mount(): void
     {
+        $this->path = request()->path();
+
         $latest = ConciergeConversation::listFor((int) auth()->id())->first();
 
         $latest === null ? $this->startConversation() : $this->openConversation($latest->id);
@@ -620,9 +632,19 @@ class AgentSidebar extends Component
             ->exists() ? $conversationId : null;
     }
 
-    /** 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(ConciergeConversation 주석 참고). */
-    public function startConversation(): void
+    /**
+     * 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(ConciergeConversation 주석 참고).
+     *
+     * @param  ?string  $path  화면이 알려 주는 지금 경로 (#93). 새 대화는 곧 시작점이 뜬다는
+     *                         뜻이라, 이 요청에 실어 보내면 경로를 맞추려고 따로 왕복하지
+     *                         않아도 된다. 신뢰 대상이 아니다 — $path 프로퍼티 주석 참고.
+     */
+    public function startConversation(?string $path = null): void
     {
+        if ($path !== null) {
+            $this->path = ltrim($path, '/');
+        }
+
         // ULID 라서 사전순 정렬이 곧 시간순이다 → 관리 화면에서 최신 대화부터 보인다.
         $this->conversationId = ConciergeConversation::newId();
         $this->messages = [];
@@ -964,7 +986,9 @@ class AgentSidebar extends Component
     }
 
     /**
-     * 빈 대화에 보여줄 시작점 (#93). 범위에 맞는 것만 온다 — ChatPresets 참고.
+     * 빈 대화에 보여줄 시작점 (#93).
+     *
+     * 범위(권한)와 **지금 보고 있는 화면**에 맞는 것만 온다 — ChatPresets 참고.
      *
      * @return array<int, array{key: string, label: string, prompt: string}>
      */
@@ -973,7 +997,7 @@ class AgentSidebar extends Component
     {
         $user = auth()->user();
 
-        return $user === null ? [] : ChatPresets::for((new AgentToolbox($user))->scope);
+        return $user === null ? [] : ChatPresets::for((new AgentToolbox($user))->scope, $this->path);
     }
 
     /**
