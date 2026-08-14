@@ -532,13 +532,16 @@ return [
     'idle_snoozed' => '알겠습니다. :server 는 그대로 두고 다시 지켜볼게요.',
 
     // ── 관리자 · 설정 ──
-    'settings_title' => 'AI Agent 설정',
-    'save' => '저장',
     'saved' => '설정을 저장했습니다.',
 
-    'section_general' => '일반',
-    'section_connection' => '모델 연결',
-    'section_limits' => '한도와 로그',
+    // 탭 이름(#103). 순서는 결정의 성격을 따른다 — 연결 없이는 나머지가 의미 없고,
+    // 모양은 동작을 바꾸지 않으므로 마지막이다.
+    'tab_connection' => '에이전트 연결',
+    'tab_limits' => '사용 한도',
+    'tab_features' => '기능',
+    'tab_environment' => '환경 정보',
+    'tab_presets' => '대화 시작점',
+    'tab_appearance' => '모양',
 
 
     'field_api_key_for' => ':provider API 키',
@@ -786,4 +789,27 @@ return [
     'preset_prompt_catalog_new' => '카탈로그에 새 게임을 추가하고 싶어. 지금 카탈로그에 뭐가 있고 아직 항목이 없는 egg 는 뭐가 있는지 알려줘. 그다음 하나 골라서 같이 만들자.',
     'preset_label_health' => '패널 상태 점검',
     'preset_prompt_health' => '패널이랑 노드 상태를 점검해줘. 문제가 될 만한 게 있으면 짚어줘.',
+
+    // ── 관리자 · 대화 시작점 편집 (#103) ──
+    'presets_help' => '채팅을 처음 열었을 때 입력창 위에 놓이는 버튼들입니다. 누르면 그 문장을 사용자가 직접 친 것처럼 보냅니다 — 그 사람의 말로 기록되고 그 사람의 한도에서 깎입니다. 조건(노출 범위·권한·경로)을 모두 통과한 것 중 위에서부터 최대 4개가 보이므로, 순서가 곧 무엇을 보일지입니다.',
+    'presets_add' => '시작점 추가',
+    'presets_new_item' => '새 시작점',
+    'presets_field_key' => '식별자',
+    'presets_help_key' => '영문 소문자·숫자·밑줄. 화면 밖에서 이 시작점을 여는 이름입니다(카탈로그 목록의 "에이전트와 함께 만들기" 버튼 등) — 바꾸면 그 버튼이 아무것도 열지 않습니다.',
+    'presets_field_enabled' => '사용함',
+    'presets_field_label' => '버튼 문구',
+    'presets_help_label' => '버튼에 적히는 짧은 말입니다. 사용자가 할 법한 말투로 적으세요.',
+    'presets_field_label_translations' => '버튼 문구 (언어별)',
+    'presets_field_prompt' => '보낼 문장',
+    'presets_help_prompt' => '눌렀을 때 사용자 이름으로 전송되는 질문입니다. 답을 미리 적지 마세요 — "만들 수 있는 게임은 A·B·C 야" 처럼 사실을 넣으면 에이전트가 확인하지도 않은 것을 되읽습니다. 묻는 문장으로 두면 에이전트가 도구로 확인해 답합니다.',
+    'presets_field_prompt_translations' => '보낼 문장 (언어별)',
+    'presets_field_visibility' => '누구에게',
+    'presets_help_visibility' => '개설·관리 도구를 쓸 수 없는 사람에게 그 시작점을 보여주면 막다른 길이 됩니다.',
+    'presets_visibility_all' => '모두',
+    'presets_visibility_create' => '서버를 개설할 수 있는 사람',
+    'presets_visibility_admin' => '관리자',
+    'presets_field_permission' => '추가 권한 (선택)',
+    'presets_help_permission' => '이 권한이 있어야 보입니다. 패널 권한(update egg)이든 이 플러그인 권한(viewList wisdomAgent)이든 그대로 적으면 됩니다. 비우면 검사하지 않습니다.',
+    'presets_field_path' => '보일 화면 (선택)',
+    'presets_help_path' => '비우면 모든 화면에서 보입니다. 경로 패턴을 적으면 그 화면에서만 보입니다 — 예: *concierge-games*. ⚠ 이것은 접근 제어가 아니라 "지금 화면에서 할 만한 일인가"를 정하는 것입니다. 못 쓰게 막는 일은 위의 노출 범위와 권한이 합니다.',
 ];

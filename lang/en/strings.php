@@ -531,13 +531,16 @@ return [
     'idle_snoozed' => 'Alright, leaving :server running. I will keep watching.',
 
     // ── Admin · settings ──
-    'settings_title' => 'AI Agent Settings',
-    'save' => 'Save',
     'saved' => 'Settings saved.',
 
-    'section_general' => 'General',
-    'section_connection' => 'Model connection',
-    'section_limits' => 'Limits and logging',
+    // Tab names (#103). Ordered by the kind of decision — nothing else matters until the
+    // connection works, and appearance changes no behaviour so it comes last.
+    'tab_connection' => 'Agent connection',
+    'tab_limits' => 'Usage limits',
+    'tab_features' => 'Features',
+    'tab_environment' => 'Environment',
+    'tab_presets' => 'Starting points',
+    'tab_appearance' => 'Appearance',
 
 
     'field_api_key_for' => ':provider API key',
@@ -786,4 +789,27 @@ return [
     'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
     'preset_label_health' => 'Check the panel',
     'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
+
+    // ── Admin · editing starting points (#103) ──
+    'presets_help' => 'The buttons above the message box when a chat is first opened. Pressing one sends that sentence as if the user typed it — it is recorded as their speech and counts against their quota. Of the ones that pass every condition (visibility, permission, path), the first four are shown, so the order decides what appears.',
+    'presets_add' => 'Add a starting point',
+    'presets_new_item' => 'New starting point',
+    'presets_field_key' => 'Identifier',
+    'presets_help_key' => 'Lower-case letters, digits and underscores. This is the name used to open the starting point from outside the chat (the "Build it with the assistant" button on the catalogue list, for example) — change it and that button opens nothing.',
+    'presets_field_enabled' => 'Enabled',
+    'presets_field_label' => 'Button text',
+    'presets_help_label' => 'The short line written on the button. Word it the way a user would say it.',
+    'presets_field_label_translations' => 'Button text (per language)',
+    'presets_field_prompt' => 'Sentence to send',
+    'presets_help_prompt' => 'The question sent under the user\'s name when the button is pressed. Do not write the answer into it — put facts in ("the games you can create are A, B and C") and the assistant reads back something it never checked. Keep it a question and the assistant checks with its tools before answering.',
+    'presets_field_prompt_translations' => 'Sentence to send (per language)',
+    'presets_field_visibility' => 'Who sees it',
+    'presets_help_visibility' => 'Offering a starting point to someone who cannot use the tools behind it is a dead end.',
+    'presets_visibility_all' => 'Everyone',
+    'presets_visibility_create' => 'People who can create servers',
+    'presets_visibility_admin' => 'Administrators',
+    'presets_field_permission' => 'Extra permission (optional)',
+    'presets_help_permission' => 'Shown only to holders of this permission. Write it as-is, whether it is a panel permission (update egg) or one of this plugin\'s (viewList wisdomAgent). Leave it empty to skip the check.',
+    'presets_field_path' => 'Where it shows (optional)',
+    'presets_help_path' => 'Empty means every screen. Give a path pattern and it shows only there — for example *concierge-games*. ⚠ This decides whether the suggestion is worth making here, not who may use it. Keeping someone out is the job of the visibility and permission above.',
 ];
