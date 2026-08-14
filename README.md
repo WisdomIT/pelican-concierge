@@ -147,6 +147,8 @@ player query it counts players; otherwise it watches network traffic.
   **local OpenAI-compatible endpoints** (Ollama, vLLM, llama.cpp) are also supported.
   API usage is billed to your key. See *Cost* below.
 - A working queue worker (server creation and install checks run as background jobs)
+- Any database the panel supports — SQLite, MySQL, MariaDB or PostgreSQL. The migrations
+  are checked against all four before release
 
 The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 

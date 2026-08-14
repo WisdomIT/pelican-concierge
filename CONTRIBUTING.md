@@ -94,6 +94,39 @@ foreach (collect($tb->definitions())->pluck('name') as $n) {
 Run it for every locale — a label added to `ko` and forgotten in `en` fails the same way
 for English users.
 
+## Migrations
+
+Pelican's installer offers four databases — SQLite, MySQL, MariaDB, PostgreSQL — and this
+plugin shipped for months installable on exactly one of them. Two rules would have caught
+it, and both are cheap:
+
+- 🔴 **Panel tables are `INT UNSIGNED`.** `servers`, `users` and their siblings were
+  created with `$table->increments('id')`. Reference them with `unsignedInteger`, never
+  `foreignId()` — that emits `BIGINT UNSIGNED`, and MySQL rejects the foreign key with
+  errno 3780 while SQLite accepts it without comment. Worse, the rejection lands *after*
+  the `CREATE TABLE` in the same migration, and none of the three server engines has
+  transactional DDL: the table survives, the migration is never recorded, and every retry
+  from then on reports `1050 Table already exists`. One wrong column type makes the plugin
+  permanently uninstallable.
+- 🔴 **A migration that has shipped is history. Do not edit it.** Not to add a column, not
+  to extend a seed. `869bfcd` added a per-locale field to `024`'s seed while the column
+  itself arrived in `025` — every installed panel had both recorded so nothing re-ran, and
+  every new install died on it, on all four engines. New facts arrive as a new migration.
+
+```bash
+bash scripts/verify-migrations.sh        # PANEL=<container> to point at another panel
+```
+
+It stands up MySQL, MariaDB and PostgreSQL in throwaway containers, plus a fresh SQLite
+file, and runs the panel schema and then the plugin's chain through the same entry point
+the host uses (`PluginService::runPluginMigrations`). Then it checks what actually landed:
+the nine `concierge_*` tables, no leftovers under the two former names, the foreign keys
+really attached, and the seeds non-empty.
+
+⚠ **Our own panel cannot stand in for this.** Every migration is already recorded there,
+so nothing re-runs and a broken chain looks perfectly healthy. Both defects above were
+invisible on it. Run against an empty database or you have tested nothing.
+
 ## Measured pitfalls
 
 - 🔴 **Tenant global scopes.** Filament registers global scopes on tenant-panel models

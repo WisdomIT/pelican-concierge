@@ -17,6 +17,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // 새 설치는 024 가 이미 만들어 둔다 — 그 시드가 이 칸에 값을 넣기 때문이다(#106).
+        // 이 마이그레이션은 그때 이미 이 칸이 없던 패널을 위한 것이므로, 있으면 할 일이 없다.
+        if (Schema::hasColumn('concierge_games', 'unavailable_reason_translations')) {
+            return;
+        }
+
         Schema::table('concierge_games', function (Blueprint $table) {
             $table->json('unavailable_reason_translations')->nullable()->after('unavailable_reason');
         });
