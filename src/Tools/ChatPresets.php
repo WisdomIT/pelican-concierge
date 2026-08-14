@@ -2,22 +2,24 @@
 
 namespace WisdomIT\Concierge\Tools;
 
-use App\Models\Egg;
-use WisdomIT\Concierge\Catalog\GameCatalog;
-use WisdomIT\Concierge\Models\ConciergeGame;
-
 /**
  * 대화의 시작점 (#93).
  *
- * 모든 대화가 빈 상자에서 시작했다. 그래서 사람들은 매번 "어떤 게임 만들 수 있어?" 로 열고,
- * 에이전트는 **도구를 불러 카탈로그를 읽어** 답한다 — 사용자가 아무것도 치기 전에 우리가
- * 이미 아는 것을 알아내느라 한 턴을 쓴다.
+ * 모든 대화가 빈 상자에서 시작했다. 무엇을 물어도 되는지 모르는 채로 커서를 보고 있게 되고,
+ * 그래서 첫 문장을 쓰는 데 시간이 든다. 시작점은 그 첫 문장을 거들 뿐이다 —
+ * **누른 뒤에는 평범한 대화다.**
  *
  * 🔴 **범위에 맞는 것만 보여준다.** 개설할 수 없는 사람에게 게임 목록을 내미는 것은 #48 이
  *    없앤 막다른 길이고, 프리셋으로 그게 되살아나면 안 된다. 목록은 RequesterScope 가 정한다.
  *
  * ⚠ 프리셋은 **제안이지 레일이 아니다.** 여기 없는 것을 물어도 그대로 동작해야 한다 — 이건
  *   입력창을 대신하는 게 아니라 첫 문장을 거들 뿐이다.
+ *
+ * 🔴 **답을 미리 넣지 않는다.** 한때 개설 가능한 게임 목록이나 항목 없는 egg 를 프롬프트에
+ *    박아 넣어 도구 호출 한 번을 아꼈다. 토큰은 아꼈지만 대화가 이상해진다 — 사용자가
+ *    "어떤 게임 만들 수 있어?" 라고 물었는데 그 질문 안에 이미 답이 적혀 있는 꼴이고,
+ *    에이전트는 자기가 확인하지도 않은 사실을 되읽게 된다. **사용자는 묻고 에이전트가
+ *    도구로 확인해 답한다** — 이 형태가 몇 백 토큰보다 중요하다.
  */
 final class ChatPresets
 {
@@ -39,7 +41,7 @@ final class ChatPresets
         }
 
         if ($scope->has(ToolGroup::Create)) {
-            $presets[] = self::preset('games', self::gamesPrompt());
+            $presets[] = self::preset('games');
         }
 
         // 서버를 돌보는 사람 모두에게. 개설 여부와 무관하다.
@@ -77,7 +79,7 @@ final class ChatPresets
         // 카탈로그를 고칠 수 있는 사람에게만. 조회만 되는 관리자에게 "게임을 추가하자" 는
         // 막다른 길이다.
         if ($scope->can(\App\Enums\RolePermissionPrefixes::Update, \App\Enums\RolePermissionModels::Egg)) {
-            $presets[] = self::preset('catalog_new', self::catalogPrompt());
+            $presets[] = self::preset('catalog_new');
         }
 
         $presets[] = self::preset('health');
@@ -86,44 +88,15 @@ final class ChatPresets
     }
 
     /**
-     * 개설할 수 있는 게임을 **미리** 적어 준다 — 이 목록은 DB 한 번 읽으면 되는 것이고,
-     * 그걸 알아내자고 모델 턴과 도구 호출을 쓸 이유가 없다.
-     */
-    private static function gamesPrompt(): string
-    {
-        $names = collect((new GameCatalog())->selfServiceGames())
-            ->pluck('name')
-            ->take(12)
-            ->implode(', ');
-
-        return trans('concierge::strings.preset_prompt_games', ['games' => $names]);
-    }
-
-    /**
-     * 카탈로그 항목이 없는 egg 를 함께 적는다 — 빈 상자를 **결정거리**로 바꾸는 부분이다.
-     */
-    private static function catalogPrompt(): string
-    {
-        $without = array_values(array_diff(
-            Egg::query()->pluck('name')->all(),
-            ConciergeGame::query()->pluck('egg')->all(),
-        ));
-
-        return $without === []
-            ? trans('concierge::strings.preset_prompt_catalog_all_covered')
-            : trans('concierge::strings.preset_prompt_catalog_new', ['eggs' => implode(', ', array_slice($without, 0, 8))]);
-    }
-
-    /**
      * @return array{key: string, label: string, prompt: string}
      */
-    private static function preset(string $key, ?string $prompt = null): array
+    private static function preset(string $key): array
     {
         return [
             'key' => $key,
             'label' => trans("concierge::strings.preset_label_{$key}"),
             // 프롬프트는 **사용자가 친 것처럼** 보내진다 — 그래서 문장이어야 하고, 번역된다.
-            'prompt' => $prompt ?? trans("concierge::strings.preset_prompt_{$key}"),
+            'prompt' => trans("concierge::strings.preset_prompt_{$key}"),
         ];
     }
 }

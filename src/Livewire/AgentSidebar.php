@@ -998,6 +998,11 @@ class AgentSidebar extends Component
             return;
         }
 
+        // 🔴 **항상 새 대화에서 시작한다.** 화면 바깥의 버튼(카탈로그의 "에이전트와 함께
+        //    만들기")은 지금 열려 있는 대화와 아무 상관이 없다 — 하던 이야기 뒤에 붙이면
+        //    맥락이 섞이고, 앞 대화가 길면 그 토큰도 함께 실려 간다.
+        $this->startConversation();
+
         $this->draft = $prompt;
         $this->send();
     }

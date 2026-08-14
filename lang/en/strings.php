@@ -777,14 +777,13 @@ return [
     'card_note_catalog_delete' => 'Only the catalogue entry goes — **servers created from it are untouched.** If you just want to stop offering it, turn off creation instead, which also lets you say why.',
     // Conversation starting points (#93)
     'preset_label_games' => 'What games can I make?',
-    'preset_prompt_games' => 'These games are available to create right now: :games. Tell me briefly what each one is.',
+    'preset_prompt_games' => 'What game servers can I create? Tell me briefly what each one is.',
     'preset_label_status' => 'How are my servers?',
     'preset_prompt_status' => 'How are my servers doing right now? Tell me if anything is wrong.',
     'preset_label_cannot_join' => "I can't connect to my server",
     'preset_prompt_cannot_join' => 'My server is running but nobody can connect. Find out why.',
     'preset_label_catalog_new' => 'Add a game to the catalogue',
-    'preset_prompt_catalog_new' => 'I want to add a game to the catalogue. These eggs have no entry yet: :eggs. Tell me what an entry needs, then pick one and let us build it together.',
-    'preset_prompt_catalog_all_covered' => 'I want to add a game to the catalogue. Every egg on this panel already has an entry — tell me what a new entry needs.',
+    'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
     'preset_label_health' => 'Check the panel',
     'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
 ];
