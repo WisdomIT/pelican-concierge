@@ -305,7 +305,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 ->label(trans('concierge::strings.entry_field_label'))
                 ->helperText(trans('concierge::strings.entry_help_label'))
                 ->maxLength(60)
-                ->placeholder(fn (Get $get) => ProviderFactory::label((string) $get('provider'))),
+                ->placeholder(fn (Get $get) => ProviderFactory::label((string) $get('provider')))
+                ->columnSpanFull(),
 
             Select::make('provider')
                 ->label(trans('concierge::strings.field_provider'))
@@ -320,7 +321,8 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     $set('effort', (string) (config("concierge.providers.{$state}.default_effort") ?? ''));
                     $set('verified', ''); // 다른 공급자에 대한 확인은 무효다
                 })
-                ->required(),
+                ->required()
+                ->columnSpanFull(),
 
             // 로컬 OpenAI 호환 엔드포인트만 주소가 필요하다(capabilities 기준).
             TextInput::make('base_url')
@@ -347,7 +349,10 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 ->placeholder(fn (Get $get) => $this->entryHasStoredKey((string) $get('id'))
                     ? trans('concierge::strings.api_key_set')
                     : trans('concierge::strings.api_key_unset'))
-                ->helperText(trans('concierge::strings.help_api_key')),
+                ->helperText(trans('concierge::strings.help_api_key'))
+                // 이름·공급자·주소·키는 한 행을 통째로 쓴다 — 반씩 나누면 값이 길어
+                // 잘려 보이고, 좌우로 읽을 이유도 없다(모델·effort·상한만 짝을 이룬다).
+                ->columnSpanFull(),
 
             Actions::make([
                 Action::make('verify_entry')
