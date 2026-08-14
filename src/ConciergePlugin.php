@@ -7,6 +7,8 @@ use Filament\Contracts\Plugin;
 use App\Enums\PluginStatus;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\ColorPicker;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Placeholder;
@@ -17,6 +19,9 @@ use Filament\Panel;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
+use Filament\Schemas\Components\Text;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Schemas\Components\Actions as FormActions;
@@ -28,6 +33,7 @@ use Illuminate\Support\HtmlString;
 use Throwable;
 use WisdomIT\Concierge\Llm\ProviderFactory;
 use WisdomIT\Concierge\Llm\ProviderProbe;
+use WisdomIT\Concierge\Models\ConciergePreset;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Services\UsageLimiter;
 use WisdomIT\Concierge\Support\OptionalPlugins;
@@ -118,7 +124,38 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'sidebar_color_custom' => filled($settings->sidebar_color),
             'sidebar_color' => $settings->sidebar_color,
             'deployment_knowledge' => $settings->deployment_knowledge,
+            'presets' => $this->presetRows(),
         ];
+    }
+
+    /**
+     * 시작점 목록을 폼 배열로 (#103). 실패해도 폼 전체를 죽이지 않는다 —
+     * 마이그레이션 전(설치 직후)에는 테이블이 없다.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function presetRows(): array
+    {
+        try {
+            return ConciergePreset::query()
+                ->orderBy('sort')
+                ->orderBy('id')
+                ->get()
+                ->map(fn (ConciergePreset $preset) => [
+                    'preset_key' => $preset->preset_key,
+                    'enabled' => $preset->enabled,
+                    'label' => $preset->label,
+                    'label_translations' => $preset->label_translations ?? [],
+                    'prompt' => $preset->prompt,
+                    'prompt_translations' => $preset->prompt_translations ?? [],
+                    'visibility' => $preset->visibility,
+                    'permission' => $preset->permission,
+                    'path_pattern' => $preset->path_pattern,
+                ])
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -174,12 +211,61 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         }
     }
 
+    /**
+     * 설정은 **탭 여섯**이다 (#103).
+     *
+     * 예전에는 한 장의 긴 스크롤이었다 — 키와 모델로 시작해 기능이 붙을 때마다 섹션이
+     * 아래에 쌓였고, 한 번만 정할 것(어느 에이전트에 연결하는가)을 지나야 자주 고칠
+     * 것(한도)에 닿았다. 순서는 **결정의 성격**을 따른다:
+     *
+     *  1. 연결   — 이게 되기 전에는 나머지가 의미 없다. 새 설치가 반드시 손대는 하나.
+     *  2. 한도   — 연결이 되고 나면 운영자가 가장 자주 돌아오는 곳.
+     *  3. 기능   — 어시스턴트가 무엇을 할 수 있는지 정하는 스위치들.
+     *  4. 환경   — 스위치가 아니라 운영자가 쓰는 글. 위가 정해진 뒤에야 쓸 만하다.
+     *  5. 시작점 — 같은 성격(운영자가 쓰는 글)이고, 무엇을 권할지는 3·4 가 정해져야 정해진다.
+     *  6. 모양   — 동작을 바꾸지 않으므로 마지막.
+     *
+     * ⚠ **저장은 하나다.** 탭은 화면을 나눌 뿐 제출을 나누지 않는다 — 호스트(PluginResource)가
+     *   슬라이드오버 하나에 렌더하고 제출 한 번에 saveSettings() 를 부른다. 탭마다 저장이
+     *   갈리면 "어느 탭은 저장됐고 어느 탭은 아닌" 반쯤 설정된 플러그인이 생기는데,
+     *   그건 설정하지 않은 것보다 나쁘다.
+     *
+     * @return Component[]
+     */
     public function getSettingsForm(): array
     {
         return [
-            Section::make(trans('concierge::strings.section_connection'))
-                ->columns(2)
-                ->schema([
+            Tabs::make('concierge_settings')
+                ->columnSpanFull()
+                ->tabs([
+                    Tab::make(trans('concierge::strings.tab_connection'))
+                        ->columns(2)
+                        ->schema($this->connectionFields()),
+
+                    Tab::make(trans('concierge::strings.tab_limits'))
+                        ->columns(4)
+                        ->schema($this->limitFields()),
+
+                    Tab::make(trans('concierge::strings.tab_features'))
+                        ->schema($this->featureSections()),
+
+                    Tab::make(trans('concierge::strings.tab_environment'))
+                        ->schema($this->environmentFields()),
+
+                    Tab::make(trans('concierge::strings.tab_presets'))
+                        ->schema($this->presetFields()),
+
+                    Tab::make(trans('concierge::strings.tab_appearance'))
+                        ->columns(2)
+                        ->schema($this->appearanceFields()),
+                ]),
+        ];
+    }
+
+    /** @return Component[] */
+    private function connectionFields(): array
+    {
+        return [
                     // LLM 공급자(#3). 바꿔도 다른 공급자의 키·모델 선택은 스냅샷에 남는다.
                     Select::make('provider')
                         ->label(trans('concierge::strings.field_provider'))
@@ -355,16 +441,22 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->maxValue(64000)
                         ->default(fn () => ConciergeSettings::current()->max_tokens)
                         ->required(),
+        ];
+    }
 
-                ]),
+    /**
+     * 사용 한도(#4) — 규칙 하나: 기준(메시지·토큰) × 범위 × 주기 × 한도량.
+     * 저장 형식(usage_limits 목록)과 판정(UsageLimiter)은 목록 그대로 두고,
+     * 화면은 0~1개만 쓴다. 한도량 0 = 무제한(빈 목록).
+     *
+     * @return Component[]
+     */
+    private function limitFields(): array
+    {
+        return [
+                    Text::make(trans('concierge::strings.section_limits_help'))
+                        ->columnSpanFull(),
 
-            // 사용 한도(#4) — 규칙 하나: 기준(메시지·토큰) × 범위 × 주기 × 한도량.
-            // 저장 형식(usage_limits 목록)과 판정(UsageLimiter)은 목록 그대로 두고,
-            // 화면은 0~1개만 쓴다. 한도량 0 = 무제한(빈 목록).
-            Section::make(trans('concierge::strings.section_limits'))
-                ->description(trans('concierge::strings.section_limits_help'))
-                ->columns(4)
-                ->schema([
                     Select::make('limit_metric')
                         ->label(trans('concierge::strings.limit_metric'))
                         ->options([
@@ -404,12 +496,20 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->minValue(0)
                         ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['amount'] ?? 0)
                         ->required(),
-                ]),
+        ];
+    }
 
-            // 배포 지식(#59) — 도구로 알 수 없는 사실. 매 요청에 실려 가므로 길이가 곧 비용이다.
-            Section::make(trans('concierge::strings.section_knowledge'))
-                ->description(trans('concierge::strings.section_knowledge_help'))
-                ->schema([
+    /**
+     * 배포 지식(#59) — 도구로 알 수 없는 사실. 매 요청에 실려 가므로 길이가 곧 비용이다.
+     *
+     * @return Component[]
+     */
+    private function environmentFields(): array
+    {
+        return [
+                    Text::make(trans('concierge::strings.section_knowledge_help'))
+                        ->columnSpanFull(),
+
                     Textarea::make('deployment_knowledge')
                         ->hiddenLabel()
                         ->rows(10)
@@ -427,26 +527,21 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                             ->url(fn () => self::knowledgeGuideUrl())
                             ->openUrlInNewTab(),
                     ]),
-                ]),
+        ];
+    }
 
-            // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
-            Section::make(trans('concierge::strings.section_conversations'))
-                ->description(trans('concierge::strings.section_conversations_help'))
-                ->schema([
-                    // 기본 꺼짐(#8) — 삭제는 soft 라 관리자 기록은 남지만,
-                    // 사용자에게 지우기를 줄지 자체가 운영자의 결정이다.
-                    Toggle::make('allow_conversation_delete')
-                        ->label(trans('concierge::strings.field_allow_conversation_delete'))
-                        ->helperText(trans('concierge::strings.help_allow_conversation_delete'))
-                        ->default(fn () => ConciergeSettings::current()->allow_conversation_delete),
-                ]),
+    /**
+     * 모양(#10) — 기본은 패널의 primary 를 그대로 따른다(오버라이드 없음).
+     * 에이전트를 패널과 구분되는 물건으로 표시하고 싶은 운영자만 색을 고른다.
+     *
+     * @return Component[]
+     */
+    private function appearanceFields(): array
+    {
+        return [
+                    Text::make(trans('concierge::strings.section_appearance_help'))
+                        ->columnSpanFull(),
 
-            // 모양(#10) — 기본은 패널의 primary 를 그대로 따른다(오버라이드 없음).
-            // 에이전트를 패널과 구분되는 물건으로 표시하고 싶은 운영자만 색을 고른다.
-            Section::make(trans('concierge::strings.section_appearance'))
-                ->description(trans('concierge::strings.section_appearance_help'))
-                ->columns(2)
-                ->schema([
                     Toggle::make('sidebar_color_custom')
                         ->label(trans('concierge::strings.field_sidebar_color_custom'))
                         ->default(fn () => filled(ConciergeSettings::current()->sidebar_color))
@@ -458,8 +553,20 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->default(fn () => ConciergeSettings::current()->sidebar_color)
                         ->visible(fn (Get $get) => (bool) $get('sidebar_color_custom'))
                         ->requiredIf('sidebar_color_custom', true),
-                ]),
+        ];
+    }
 
+    /**
+     * 기능 — 어시스턴트가 무엇을 할 수 있는지 정하는 스위치들 (#103).
+     *
+     * 여기만 섹션을 유지한다. 나머지 탭은 한 가지를 정하지만 이 탭은 성격이 다른 넷
+     * (검색·유휴 정리·대화 삭제·연동 상태)을 담고, 각각 자기 설명이 필요하다.
+     *
+     * @return Component[]
+     */
+    private function featureSections(): array
+    {
+        return [
             Section::make(trans('concierge::strings.section_search'))
                 ->description(trans('concierge::strings.section_search_help'))
                 ->schema([
@@ -522,7 +629,125 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->visible(fn (Get $get) => (bool) $get('idle_enabled') && (bool) $get('idle_stop_enabled')),
                 ]),
 
+            // 대화 정책(#8) — 연결 설정과 성격이 달라 제 그룹을 갖는다.
+            Section::make(trans('concierge::strings.section_conversations'))
+                ->description(trans('concierge::strings.section_conversations_help'))
+                ->schema([
+                    // 기본 꺼짐(#8) — 삭제는 soft 라 관리자 기록은 남지만,
+                    // 사용자에게 지우기를 줄지 자체가 운영자의 결정이다.
+                    Toggle::make('allow_conversation_delete')
+                        ->label(trans('concierge::strings.field_allow_conversation_delete'))
+                        ->helperText(trans('concierge::strings.help_allow_conversation_delete'))
+                        ->default(fn () => ConciergeSettings::current()->allow_conversation_delete),
+                ]),
+
             $this->integrationsSection(),
+        ];
+    }
+
+    /**
+     * 대화의 시작점 (#93 · #103). 채팅을 열었을 때 입력창 위에 놓이는 버튼들이다.
+     *
+     * ⚠ **누르면 그 사람이 친 것이 된다.** 프롬프트는 사용자의 말로 기록되고 그 사람의
+     *   한도에서 깎인다 — 운영자가 대신 말하게 하는 장치가 아니라 첫 문장을 거드는 것이다.
+     *
+     * 🔴 **답을 미리 넣지 않는다.** "만들 수 있는 게임은 A·B·C 야" 같은 문장을 프롬프트에
+     *    박으면 에이전트가 자기가 확인하지도 않은 사실을 되읽는다. 사용자는 묻고,
+     *    에이전트가 도구로 확인해 답한다.
+     *
+     * 🔴 **경로는 보안이 아니다.** path 는 "지금 화면에서 할 만한 일인가"(적절함)를 정하고,
+     *    막는 일은 노출 범위와 권한이 한다. 경로만 걸어 두고 감췄다고 여기면 안 된다 —
+     *    사이드바는 어느 화면에서나 열리고, 화면 바깥에서 시작점을 여는 경로도 있다.
+     *
+     * @return Component[]
+     */
+    private function presetFields(): array
+    {
+        return [
+            Text::make(trans('concierge::strings.presets_help'))
+                ->columnSpanFull(),
+
+            Repeater::make('presets')
+                ->hiddenLabel()
+                ->addActionLabel(trans('concierge::strings.presets_add'))
+                ->reorderable()
+                ->collapsible()
+                ->collapsed()
+                ->itemLabel(fn (array $state): ?string => filled($state['label'] ?? null)
+                    ? (string) $state['label']
+                    : trans('concierge::strings.presets_new_item'))
+                ->defaultItems(0)
+                ->schema([
+                    // 화면 바깥(카탈로그 목록의 버튼 등)에서 이 시작점을 여는 이름이다.
+                    // 바꾸면 그 버튼이 아무것도 열지 않게 되므로 설명에 적어 둔다.
+                    TextInput::make('preset_key')
+                        ->label(trans('concierge::strings.presets_field_key'))
+                        ->helperText(trans('concierge::strings.presets_help_key'))
+                        ->required()
+                        ->maxLength(64)
+                        ->regex('/^[a-z0-9_]+$/')
+                        // 같은 키가 둘이면 저장할 때 유니크 제약에 걸린다 — 폼에서 막는다.
+                        ->distinct(),
+
+                    Toggle::make('enabled')
+                        ->label(trans('concierge::strings.presets_field_enabled'))
+                        ->default(true),
+
+                    TextInput::make('label')
+                        ->label(trans('concierge::strings.presets_field_label'))
+                        ->helperText(trans('concierge::strings.presets_help_label'))
+                        ->required()
+                        ->maxLength(80)
+                        ->columnSpanFull(),
+
+                    KeyValue::make('label_translations')
+                        ->label(trans('concierge::strings.presets_field_label_translations'))
+                        ->helperText(trans('concierge::strings.catalog_help_translations'))
+                        ->keyLabel(trans('concierge::strings.catalog_locale'))
+                        ->valueLabel(trans('concierge::strings.presets_field_label'))
+                        ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                        ->columnSpanFull(),
+
+                    Textarea::make('prompt')
+                        ->label(trans('concierge::strings.presets_field_prompt'))
+                        ->helperText(trans('concierge::strings.presets_help_prompt'))
+                        ->rows(3)
+                        ->required()
+                        ->columnSpanFull(),
+
+                    KeyValue::make('prompt_translations')
+                        ->label(trans('concierge::strings.presets_field_prompt_translations'))
+                        ->keyLabel(trans('concierge::strings.catalog_locale'))
+                        ->valueLabel(trans('concierge::strings.presets_field_prompt'))
+                        ->addActionLabel(trans('concierge::strings.catalog_add_translation'))
+                        ->columnSpanFull(),
+
+                    Select::make('visibility')
+                        ->label(trans('concierge::strings.presets_field_visibility'))
+                        ->helperText(trans('concierge::strings.presets_help_visibility'))
+                        ->options([
+                            'all' => trans('concierge::strings.presets_visibility_all'),
+                            'create' => trans('concierge::strings.presets_visibility_create'),
+                            'admin' => trans('concierge::strings.presets_visibility_admin'),
+                        ])
+                        ->default('all')
+                        ->native(false)
+                        ->required(),
+
+                    TextInput::make('permission')
+                        ->label(trans('concierge::strings.presets_field_permission'))
+                        ->helperText(trans('concierge::strings.presets_help_permission'))
+                        ->placeholder('update egg')
+                        ->maxLength(120),
+
+                    TextInput::make('path_pattern')
+                        ->label(trans('concierge::strings.presets_field_path'))
+                        ->helperText(trans('concierge::strings.presets_help_path'))
+                        ->placeholder('*concierge-games*')
+                        ->maxLength(160)
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
         ];
     }
 
@@ -586,6 +811,10 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         $apiKey = trim((string) ($data['api_key'] ?? ''));
         $clearApiKey = (bool) ($data['clear_api_key'] ?? false);
         unset($data['api_key'], $data['clear_api_key']);
+
+        // 시작점은 제 테이블에 있다 — settings 행에 fill 되지 않게 먼저 뺀다(#103).
+        $presets = $data['presets'] ?? null;
+        unset($data['presets']);
 
         $settings = ConciergeSettings::current();
 
@@ -681,9 +910,93 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         $settings->save();
         ConciergeSettings::forgetCached();
 
+        if (is_array($presets)) {
+            $this->savePresets($presets);
+        }
+
         Notification::make()
             ->title(trans('concierge::strings.saved'))
             ->success()
             ->send();
+    }
+
+    /**
+     * 폼의 시작점 목록을 테이블에 반영한다 (#103).
+     *
+     * ⚠ **화면에 없는 것은 지운다.** 반복 필드에서 지운 항목은 배열에서 사라질 뿐 삭제
+     *   신호가 따로 오지 않는다 — 목록에 남은 키만 남기고 나머지를 지워야 화면과 DB 가
+     *   같아진다. 이 폼이 시작점 전체를 보여주므로 안전하다(부분 목록이 아니다).
+     *
+     * ⚠ 순서는 배열의 순서다. 운영자가 끌어 옮긴 결과가 곧 sort 이고, 노출은 앞에서부터
+     *   차오른다(ChatPresets::LIMIT) — 그래서 순서가 곧 "무엇을 보일지"다.
+     *
+     * @param  array<mixed, array<string, mixed>>  $rows
+     */
+    private function savePresets(array $rows): void
+    {
+        $seen = [];
+        $sort = 0;
+
+        foreach ($rows as $row) {
+            $key = trim((string) ($row['preset_key'] ?? ''));
+            $label = trim((string) ($row['label'] ?? ''));
+            $prompt = trim((string) ($row['prompt'] ?? ''));
+
+            // 셋 중 하나라도 비면 시작점이 되지 못한다 — 폼 검증이 이미 막지만,
+            // 반쯤 만들다 만 행이 DB 에 남는 것보다 조용히 건너뛰는 편이 낫다.
+            if ($key === '' || $label === '' || $prompt === '') {
+                continue;
+            }
+
+            ConciergePreset::query()->updateOrCreate(
+                ['preset_key' => $key],
+                [
+                    'sort' => $sort++,
+                    'enabled' => (bool) ($row['enabled'] ?? true),
+                    'label' => $label,
+                    'label_translations' => self::cleanTranslations($row['label_translations'] ?? null),
+                    'prompt' => $prompt,
+                    'prompt_translations' => self::cleanTranslations($row['prompt_translations'] ?? null),
+                    'visibility' => in_array($row['visibility'] ?? '', ['all', 'create', 'admin'], true)
+                        ? (string) $row['visibility']
+                        : 'all',
+                    // 빈 문자열과 null 은 뜻이 다르다 — 모델은 filled() 로 "검사하지 않음"을
+                    // 가리므로 빈 값은 null 로 눕힌다.
+                    'permission' => trim((string) ($row['permission'] ?? '')) ?: null,
+                    'path_pattern' => trim((string) ($row['path_pattern'] ?? '')) ?: null,
+                ],
+            );
+
+            $seen[] = $key;
+        }
+
+        ConciergePreset::query()->whereNotIn('preset_key', $seen)->delete();
+    }
+
+    /**
+     * 빈 번역은 저장하지 않는다 — 로케일 칸만 만들어 두고 값을 비워 두면 그 언어에서
+     * 빈 라벨이 뜬다. 값이 없으면 기본값으로 물러나는 것이 규칙이다(#99).
+     *
+     * @param  mixed  $translations
+     * @return ?array<string, string>
+     */
+    private static function cleanTranslations(mixed $translations): ?array
+    {
+        if (!is_array($translations)) {
+            return null;
+        }
+
+        $clean = [];
+
+        foreach ($translations as $locale => $value) {
+            $locale = trim((string) $locale);
+            $value = trim((string) $value);
+
+            if ($locale !== '' && $value !== '') {
+                $clean[$locale] = $value;
+            }
+        }
+
+        return $clean ?: null;
     }
 }

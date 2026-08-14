@@ -169,25 +169,47 @@ The `anthropic-ai/sdk` composer package is installed automatically by the panel.
 Keep the zip filename as-is — the panel derives the plugin folder name from it, and it
 has to match the `id` in `plugin.json`.
 
-Then open **Admin → Advanced → AI Agent Settings** and paste your API key.
+Then find Concierge on the panel's plugin list, press **Settings**, and paste your API key.
 
 ## Configuration
 
-Everything lives on the admin settings page; nothing needs an `.env` change.
+Everything lives in that settings dialog; nothing needs an `.env` change. It is split into
+six tabs, ordered by the kind of decision each one holds — **Agent connection** (nothing
+else matters until this works), **Usage limits**, **Features**, **Environment**,
+**Starting points**, **Appearance**. One save covers all six.
 
-| Setting | Default | Notes |
-|---|---|---|
-| LLM provider | Anthropic | OpenAI, Google (Gemini) and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
-| API key | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
-| Model | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
-| Effort | `medium` | How hard the model thinks. Higher costs more |
-| Max tokens | `8192` | Per reply |
-| Usage limit | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
-| Idle watch | off | Interval, and whether to stop the server or only ask |
-| Web search | off | Adds a per-search fee on top of tokens |
-| Conversation deletion | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
-| Sidebar colour | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
-| About this deployment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
+| Setting | Tab | Default | Notes |
+|---|---|---|---|
+| LLM provider | Connection | Anthropic | OpenAI, Google (Gemini) and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
+| API key | Connection | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
+| Model | Connection | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
+| Effort | Connection | `medium` | How hard the model thinks. Higher costs more |
+| Max tokens | Connection | `8192` | Per reply |
+| Usage limit | Limits | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
+| Web search | Features | off | Adds a per-search fee on top of tokens |
+| Idle watch | Features | off | Interval, and whether to stop the server or only ask |
+| Conversation deletion | Features | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
+| About this deployment | Environment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
+| Starting points | Starting points | seven shipped | The buttons above the message box on an empty chat. Each carries a label and a sentence, both translatable, plus who sees it (everyone · can-create · admin), an optional permission, and an optional path pattern. See below |
+| Sidebar colour | Appearance | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
+
+### Starting points
+
+A starting point is a button that writes the user's first sentence for them. Pressing one
+sends that sentence **as if the user typed it** — it is recorded as their speech and counts
+against their quota.
+
+Two rules are worth knowing before you write one:
+
+- **Do not put the answer in the prompt.** "The games you can create are A, B and C" makes
+  the assistant read back something it never checked. Keep it a question; the assistant has
+  tools and will look.
+- **The path pattern decides relevance, not access.** It answers "is this worth suggesting
+  on this screen", so a catalogue suggestion does not surface on a server console. What
+  keeps someone out is the visibility level and the optional permission.
+
+Of the starting points that pass all three conditions, the first four appear — so the order
+you drag them into is what decides which ones are seen.
 
 Model and effort choices are listed in `config/concierge.php`. When Anthropic
 ships a new model you can add it there without touching code.
