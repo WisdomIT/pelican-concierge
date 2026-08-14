@@ -29,6 +29,7 @@ use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\VerticalAlignment;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Throwable;
@@ -847,12 +848,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
         $settings = ConciergeSettings::current();
 
         // ── 공급자 목록 (#89) ─────────────────────────────────────
+        // 통과하지 못하면 Halt 가 올라온다 — 창이 열린 채로 남아 고칠 수 있다.
         $entries = $this->normalizeEntries((array) ($data['provider_entries'] ?? []), $settings);
         unset($data['provider_entries']);
-
-        if ($entries === null) {
-            return; // 연결 확인을 통과하지 못했다 — 아래 gate 가 이미 알렸다.
-        }
 
         $data['provider_entries'] = $entries;
 
@@ -903,9 +901,11 @@ class ConciergePlugin implements Plugin, HasPluginSettings
      * 폼의 항목 목록을 저장할 모양으로 (#89).
      *
      * @param  array<mixed, array<string, mixed>>  $rows
-     * @return ?array<int, array<string, mixed>>  null = 연결 확인을 통과하지 못했다
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws Halt 연결 확인을 통과하지 못했을 때 — 창을 닫지 않고 멈춘다
      */
-    private function normalizeEntries(array $rows, ConciergeSettings $settings): ?array
+    private function normalizeEntries(array $rows, ConciergeSettings $settings): array
     {
         $stored = [];
 
@@ -937,10 +937,14 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 Notification::make()
                     ->danger()
                     ->title(trans('concierge::strings.verify_required'))
-                    ->body(trans('concierge::strings.verify_required_body'))
+                    ->body(trans('concierge::strings.verify_required_body', ['entry' => trim((string) ($row['label'] ?? '')) ?: ProviderFactory::label($provider)]))
                     ->send();
 
-                return null;
+                // 🔴 **Halt 를 던진다. 그냥 return 하면 창이 닫힌다.** 호스트의 액션은
+                //    이 메서드가 정상으로 끝나면 성공으로 보고 모달을 내린다 — 오류를
+                //    띄워 놓고 고칠 화면을 치워 버리는 꼴이었다(실측). Filament 는 Halt 를
+                //    잡으면 unmountAction() 을 건너뛰므로 창이 그대로 남는다.
+                throw new Halt();
             }
 
             $efforts = array_values((array) config("concierge.providers.{$provider}.efforts", []));

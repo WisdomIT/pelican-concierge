@@ -262,7 +262,8 @@ return [
     'search_unsupported' => 'This provider has no web search. The assistant will say so when a question needs current information.',
     'verify_key' => 'Verify connection',
     'verify_required' => 'Verification required',
-    'verify_required_body' => 'A new key or a new provider must pass "Verify connection" before saving. Verify first, then save again.',
+    // ⚠ With several entries, say which one — a collapsed list gives no clue otherwise.
+    'verify_required_body' => 'An entry with a new key must pass "Verify connection" before it can be saved — :entry. Expand it, press the button, then save again.',
     'verify_ok' => 'Connected — the key is valid.',
     'verify_failed' => 'Verification failed',
     'verify_no_key' => 'Nothing to verify — enter or save a key first.',
