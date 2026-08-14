@@ -493,6 +493,23 @@ return [
     'empty_reply' => 'The reply came back empty. Please ask again.',
 
     // Known kinds of provider failure — say the reason and the next step, not the raw error (#3).
+    'entries_help' => 'Where the assistant does its talking. With more than one, the first is the primary and the rest are fallbacks in order — if the primary hits its quota or goes down, the next one takes over, and the primary is tried again shortly. A failover leaves a line in the conversation and notifies administrators.',
+    'entries_add' => 'Add a provider',
+    'entry_field_label' => 'Name',
+    'entry_help_label' => 'How this entry appears in the list, in notifications and in the usage log. Leave it empty to use the provider name — if you configure the same provider twice, give them names you can tell apart.',
+
+    // ── Failover (#89) ──
+    'failover_event' => ':from stopped answering, so :to took over (:reason). A different model is replying from here on.',
+    'failover_back_event' => ':to is answering again, so it is back in charge.',
+    'failover_reason_quota' => 'quota reached',
+    'failover_reason_down' => 'provider outage',
+    'failover_reason_unreachable' => 'could not connect',
+    'failover_reason_model_gone' => 'model withdrawn',
+    'failover_reason_auth' => 'API key refused',
+    'failover_reason_request' => 'request error',
+    'failover_notice_title' => ':from is not answering',
+    'failover_notice_body' => 'Reason: :reason. :to is answering instead — the assistant still works, but on a different model. :from will be tried again shortly.',
+
     'provider_quota' => 'The AI model\'s usage quota was exceeded. Try again shortly, and tell an administrator if it keeps happening — the API key may have no quota for the selected model (for example, Gemini\'s Pro preview models require a key with billing enabled).',
     'provider_model_gone' => 'The configured AI model is not offered by the provider. Tell an administrator — the model needs to be re-selected in settings.',
     'provider_auth' => 'The AI provider rejected the API key. Tell an administrator — the key needs to be checked in settings.',

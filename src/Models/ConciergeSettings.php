@@ -55,9 +55,18 @@ class ConciergeSettings extends Model
         'provider',
         'base_url',
         'provider_settings',
+        'provider_entries',
     ];
 
     private static ?self $cached = null;
+
+    /**
+     * 이 사본이 어느 항목의 것인가 (#89) — forEntry() 가 채운다.
+     *
+     * ⚠ **컬럼이 아니라 평범한 프로퍼티다.** Eloquent 는 선언된 프로퍼티를 속성으로 보지
+     *   않으므로 저장에 끼어들지 않는다. 사용 기록이 "무엇으로 청구됐는가"를 이 값으로 적는다.
+     */
+    public ?string $entryLabel = null;
 
     /** @return array<string, string> */
     protected function casts(): array
@@ -76,7 +85,80 @@ class ConciergeSettings extends Model
             'allow_conversation_delete' => 'boolean',
             // 공급자별 키 스냅샷이 들어간다 — 통째로 암호화한다(#3).
             'provider_settings' => 'encrypted:array',
+            // 순서 있는 공급자 목록(#89). 키가 들어가므로 같은 규칙으로 암호화한다.
+            'provider_entries' => 'encrypted:array',
         ];
+    }
+
+    /**
+     * 설정된 공급자들 — **순서가 곧 우선순위다** (#89). 첫 항목이 주 공급자고 나머지가
+     * 차례로 대비책이다.
+     *
+     * 목록이 비어 있으면(마이그레이션 직후 저장 전, 혹은 운영자가 전부 지운 경우) 활성
+     * 칸으로 항목 하나를 만들어 돌려준다 — 목록이 사실이 되기 전에도 대화는 되어야 한다.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function entries(): array
+    {
+        try {
+            $entries = $this->provider_entries ?? [];
+        } catch (DecryptException) {
+            // APP_KEY 가 바뀌었다 — apiKey() 와 같은 태도로 "없음" 취급하고 활성 칸으로 간다.
+            $entries = [];
+        }
+
+        $entries = array_values(array_filter(
+            is_array($entries) ? $entries : [],
+            fn ($entry) => is_array($entry) && filled($entry['provider'] ?? null),
+        ));
+
+        return $entries !== [] ? $entries : [$this->activeAsEntry()];
+    }
+
+    /** 활성 칸을 항목 하나로 — 목록이 없을 때의 뒷받침이자, 마이그레이션이 옮기는 값과 같은 모양. */
+    public function activeAsEntry(): array
+    {
+        $provider = $this->provider ?? 'anthropic';
+
+        return [
+            'id' => 'active',
+            'label' => (string) (config("concierge.providers.{$provider}.label")
+                ?? trans("concierge::strings.provider_{$provider}")),
+            'provider' => $provider,
+            'api_key' => $this->apiKey(),
+            'base_url' => $this->base_url,
+            'model' => (string) $this->model,
+            'effort' => $this->effort,
+            'max_tokens' => (int) $this->max_tokens,
+        ];
+    }
+
+    /**
+     * 이 항목으로 말하는 설정 — 활성 칸만 갈아 끼운 **저장하지 않는 사본**이다 (#89).
+     *
+     * 🔴 어댑터들은 ConciergeSettings 를 받아 model·effort·max_tokens·base_url·apiKey() 를
+     *    읽는다. 항목마다 어댑터를 고치는 대신 설정 쪽을 갈아 끼우면 어댑터는 손대지 않아도
+     *    된다 — 그리고 웹 검색처럼 **패널 전체에 걸린 값**은 그대로 따라온다.
+     *
+     * ⚠ 절대 save() 하지 말 것. 장애 조치는 운영자의 설정을 바꾸는 일이 아니다 —
+     *   지금 이 대화가 어디로 나가는지를 정할 뿐이다.
+     *
+     * @param  array<string, mixed>  $entry
+     */
+    public function forEntry(array $entry): self
+    {
+        $clone = clone $this;
+
+        $clone->provider = (string) $entry['provider'];
+        $clone->api_key = $entry['api_key'] ?? null;
+        $clone->base_url = $entry['base_url'] ?? null;
+        $clone->model = (string) ($entry['model'] ?? '');
+        $clone->effort = (string) ($entry['effort'] ?? '');
+        $clone->max_tokens = (int) ($entry['max_tokens'] ?? $this->max_tokens);
+        $clone->entryLabel = \WisdomIT\Concierge\Llm\ProviderChain::labelOf($entry);
+
+        return $clone;
     }
 
     /**

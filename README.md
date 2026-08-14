@@ -182,11 +182,11 @@ else matters until this works), **Usage limits**, **Features**, **Environment**,
 
 | Setting | Tab | Default | Notes |
 |---|---|---|---|
-| LLM provider | Connection | Anthropic | OpenAI, Google (Gemini) and local OpenAI-compatible endpoints are also supported. Switching keeps each provider's key and model choice. A provider without web search shows that plainly |
-| API key | Connection | — | Stored encrypted in the database, per provider. Local endpoints usually need none |
-| Model | Connection | `claude-opus-5` | Choices are per provider (`config/concierge.php`); local endpoints take a free-form model name — pick one that supports tool calling |
-| Effort | Connection | `medium` | How hard the model thinks. Higher costs more |
-| Max tokens | Connection | `8192` | Per reply |
+| Providers | Connection | one entry | An ordered list. The first is the primary, the rest are fallbacks — see below. Anthropic, OpenAI, Google (Gemini) and local OpenAI-compatible endpoints; the same provider may appear more than once |
+| API key | Connection | — | Belongs to the entry, stored encrypted. Local endpoints usually need none. Leave the field empty to keep the stored key |
+| Model | Connection | `claude-opus-5` | Per entry. Choices come from the provider itself; local endpoints take a free-form name — pick one that supports tool calling |
+| Effort | Connection | `medium` | Per entry. How hard the model thinks. Higher costs more |
+| Max tokens | Connection | `8192` | Per entry, per reply |
 | Usage limit | Limits | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
 | Web search | Features | off | Adds a per-search fee on top of tokens |
 | Idle watch | Features | off | Interval, and whether to stop the server or only ask |
@@ -194,6 +194,25 @@ else matters until this works), **Usage limits**, **Features**, **Environment**,
 | About this deployment | Environment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
 | Starting points | Starting points | seven shipped | The buttons above the message box on an empty chat. Each carries a label and a sentence, both translatable, plus who sees it (everyone · can-create · admin), an optional permission, and an optional path pattern. See below |
 | Sidebar colour | Appearance | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
+
+### When a provider stops answering
+
+Configure more than one entry and the assistant keeps working when the first one does not.
+A quota reached, an outage, a withdrawn model, a refused key — the next entry takes over
+**at a turn boundary**, and the failed one is skipped for a while rather than dropped, so
+the primary comes back on its own once its quota clears.
+
+Three things happen when it does:
+
+- A line appears **in the conversation** — the answers are coming from a different, often
+  weaker model, and nobody should have to guess why the quality changed.
+- Administrators get a **notification**: which entry stopped, the reason, and what took
+  over. Once per episode, never once per message, and never containing a key.
+- The usage log records **which entry was billed**, so the cost breakdown stays honest
+  after a failover.
+
+A request the next provider would also reject — a malformed request, a tool-schema
+problem — is not failed over. It would burn tokens twice for the same error.
 
 ### Starting points
 
