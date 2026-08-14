@@ -67,6 +67,9 @@ return [
     'tool_create_catalog_game' => 'Adding a game to the catalogue',
     'tool_update_catalog_game' => 'Updating a catalogue entry',
     'tool_delete_catalog_game' => 'Removing a catalogue entry',
+    // Importing eggs (#105)
+    'tool_list_importable_eggs' => 'Searching for eggs to import',
+    'tool_import_egg' => 'Importing an egg',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',
@@ -146,6 +149,17 @@ return [
     'card_note_create_node' => 'This only registers it on the panel — wings must be installed on that machine with this node\'s configuration before it works, and ports have to be added afterwards.',
     'card_node_address' => 'Address',
     'card_title_create_mount' => 'Create this mount?',
+    // Importing eggs (#105) — this brings in someone else's install script, so the card names the source.
+    'card_title_import_egg' => 'Import this egg?',
+    'card_confirm_import_egg' => 'Import',
+    'card_egg' => 'Egg',
+    'card_egg_source' => 'Source',
+    'card_egg_source_index' => 'Official index · :category',
+    'card_egg_source_url' => 'A url that is not in the official index',
+    'card_egg_url' => 'Url',
+    'card_egg_replaces' => 'Replaces',
+    'card_note_import_egg' => 'An egg carries install scripts and a startup command — importing it means whatever its author wrote will run on this panel. Importing does not make the assistant offer this game; that needs a catalogue entry of its own.',
+    'card_note_import_egg_unlisted' => '⚠ This url is not in the panel\'s official egg index. An egg carries install scripts and a startup command, so importing it means whatever its author wrote will run on this panel. Do not approve unless you checked the url yourself.',
     'card_confirm_create_mount' => 'Create',
     'card_note_create_mount' => 'Creating it is not enough — attach it to nodes and eggs on the mount screen for it to take effect.',
     'card_mount_name' => 'Name',
@@ -789,9 +803,8 @@ return [
     'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
     'preset_label_health' => 'Check the panel',
     'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
-    // ⚠ There is no egg-import tool yet — hence "tell me how", not "do it for me".
     'preset_label_egg_import' => 'Import an egg',
-    'preset_prompt_egg_import' => 'I want to add a game this panel does not have yet. Show me which eggs are imported, then tell me what I need to do to bring in a new one.',
+    'preset_prompt_egg_import' => 'I want to add a game this panel does not have yet. Show me which eggs are imported, then find the one I want in the official index and bring it in.',
     'preset_label_user_new' => 'Add a user',
     'preset_prompt_user_new' => 'Create a new user for me. Ask me for whatever you need first.',
 

@@ -75,7 +75,7 @@ from the requester's own permissions, so it differs per person.
 | Diagnose | node health and capacity, wings reachability, ports, users and what they own, roles and what each grants, eggs and their variables, mounts, database and backup hosts, webhooks, API keys, panel health, activity log |
 | Operate | maintenance mode, add or reclaim ports, suspend a server |
 | People | create an account, grant or revoke roles, transfer a server, edit an account, send a password reset link, clear a stuck two-factor, create roles and set their permissions |
-| Build | register a node or a mount |
+| Build | register a node or a mount; search the official egg index and import a game this panel does not have yet |
 | Delete | servers, accounts, roles, nodes, mounts — each behind the strongest confirmation in the product |
 
 ## What the assistant can do depends on who is asking
