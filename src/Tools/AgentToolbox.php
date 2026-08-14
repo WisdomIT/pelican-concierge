@@ -121,6 +121,14 @@ final class AgentToolbox
         return $this->adminRead ??= new AdminReadTools($this->user);
     }
 
+    /** egg 가져오기 (#105). */
+    private function eggImport(): EggImportTools
+    {
+        return $this->eggImport ??= new EggImportTools();
+    }
+
+    private ?EggImportTools $eggImport = null;
+
     /**
      * 관리 변경의 확인 카드 (#47).
      *
@@ -327,6 +335,33 @@ final class AgentToolbox
                 ]);
             })(),
 
+            'import_egg' => (function () use ($common, $input) {
+                // 검사는 카드 앞에서 끝난다 — 주소 형태·스킴·확장자, 그리고 공식 목록 대조까지.
+                $plan = $this->eggImport()->plan($input);
+
+                return array_merge($common, [
+                    'lines' => array_values(array_filter([
+                        ['label' => trans('concierge::strings.card_egg'), 'value' => $plan['name']],
+                        // 🔴 **출처를 그대로 보여준다.** 모델이 지어낸 주소를 관리자가 모르고
+                        //    승인하는 일이 없어야 한다 — 승인의 근거가 이 한 줄이다.
+                        ['label' => trans('concierge::strings.card_egg_source'), 'value' => $plan['from_index']
+                            ? trans('concierge::strings.card_egg_source_index', ['category' => $plan['category']])
+                            : trans('concierge::strings.card_egg_source_url')],
+                        ['label' => trans('concierge::strings.card_egg_url'), 'value' => $plan['url']],
+                        // 같은 이름의 egg 가 있으면 새로 생기는 게 아니라 덮어쓰는 것이다.
+                        $plan['replaces'] === null ? null : [
+                            'label' => trans('concierge::strings.card_egg_replaces'),
+                            'value' => $plan['replaces'],
+                        ],
+                    ])),
+                    'note' => trans($plan['from_index']
+                        ? 'concierge::strings.card_note_import_egg'
+                        : 'concierge::strings.card_note_import_egg_unlisted'),
+                    // 목록 밖 주소이거나 기존 egg 를 덮어쓰는 경우는 눈에 띄어야 한다.
+                    'danger' => !$plan['from_index'] || $plan['replaces'] !== null,
+                ]);
+            })(),
+
             'create_mount' => (function () use ($common, $input) {
                 $plan = $this->admin()->mountPlan($input);
 
@@ -468,6 +503,8 @@ final class AgentToolbox
         // 게임 카탈로그 (#91) — 화면(ConciergeGamePolicy)과 같은 egg 권한을 쓴다
         'list_catalog_games', 'get_catalog_game',
         'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
+        // egg 가져오기 (#105) — 화면 툴바의 Import 와 같은 `import egg` 권한
+        'list_importable_eggs', 'import_egg',
     ];
 
     /**
@@ -522,6 +559,13 @@ final class AgentToolbox
         'create_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
         'update_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
         'delete_catalog_game' => [RolePermissionPrefixes::Update, RolePermissionModels::Egg],
+        // egg 가져오기 (#105). 🔴 `create egg` 가 아니라 **`import egg`** 다 — Pelican 이
+        // egg 에만 따로 둔 권한이고(Role::MODEL_SPECIFIC_PERMISSIONS), 화면 툴바의 Import
+        // 버튼도 그것으로 인가한다. egg 를 새로 쓰는 것과 남의 egg 를 들여오는 것은 다른 일이라
+        // 패널이 나눠 뒀고, 화면과 도구가 같은 기준을 써야 한다(#97).
+        // 접두어 enum 에는 import 가 없다 — 문자열 형태를 쓴다.
+        'list_importable_eggs' => 'import egg',
+        'import_egg' => 'import egg',
         // 사용자·역할 2차 (#63)
         'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
@@ -1293,6 +1337,39 @@ final class AgentToolbox
                     'required' => ['egg'],
                 ],
             ],
+            // ── egg 가져오기 (#105) ──
+            [
+                'name' => 'list_importable_eggs',
+                'description' => 'Search the official egg index for a game this panel does not have yet. '
+                    . 'Use it when someone wants a game that list_eggs does not show. '
+                    . 'Search by the game name; with no search term you only get the categories and their counts, '
+                    . 'because the index holds hundreds of eggs and listing them is not an answer. '
+                    . 'Each hit carries the url that import_egg takes, and says whether it is already imported.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'search' => ['type' => 'string', 'description' => 'Game or egg name to look for. Leave empty to see the categories.'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            [
+                'name' => 'import_egg',
+                'description' => 'Bring an egg into this panel from a url, so servers can be created from it. '
+                    . 'Prefer a url from list_importable_eggs. A url from anywhere else works too, but the confirmation '
+                    . 'card will say it did not come from the official index — never present such a url as official, and '
+                    . 'never invent one: if you do not have a url from the index, ask the administrator for it. '
+                    . 'An egg carries install scripts and a startup command, so this runs whatever its author wrote. '
+                    . 'Importing an egg does not make the assistant offer it — that needs a catalogue entry (create_catalog_game). '
+                    . 'Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'url' => ['type' => 'string', 'description' => 'Direct url to the egg file (.json, .yaml or .yml), as given by list_importable_eggs.'],
+                    ],
+                    'required' => ['url'],
+                ],
+            ],
             [
                 'name' => 'list_mounts',
                 'description' => 'Mounts configured on this panel — host directories attached into servers, and which nodes and eggs use them.',
@@ -1657,11 +1734,16 @@ final class AgentToolbox
         'delete_server', 'delete_panel_user', 'delete_role', 'delete_node', 'delete_mount',
         // 카탈로그 (#91)
         'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
+        // egg 가져오기 (#105) — 대상이 서버가 아니라 패널 전체다
+        'import_egg',
     ];
 
     private const CONFIRM_TOOLS = [
         // 카탈로그 변경 (#91) — 운영자 데이터를 대신 고치는 일이라 전부 카드를 거친다
         'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
+        // 🔴 egg 가져오기 (#105) — 남이 쓴 설치 스크립트를 이 패널에 들이는 일이다.
+        //    카드가 출처를 밝히고, 공식 목록 밖 주소는 그렇다고 적는다.
+        'import_egg',
         'start_server', 'stop_server', 'restart_server',
         'accept_minecraft_eula', 'replace_in_server_file',
         'create_server', 'install_mod',
@@ -2289,6 +2371,9 @@ final class AgentToolbox
                 'get_usage_stats' => new ToolCallResult($name, $input, $this->json(
                     UsageStats::summary((string) ($input['window'] ?? 'today')),
                 )),
+                // egg 가져오기 (#105)
+                'list_importable_eggs' => new ToolCallResult($name, $input, $this->eggImport()->listImportable($input)),
+                'import_egg' => new ToolCallResult($name, $input, $this->eggImport()->import($input)),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {

@@ -67,6 +67,9 @@ return [
     'tool_create_catalog_game' => '카탈로그에 게임 추가하는 중',
     'tool_update_catalog_game' => '카탈로그 항목 고치는 중',
     'tool_delete_catalog_game' => '카탈로그 항목 지우는 중',
+    // egg 가져오기 (#105)
+    'tool_list_importable_eggs' => '가져올 수 있는 egg 찾는 중',
+    'tool_import_egg' => 'egg 가져오는 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
@@ -146,6 +149,17 @@ return [
     'card_note_create_node' => '패널에 등록만 됩니다 — 그 서버에 wings 를 설치하고 이 노드의 설정을 넣어야 실제로 동작합니다. 그다음 포트도 추가해야 합니다.',
     'card_node_address' => '접속 주소',
     'card_title_create_mount' => '이 마운트를 만들까요?',
+    // egg 가져오기 (#105) — 남이 쓴 설치 스크립트를 들이는 일이라 출처를 카드에 적는다.
+    'card_title_import_egg' => '이 egg 를 가져올까요?',
+    'card_confirm_import_egg' => '가져오기',
+    'card_egg' => 'egg',
+    'card_egg_source' => '출처',
+    'card_egg_source_index' => '공식 목록 · :category',
+    'card_egg_source_url' => '공식 목록에 없는 주소',
+    'card_egg_url' => '주소',
+    'card_egg_replaces' => '덮어쓰는 egg',
+    'card_note_import_egg' => 'egg 에는 설치 스크립트와 시작 명령이 들어 있습니다 — 가져오면 그 작성자가 쓴 것이 이 패널에서 돌아갑니다. 가져와도 어시스턴트가 이 게임을 권하지는 않습니다. 그러려면 카탈로그 항목이 따로 필요합니다.',
+    'card_note_import_egg_unlisted' => '⚠ 이 주소는 패널의 공식 egg 목록에 없습니다. egg 에는 설치 스크립트와 시작 명령이 들어 있어, 가져오면 그 작성자가 쓴 것이 이 패널에서 돌아갑니다. 주소를 직접 확인하신 게 아니라면 승인하지 마세요.',
     'card_confirm_create_mount' => '만들기',
     'card_note_create_mount' => '만들기만 합니다 — 마운트 화면에서 노드와 게임(egg)에 연결해야 실제로 붙습니다.',
     'card_mount_name' => '이름',
@@ -789,9 +803,8 @@ return [
     'preset_prompt_catalog_new' => '카탈로그에 새 게임을 추가하고 싶어. 지금 카탈로그에 뭐가 있고 아직 항목이 없는 egg 는 뭐가 있는지 알려줘. 그다음 하나 골라서 같이 만들자.',
     'preset_label_health' => '패널 상태 점검',
     'preset_prompt_health' => '패널이랑 노드 상태를 점검해줘. 문제가 될 만한 게 있으면 짚어줘.',
-    // ⚠ egg 가져오기 도구는 아직 없다 — 문장을 "대신 해 줘"가 아니라 "알려 줘"로 둔 이유다.
     'preset_label_egg_import' => 'egg 가져오기',
-    'preset_prompt_egg_import' => '이 패널에 없는 게임을 추가하고 싶어. 지금 어떤 egg 가 들어와 있는지 보여주고, 새 egg 를 가져오려면 뭘 해야 하는지 알려줘.',
+    'preset_prompt_egg_import' => '이 패널에 없는 게임을 추가하고 싶어. 지금 어떤 egg 가 들어와 있는지 보여주고, 없는 게임은 공식 목록에서 찾아서 가져와줘.',
     'preset_label_user_new' => '새 사용자 추가',
     'preset_prompt_user_new' => '새 사용자를 만들어줘. 필요한 게 있으면 물어보고 진행해줘.',
 
