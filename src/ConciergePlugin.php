@@ -253,12 +253,15 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             Text::make(trans('concierge::strings.entries_help'))
                 ->columnSpanFull(),
 
-            // 확인 버튼의 세로 보정. 항목마다 넣으면 목록 길이만큼 복제되므로 탭에 한 번만 둔다.
-            //  · 빈 라벨과 실제 field 라벨의 4px 높이 차이
-            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것
+            // 키 칸과 확인 버튼의 배치 보정. 항목마다 넣으면 목록 길이만큼 복제되므로
+            // 탭에 한 번만 둔다.
+            //  · 둘 사이 간격을 없앤다 — 한 덩어리로 읽혀야 무엇을 확인하는 버튼인지 보인다
+            //  · 버튼 쪽 padding 으로 높이를 맞춘다(왼쪽은 0 — 키 칸에 붙어야 한다)
+            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것을 눌러 둔다
             Text::make(new HtmlString(
                 '<style>'
-                . '.cg-verify{margin-top:-4px}'
+                . '.cg-key-row{gap:0}'
+                . '.cg-verify{padding:.75rem .75rem .75rem 0}'
                 . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
                 . '</style>'
             )),
@@ -392,11 +395,12 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         }),
                 ])
                     ->grow(false)
-                    ->extraAttributes(['class' => 'cg-verify'])
-                    // 빈 라벨로 입력 칸 본체와 높이를 맞춘다 — 별도 컴포넌트로 넣으면
-                    // 그리드 칸이 하나 생겨 간격이 틀어진다. 보정은 cg-verify 규칙이 한다.
-                    ->label(new HtmlString('&nbsp;')),
+                    // ⚠ 빈 라벨을 두지 않는다. 라벨 자리로 높이를 맞추는 수법은 키 칸이
+                    //   **위에** 있을 때 이야기고, 지금은 옆에 있어 죽은 여백만 남는다.
+                    //   높이는 cg-verify 의 padding 이 맞춘다.
+                    ->extraAttributes(['class' => 'cg-verify']),
             ])
+                ->extraAttributes(['class' => 'cg-key-row'])
                 ->verticalAlignment(VerticalAlignment::Start)
                 // 이름·공급자·주소·키는 한 행을 통째로 쓴다 — 반씩 나누면 값이 길어
                 // 잘려 보이고, 좌우로 읽을 이유도 없다(모델·effort·상한만 짝을 이룬다).
