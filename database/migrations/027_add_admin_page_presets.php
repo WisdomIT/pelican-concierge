@@ -21,9 +21,16 @@ use Illuminate\Support\Facades\DB;
  */
 return new class extends Migration
 {
-    /** [키, 노출, 권한, 경로] — 권한은 그 화면의 버튼과 같은 것을 쓴다. */
+    /**
+     * [키, 노출, 권한, 경로] — 권한은 **그 화면의 버튼과 같은 것**을 쓴다.
+     *
+     * ⚠ egg 가져오기는 `create egg` 가 아니라 `import egg` 다. Pelican 이 egg 에만
+     *   따로 둔 권한이고(Role::MODEL_SPECIFIC_PERMISSIONS), 툴바의 Import 버튼도
+     *   그것으로 인가한다 — egg 를 새로 쓸 수 있는 것과 남의 egg 를 들여오는 것은
+     *   다른 일이라 패널이 나눠 뒀다.
+     */
     private const ROWS = [
-        ['egg_import', 'admin', 'create egg', '*admin/eggs*'],
+        ['egg_import', 'admin', 'import egg', '*admin/eggs*'],
         ['user_new', 'admin', 'create user', '*admin/users*'],
     ];
 
