@@ -3,6 +3,7 @@
 namespace WisdomIT\Concierge;
 
 use App\Contracts\Plugins\HasPluginSettings;
+use Closure;
 use Filament\Contracts\Plugin;
 use App\Enums\PluginStatus;
 use Filament\Forms\Components\Checkbox;
@@ -254,14 +255,12 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             Text::make(trans('concierge::strings.entries_help'))
                 ->columnSpanFull(),
 
-            // 키 칸과 확인 버튼의 배치 보정. 항목마다 넣으면 목록 길이만큼 복제되므로
-            // 탭에 한 번만 둔다.
-            //  · 둘 사이 간격을 없앤다 — 한 덩어리로 읽혀야 무엇을 확인하는 버튼인지 보인다
-            //  · 버튼 쪽 padding 으로 높이를 맞춘다(왼쪽은 0 — 키 칸에 붙어야 한다)
+            // 확인 버튼의 배치 보정. 항목마다 넣으면 목록 길이만큼 복제되므로 탭에 한 번만 둔다.
+            //  · 버튼 쪽 padding 으로 키 칸과 높이를 맞춘다(왼쪽은 0 — 키 칸에 붙어야 한다)
             //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것을 눌러 둔다
+            // (둘 사이 간격은 Repeater 의 gap(false) 가 이미 없앤다 — 여기서 또 지우지 않는다.)
             Text::make(new HtmlString(
                 '<style>'
-                . '.cg-key-row{gap:0}'
                 . '.cg-verify{padding:.75rem .75rem .75rem 0}'
                 . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
                 . '</style>'
@@ -277,6 +276,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 ->itemLabel(fn (array $state): string => self::entryItemLabel($state))
                 ->schema($this->entryFields())
                 ->columns(2)
+                // 칸마다 이미 제 여백이 있다 — 격자 간격까지 더하면 한 항목이 필요 이상으로
+                // 길어지고, 접었다 펴는 목록에서 그 길이가 곧 읽기 비용이다.
+                ->gap(false)
                 ->columnSpanFull(),
         ];
     }
@@ -366,7 +368,34 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     ->placeholder(fn (Get $get) => $this->entryHasStoredKey((string) $get('id'))
                         ? trans('concierge::strings.api_key_set')
                         : trans('concierge::strings.api_key_unset'))
-                    ->helperText(trans('concierge::strings.help_api_key')),
+                    ->helperText(trans('concierge::strings.help_api_key'))
+                    // 🔴 **연결 확인 게이트는 폼 검증으로 건다** (#89).
+                    //
+                    //    저장 쪽에서 막을 수는 없다: 호스트의 Plugin::saveSettings() 가
+                    //    `catch (Exception) {}` 로 **모든 예외를 삼킨다**. Filament 가 모달을
+                    //    열어 두는 근거인 Halt 도 Exception 이라 거기서 사라지고, 화면은
+                    //    성공한 것처럼 닫힌다 — 오류를 띄워 놓고 고칠 화면을 치우는 꼴이었다.
+                    //
+                    //    검증은 액션이 불리기 **전에** 돌고, 실패하면 모달이 그대로 남으면서
+                    //    문제가 난 칸에 빨간 글씨가 붙는다. 어느 항목인지 찾을 필요도 없다.
+                    ->rule(static fn (Get $get) => static function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                        $typed = trim((string) $value);
+
+                        // 빈 칸은 "그대로 두기" — 저장된 키를 다시 확인시킬 이유가 없다.
+                        if ($typed === '') {
+                            return;
+                        }
+
+                        $expected = self::verifyFingerprint(
+                            (string) $get('provider'),
+                            $typed,
+                            (string) $get('base_url'),
+                        );
+
+                        if ((string) $get('verified') !== $expected) {
+                            $fail(trans('concierge::strings.verify_required_inline'));
+                        }
+                    }),
 
                 Actions::make([
                     Action::make('verify_entry')
@@ -401,7 +430,6 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                     //   높이는 cg-verify 의 padding 이 맞춘다.
                     ->extraAttributes(['class' => 'cg-verify']),
             ])
-                ->extraAttributes(['class' => 'cg-key-row'])
                 ->verticalAlignment(VerticalAlignment::Start)
                 // 이름·공급자·주소·키는 한 행을 통째로 쓴다 — 반씩 나누면 값이 길어
                 // 잘려 보이고, 좌우로 읽을 이유도 없다(모델·effort·상한만 짝을 이룬다).

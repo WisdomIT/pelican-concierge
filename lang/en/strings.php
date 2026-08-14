@@ -264,6 +264,8 @@ return [
     'verify_required' => 'Verification required',
     // ⚠ With several entries, say which one — a collapsed list gives no clue otherwise.
     'verify_required_body' => 'An entry with a new key must pass "Verify connection" before it can be saved — :entry. Expand it, press the button, then save again.',
+    // Shown under the field — no need to name the entry, the field is the entry.
+    'verify_required_inline' => 'Press "Verify connection" with this key before saving.',
     'verify_ok' => 'Connected — the key is valid.',
     'verify_failed' => 'Verification failed',
     'verify_no_key' => 'Nothing to verify — enter or save a key first.',
