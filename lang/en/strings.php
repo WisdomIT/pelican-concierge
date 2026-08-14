@@ -789,6 +789,11 @@ return [
     'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
     'preset_label_health' => 'Check the panel',
     'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
+    // ⚠ There is no egg-import tool yet — hence "tell me how", not "do it for me".
+    'preset_label_egg_import' => 'Import an egg',
+    'preset_prompt_egg_import' => 'I want to add a game this panel does not have yet. Show me which eggs are imported, then tell me what I need to do to bring in a new one.',
+    'preset_label_user_new' => 'Add a user',
+    'preset_prompt_user_new' => 'Create a new user for me. Ask me for whatever you need first.',
 
     // ── Admin · editing starting points (#103) ──
     'presets_help' => 'The buttons above the message box when a chat is first opened. Pressing one sends that sentence as if the user typed it — it is recorded as their speech and counts against their quota. Of the ones that pass every condition (visibility, permission, path), the first four are shown, so the order decides what appears.',

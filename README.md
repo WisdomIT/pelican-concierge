@@ -190,7 +190,7 @@ else matters until this works), **Usage limits**, **Features**, **Environment**,
 | Idle watch | Features | off | Interval, and whether to stop the server or only ask |
 | Conversation deletion | Features | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
 | About this deployment | Environment | empty | Facts no tool can discover — the address players connect to, which ports your router forwards, how DNS is set up. Sent with every message, so keep it short. Without it the assistant works but cannot answer "it's running but nobody can join" |
-| Starting points | Starting points | five shipped | The buttons above the message box on an empty chat. Each carries a label and a sentence, both translatable, plus who sees it (everyone · can-create · admin), an optional permission, and an optional path pattern. See below |
+| Starting points | Starting points | seven shipped | The buttons above the message box on an empty chat. Each carries a label and a sentence, both translatable, plus who sees it (everyone · can-create · admin), an optional permission, and an optional path pattern. See below |
 | Sidebar colour | Appearance | follow panel | Optionally repaint the assistant sidebar with a colour of its own — the rest of the panel is untouched |
 
 ### Starting points
