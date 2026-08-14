@@ -253,6 +253,16 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             Text::make(trans('concierge::strings.entries_help'))
                 ->columnSpanFull(),
 
+            // 확인 버튼의 세로 보정. 항목마다 넣으면 목록 길이만큼 복제되므로 탭에 한 번만 둔다.
+            //  · 빈 라벨과 실제 field 라벨의 4px 높이 차이
+            //  · 로딩 아이콘이 글자보다 커서 버튼 세로가 부푸는 것
+            Text::make(new HtmlString(
+                '<style>'
+                . '.cg-verify{margin-top:-4px}'
+                . '.cg-verify .fi-loading-indicator{width:1em;height:1em}'
+                . '</style>'
+            )),
+
             Repeater::make('provider_entries')
                 ->hiddenLabel()
                 ->addActionLabel(trans('concierge::strings.entries_add'))
@@ -335,50 +345,62 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                 ->visible(fn (Get $get) => ProviderFactory::capabilitiesOf((string) $get('provider'))->needsBaseUrl)
                 ->columnSpanFull(),
 
-            TextInput::make('api_key')
-                ->label(fn (Get $get) => trans('concierge::strings.field_api_key_for', [
-                    'provider' => (string) config('concierge.providers.' . $get('provider') . '.short', ''),
-                ]))
-                ->password()
-                ->revealable()
-                ->autocomplete(false)
-                ->live(onBlur: true)
-                ->afterStateUpdated(fn (Set $set) => $set('verified', ''))
-                // 🔴 저장된 키는 폼으로 되돌리지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
-                //    비워 두면 그대로 둔다는 뜻이고, 그 사실을 자리 표시로 말한다.
-                ->placeholder(fn (Get $get) => $this->entryHasStoredKey((string) $get('id'))
-                    ? trans('concierge::strings.api_key_set')
-                    : trans('concierge::strings.api_key_unset'))
-                ->helperText(trans('concierge::strings.help_api_key'))
+            // 키 입력과 "연결 확인"은 **한 줄에** 둔다 — 버튼이 아래로 내려가면 무엇을
+            // 확인하는 버튼인지 눈으로 이어지지 않는다.
+            Flex::make([
+                TextInput::make('api_key')
+                    ->label(fn (Get $get) => trans('concierge::strings.field_api_key_for', [
+                        'provider' => (string) config('concierge.providers.' . $get('provider') . '.short', ''),
+                    ]))
+                    ->password()
+                    ->revealable()
+                    ->autocomplete(false)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Set $set) => $set('verified', ''))
+                    // 🔴 저장된 키는 폼으로 되돌리지 않는다 — 폼 상태는 브라우저로 나가는 값이다.
+                    //    비워 두면 그대로 둔다는 뜻이고, 그 사실을 자리 표시로 말한다.
+                    ->placeholder(fn (Get $get) => $this->entryHasStoredKey((string) $get('id'))
+                        ? trans('concierge::strings.api_key_set')
+                        : trans('concierge::strings.api_key_unset'))
+                    ->helperText(trans('concierge::strings.help_api_key')),
+
+                Actions::make([
+                    Action::make('verify_entry')
+                        ->label(trans('concierge::strings.verify_key'))
+                        // 명시하지 않으면 아이콘 버튼으로 렌더된다 — 아이콘이 없어
+                        // 투명한 클릭 영역만 남으므로 라벨 버튼을 강제한다.
+                        ->button()
+                        ->color('gray')
+                        ->action(function (Get $get, Set $set): void {
+                            $provider = (string) $get('provider');
+                            $typed = trim((string) $get('api_key'));
+                            // 폼에 새 키가 없으면 저장된 키로 확인한다 — 다른 값을 고칠 때마다
+                            // 키를 다시 치게 하지 않는다.
+                            $key = $typed !== '' ? $typed : $this->entryStoredKey((string) $get('id'));
+                            $baseUrl = (string) $get('base_url');
+
+                            $error = ProviderProbe::verify($provider, $key, $baseUrl);
+                            ProviderFactory::forgetModels($provider, $key, $baseUrl);
+
+                            if ($error === null) {
+                                $set('verified', self::verifyFingerprint($provider, $typed, $baseUrl));
+                                Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
+                            } else {
+                                $set('verified', '');
+                                Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
+                            }
+                        }),
+                ])
+                    ->grow(false)
+                    ->extraAttributes(['class' => 'cg-verify'])
+                    // 빈 라벨로 입력 칸 본체와 높이를 맞춘다 — 별도 컴포넌트로 넣으면
+                    // 그리드 칸이 하나 생겨 간격이 틀어진다. 보정은 cg-verify 규칙이 한다.
+                    ->label(new HtmlString('&nbsp;')),
+            ])
+                ->verticalAlignment(VerticalAlignment::Start)
                 // 이름·공급자·주소·키는 한 행을 통째로 쓴다 — 반씩 나누면 값이 길어
                 // 잘려 보이고, 좌우로 읽을 이유도 없다(모델·effort·상한만 짝을 이룬다).
                 ->columnSpanFull(),
-
-            Actions::make([
-                Action::make('verify_entry')
-                    ->label(trans('concierge::strings.verify_key'))
-                    ->button()
-                    ->color('gray')
-                    ->action(function (Get $get, Set $set): void {
-                        $provider = (string) $get('provider');
-                        $typed = trim((string) $get('api_key'));
-                        // 폼에 새 키가 없으면 저장된 키로 확인한다 — 다른 값을 고칠 때마다
-                        // 키를 다시 치게 하지 않는다.
-                        $key = $typed !== '' ? $typed : $this->entryStoredKey((string) $get('id'));
-                        $baseUrl = (string) $get('base_url');
-
-                        $error = ProviderProbe::verify($provider, $key, $baseUrl);
-                        ProviderFactory::forgetModels($provider, $key, $baseUrl);
-
-                        if ($error === null) {
-                            $set('verified', self::verifyFingerprint($provider, $typed, $baseUrl));
-                            Notification::make()->success()->title(trans('concierge::strings.verify_ok'))->send();
-                        } else {
-                            $set('verified', '');
-                            Notification::make()->danger()->title(trans('concierge::strings.verify_failed'))->body($error)->send();
-                        }
-                    }),
-            ])->columnSpanFull(),
 
             // 선택지가 정의된 공급자는 드롭다운으로, 로컬은 조회 결과 또는 자유 입력으로.
             Select::make('model')
