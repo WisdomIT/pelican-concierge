@@ -637,6 +637,7 @@ return [
 
     // ── Game catalogue administration (#81) ──
     'catalog_title' => 'AI Agent game catalogue',
+    'catalog_ask_agent' => 'Build one with the assistant',
     'catalog_game' => 'Game',
     'catalog_section_basics' => 'Basics',
     'catalog_section_basics_help' => 'What users see this game called, and which egg it is created from.',
@@ -774,4 +775,15 @@ return [
     'card_note_catalog_create' => 'The assistant will start offering this game to users. Existing servers are unaffected.',
     'card_note_catalog_update' => 'Applies to servers created **from now on**. Servers already created stay as they are.',
     'card_note_catalog_delete' => 'Only the catalogue entry goes — **servers created from it are untouched.** If you just want to stop offering it, turn off creation instead, which also lets you say why.',
+    // Conversation starting points (#93)
+    'preset_label_games' => 'What games can I make?',
+    'preset_prompt_games' => 'What game servers can I create? Tell me briefly what each one is.',
+    'preset_label_status' => 'How are my servers?',
+    'preset_prompt_status' => 'How are my servers doing right now? Tell me if anything is wrong.',
+    'preset_label_cannot_join' => "I can't connect to my server",
+    'preset_prompt_cannot_join' => 'My server is running but nobody can connect. Find out why.',
+    'preset_label_catalog_new' => 'Add a game to the catalogue',
+    'preset_prompt_catalog_new' => 'I want to add a new game to the catalogue. Show me what is in it now and which eggs have no entry yet, then let us pick one and build it together.',
+    'preset_label_health' => 'Check the panel',
+    'preset_prompt_health' => 'Check the panel and its nodes. Point out anything that looks like it will become a problem.',
 ];

@@ -638,6 +638,7 @@ return [
 
     // ── 게임 카탈로그 관리 (#81) ──
     'catalog_title' => 'AI Agent 게임 카탈로그',
+    'catalog_ask_agent' => '에이전트와 함께 만들기',
     'catalog_game' => '게임',
     'catalog_section_basics' => '기본 정보',
     'catalog_section_basics_help' => '사용자에게 보이는 이름과, 이 게임이 어떤 egg 로 만들어지는지를 정합니다.',
@@ -774,4 +775,15 @@ return [
     'card_note_catalog_create' => '에이전트가 이 게임을 사용자에게 제안하게 됩니다. 이미 만들어진 서버에는 영향이 없습니다.',
     'card_note_catalog_update' => '이 항목으로 **앞으로** 만들 서버에 적용됩니다. 이미 만들어진 서버는 그대로입니다.',
     'card_note_catalog_delete' => '카탈로그에서만 사라집니다 — **이 게임으로 만든 서버는 그대로 남습니다.** 잠시 제안만 멈추려는 것이라면 삭제 대신 개설 허용을 끄세요(이유도 함께 적을 수 있습니다).',
+    // 대화 시작점 (#93)
+    'preset_label_games' => '어떤 게임을 만들 수 있어?',
+    'preset_prompt_games' => '어떤 게임 서버를 만들 수 있어? 각각 어떤 게임인지도 짧게 알려줘.',
+    'preset_label_status' => '내 서버 상태 알려줘',
+    'preset_prompt_status' => '내 서버들 지금 상태가 어때? 문제 있는 게 있으면 알려줘.',
+    'preset_label_cannot_join' => '서버에 접속이 안 돼',
+    'preset_prompt_cannot_join' => '서버가 켜져 있는데 접속이 안 돼. 원인을 찾아줘.',
+    'preset_label_catalog_new' => '카탈로그에 게임 추가',
+    'preset_prompt_catalog_new' => '카탈로그에 새 게임을 추가하고 싶어. 지금 카탈로그에 뭐가 있고 아직 항목이 없는 egg 는 뭐가 있는지 알려줘. 그다음 하나 골라서 같이 만들자.',
+    'preset_label_health' => '패널 상태 점검',
+    'preset_prompt_health' => '패널이랑 노드 상태를 점검해줘. 문제가 될 만한 게 있으면 짚어줘.',
 ];

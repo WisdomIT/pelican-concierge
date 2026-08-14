@@ -25,6 +25,7 @@ use WisdomIT\Concierge\Services\ChatService;
 use WisdomIT\Concierge\Services\ChatResult;
 use WisdomIT\Concierge\Services\UsageLimiter;
 use WisdomIT\Concierge\Tools\AgentToolbox;
+use WisdomIT\Concierge\Tools\ChatPresets;
 use WisdomIT\Concierge\Support\Markdown;
 use WisdomIT\Concierge\Support\SecretMasker;
 use WisdomIT\Concierge\Support\ServerLinks;
@@ -129,6 +130,16 @@ class AgentSidebar extends Component
     public array $watching = [];
 
     /**
+     * 사용자가 지금 보고 있는 경로. 시작점을 고르는 데만 쓴다 (#93).
+     *
+     * ⚠ **이 값은 브라우저가 준다 — 권한 판단에 쓰면 안 된다.** 사이드바는 페이지를 넘어
+     *   살아 있어서(`wire:navigate` + `@persist`) 서버가 아는 경로는 마운트 시점의 것으로
+     *   굳는다. 그래서 화면 이동 때 브라우저가 알려 주는데, 그 말은 사용자가 아무 값이나
+     *   넣을 수 있다는 뜻이다. 경로는 *적절함*의 조건일 뿐이고, *허용*은 권한이 정한다.
+     */
+    public string $path = '';
+
+    /**
      * 마지막으로 쓰던 대화를 열어준다. 없으면 새 대화로 시작한다.
      *
      * 상시 사이드바가 되면 "화면을 옮길 때마다 처음부터"는 쓸 수 없다 — 서버 콘솔 페이지는
@@ -136,6 +147,8 @@ class AgentSidebar extends Component
      */
     public function mount(): void
     {
+        $this->path = request()->path();
+
         $latest = ConciergeConversation::listFor((int) auth()->id())->first();
 
         $latest === null ? $this->startConversation() : $this->openConversation($latest->id);
@@ -619,9 +632,19 @@ class AgentSidebar extends Component
             ->exists() ? $conversationId : null;
     }
 
-    /** 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(ConciergeConversation 주석 참고). */
-    public function startConversation(): void
+    /**
+     * 사이드바의 "새 대화". 행은 첫 발화 때 생긴다(ConciergeConversation 주석 참고).
+     *
+     * @param  ?string  $path  화면이 알려 주는 지금 경로 (#93). 새 대화는 곧 시작점이 뜬다는
+     *                         뜻이라, 이 요청에 실어 보내면 경로를 맞추려고 따로 왕복하지
+     *                         않아도 된다. 신뢰 대상이 아니다 — $path 프로퍼티 주석 참고.
+     */
+    public function startConversation(?string $path = null): void
     {
+        if ($path !== null) {
+            $this->path = ltrim($path, '/');
+        }
+
         // ULID 라서 사전순 정렬이 곧 시간순이다 → 관리 화면에서 최신 대화부터 보인다.
         $this->conversationId = ConciergeConversation::newId();
         $this->messages = [];
@@ -960,6 +983,56 @@ class AgentSidebar extends Component
         $user = auth()->user();
 
         return $user !== null && (new AgentToolbox($user))->scope->canCreateServers();
+    }
+
+    /**
+     * 빈 대화에 보여줄 시작점 (#93).
+     *
+     * 범위(권한)와 **지금 보고 있는 화면**에 맞는 것만 온다 — ChatPresets 참고.
+     *
+     * @return array<int, array{key: string, label: string, prompt: string}>
+     */
+    #[Computed]
+    public function presets(): array
+    {
+        $user = auth()->user();
+
+        return $user === null ? [] : ChatPresets::for((new AgentToolbox($user))->scope, $this->path);
+    }
+
+    /**
+     * 시작점을 눌렀다 — 그 문장을 **사용자가 친 것처럼** 보낸다.
+     *
+     * 프리셋은 제안이지 특별한 통로가 아니다: 같은 send() 를 타므로 한도·카드·권한이
+     * 평소와 똑같이 적용된다.
+     */
+    public function usePreset(string $key): void
+    {
+        $user = auth()->user();
+
+        if ($user === null) {
+            return;
+        }
+
+        $prompt = ChatPresets::promptFor($key, (new AgentToolbox($user))->scope);
+
+        if ($prompt === null) {
+            // 범위 밖이거나 사라진 키 — 조용히 무시한다. 화면 바깥에서도 부를 수 있으므로
+            // 여기서 한 번 더 본다(#46 의 두 겹과 같은 이유).
+            return;
+        }
+
+        // 🔴 **항상 새 대화에서 시작한다.** 화면 바깥의 버튼(카탈로그의 "에이전트와 함께
+        //    만들기")은 지금 열려 있는 대화와 아무 상관이 없다 — 하던 이야기 뒤에 붙이면
+        //    맥락이 섞이고, 앞 대화가 길면 그 토큰도 함께 실려 간다.
+        $this->startConversation();
+        $this->draft = $prompt;
+
+        // ⚠ **여기서 send() 를 바로 부르면 안 된다.** 그러면 한 요청 안에서 턴 전체가
+        //   돌고, 화면 정리는 응답이 끝나야 반영된다 — 옛 대화가 그대로 보이는 채로 그
+        //   아래에 새 메시지가 붙었다가, 답변이 끝나는 순간 위쪽이 통째로 사라진다(실측).
+        //   요청을 둘로 나눠, 먼저 화면을 비우고 **그다음** 요청에서 말을 건다.
+        $this->js('$wire.send()');
     }
 
     public function render(): View
