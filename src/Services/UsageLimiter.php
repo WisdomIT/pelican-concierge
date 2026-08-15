@@ -4,6 +4,7 @@ namespace WisdomIT\Concierge\Services;
 
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Throwable;
 use Illuminate\Support\Facades\Cache;
 use WisdomIT\Concierge\Models\ConciergeSettings;
 use WisdomIT\Concierge\Models\ConciergeUsage;
@@ -109,15 +110,29 @@ final class UsageLimiter
     }
 
     /**
-     * 기간 경계의 시간대 — **컨테이너의 TZ**(운영자가 compose 에 정한 서버 기준시).
+     * 기간 경계의 시간대 — **서버 기준시**.
      *
-     * Pelican 은 앱 시간대를 UTC 로 고정하므로(저장은 UTC, 표시는 프로필 시간대)
-     * config('app.timezone')는 못 쓴다. TZ 를 기준으로 하면 "오늘"의 초기화가
-     * **모든 사용자에게 같은 자정**(예: Asia/Seoul 이면 KST 00:00)이 된다.
+     * 🔴 사용자 프로필을 따르지 않는다. 할당량과 사용량 집계는 관리자가 서버 로그와
+     *    대조하는 값이라, 사람마다 달라지면 "누가 몇 건 썼나"가 관측자에 따라 달라진다.
+     *    예약·타임스탬프가 프로필을 따르는 것과 일부러 갈라 둔 지점이다(#79 · UserTime).
+     *
+     * 순서는 설정 → 컨테이너 TZ → app.timezone (#82).
+     *  · 설정이 비어 있으면 예전 그대로다 — 손대지 않은 설치의 경계가 옮겨가면 안 된다
+     *  · Pelican 은 앱 시간대를 UTC 로 고정하므로(저장은 UTC, 표시는 프로필 시간대)
+     *    app.timezone 은 마지막 수단이다
+     *
+     * ⚠ 설정을 읽는다고 부팅이 DB 에 매이면 안 된다 — 마이그레이션 전이나 설정 행이
+     *   없는 짧은 구간에도 한도 판정은 돌아야 한다. 실패하면 조용히 환경변수로 물러난다.
      */
     public static function timezone(): string
     {
-        return getenv('TZ') ?: config('app.timezone', 'UTC');
+        try {
+            $configured = trim((string) ConciergeSettings::current()->quota_timezone);
+        } catch (Throwable) {
+            $configured = '';
+        }
+
+        return $configured !== '' ? $configured : (getenv('TZ') ?: config('app.timezone', 'UTC'));
     }
 
     /** 서버 기준시(TZ)의 시각 — 차단 문구·화면의 리셋 표시용. */

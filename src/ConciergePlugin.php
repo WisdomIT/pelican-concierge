@@ -3,6 +3,8 @@
 namespace WisdomIT\Concierge;
 
 use App\Contracts\Plugins\HasPluginSettings;
+use Carbon\CarbonImmutable;
+use DateTimeZone;
 use Closure;
 use Filament\Contracts\Plugin;
 use App\Enums\PluginStatus;
@@ -557,7 +559,52 @@ class ConciergePlugin implements Plugin, HasPluginSettings
                         ->minValue(0)
                         ->default(fn () => UsageLimiter::rules(ConciergeSettings::current())[0]['amount'] ?? 0)
                         ->required(),
+
+                    // 🔴 "하루 50건"의 하루가 **어느 자정인지** 화면이 말해야 한다 (#82).
+                    //    여태 컨테이너의 TZ 가 정했고 화면은 그 사실을 언급조차 하지 않았다 —
+                    //    한국 운영자가 UTC 자정에 초기화되는 것을 모른 채 쓰게 된다.
+                    Select::make('quota_timezone')
+                        ->label(trans('concierge::strings.field_quota_timezone'))
+                        ->helperText(fn (Get $get) => trans('concierge::strings.help_quota_timezone', [
+                            'resets' => self::nextResetLabel((string) $get('limit_period'), (string) $get('quota_timezone')),
+                        ]))
+                        // 패널의 사용자 프로필과 같은 목록을 쓴다 — 두 화면이 다른 이름을
+                        // 쓰면 같은 시간대를 서로 다른 것으로 읽게 된다.
+                        ->options(fn () => collect(DateTimeZone::listIdentifiers())->mapWithKeys(fn (string $tz) => [$tz => $tz]))
+                        ->searchable()
+                        ->native(false)
+                        ->live()
+                        // 비어 있으면 지금 그대로다(TZ → app.timezone). 기본값을 심으면
+                        // 손대지 않은 설치의 경계가 그 순간 옮겨간다.
+                        ->placeholder(trans('concierge::strings.quota_timezone_inherited', [
+                            'timezone' => getenv('TZ') ?: (string) config('app.timezone', 'UTC'),
+                        ]))
+                        ->default(fn () => ConciergeSettings::current()->quota_timezone)
+                        ->columnSpan(2),
         ];
+    }
+
+    /**
+     * "다음 초기화는 언제인가" 한 줄 (#82). 고른 시간대와 주기를 그대로 적용해 보여준다 —
+     * 설명이 아니라 **실제 값**이어야 운영자가 자기 기대와 맞춰 볼 수 있다.
+     */
+    private static function nextResetLabel(string $period, string $timezone): string
+    {
+        $timezone = trim($timezone) ?: (getenv('TZ') ?: (string) config('app.timezone', 'UTC'));
+
+        try {
+            $at = match ($period) {
+                'hour' => CarbonImmutable::now($timezone)->addHour()->startOfHour(),
+                'week' => CarbonImmutable::now($timezone)->addWeek()->startOfWeek(),
+                'month' => CarbonImmutable::now($timezone)->addMonthNoOverflow()->startOfMonth(),
+                default => CarbonImmutable::tomorrow($timezone),
+            };
+        } catch (Throwable) {
+            // 목록에 없는 값이 들어온 경우 — 화면이 죽는 것보다 조용히 비우는 편이 낫다.
+            return '';
+        }
+
+        return $at->format('Y-m-d H:i') . ' (' . $timezone . ')';
     }
 
     /**
@@ -908,6 +955,9 @@ class ConciergePlugin implements Plugin, HasPluginSettings
             'amount' => (int) ($data['limit_amount'] ?? 0),
         ]]);
         unset($data['limit_metric'], $data['limit_scope'], $data['limit_period'], $data['limit_amount']);
+
+        // 빈 값은 "패널을 따른다" 다 — 빈 문자열로 저장하면 null 과 뜻이 갈린다(#82).
+        $data['quota_timezone'] = trim((string) ($data['quota_timezone'] ?? '')) ?: null;
 
         $settings->fill($data);
         $settings->api_key = $primary['api_key'];

@@ -598,6 +598,11 @@ return [
 
     'section_limits' => '사용 한도',
     'section_limits_help' => '기준(메시지 수 또는 토큰) × 범위(사용자별·패널 전체) × 주기(시·일·주·월)로 정합니다. 한도에 걸려 거절된 요청은 한도에 세지 않습니다.',
+    // 할당량이 넘어가는 시계 (#82) — 사용자 프로필이 아니라 서버 기준시다.
+    'field_quota_timezone' => '초기화 기준 시간대',
+    'help_quota_timezone' => '한도가 넘어가는 시계입니다. 사용자 프로필이 아니라 서버 기준이라, 모든 사용자에게 같은 자정에 초기화됩니다 — 관리자가 서버 로그와 대조할 수 있어야 하기 때문입니다. 다음 초기화: :resets',
+    'quota_timezone_inherited' => '패널을 따름 (:timezone)',
+
     'limit_metric' => '기준',
     'limit_metric_messages' => '메시지 수',
     'limit_metric_tokens' => '토큰',

@@ -595,6 +595,11 @@ return [
 
     'section_limits' => 'Usage limit',
     'section_limits_help' => 'Metric (messages or tokens) × scope (per user / panel-wide) × period (hour / day / week / month). Requests rejected by the limit do not count toward it.',
+    // The clock a quota rolls over on (#82) — server time, not the user's profile.
+    'field_quota_timezone' => 'Reset timezone',
+    'help_quota_timezone' => 'The clock the limit rolls over on. It follows the server, not each user\'s profile, so it resets at the same midnight for everyone — an administrator has to be able to line it up with server logs. Next reset: :resets',
+    'quota_timezone_inherited' => 'Follow the panel (:timezone)',
+
     'limit_metric' => 'Metric',
     'limit_metric_messages' => 'Messages',
     'limit_metric_tokens' => 'Tokens',
