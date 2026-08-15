@@ -10,10 +10,19 @@ use WisdomIT\Concierge\Support\OptionalPlugins;
 /**
  * 접속자 수 조회 (#18·#53). 유휴 판정·콘솔 위젯·에이전트 도구가 **같은 코드로 같은 숫자**를 본다.
  *
- * ⚠ 할당 IP 는 0.0.0.0(전체 바인드)이라 그대로 쿼리할 수 없다 — 도커 게이트웨이로 되돌아
- *   들어간다. Player Counter 위젯이 이 배포에서 동작하지 않는 이유이기도 하다
- *   (canRunQuery 가 0.0.0.0 을 거부). 그래서 스키마(프로토콜 구현)만 빌려 쓰고
- *   대상 주소는 우리가 정한다.
+ * 🔴 **조회 대상은 할당의 IP 다** (#82). 한때는 전역 설정(`query_host`, 기본 172.17.0.1)으로
+ *    도커 게이트웨이에 되돌아 들어갔다 — 이 배포의 할당이 전부 `0.0.0.0` 이라 그 주소로는
+ *    아무 데도 닿을 수 없었기 때문이다. 하지만 그 우회에는 값이 없었다: 노드가 둘이면
+ *    표현할 수 없고(노드마다 주소가 다르다), 틀렸을 때 조용히 실패하며, 무엇보다
+ *    **할당이 제 주소를 갖게 되면 필요가 없다.**
+ *
+ * ⚠ `query_host` 는 남겨 둔다. 다만 뜻이 바뀌었다 — 기본 경로가 아니라, 패널이 자기
+ *   할당 주소로 되돌아 들어갈 수 없는 배포(헤어핀 NAT 등)를 위한 **덮어쓰기**다.
+ *   비어 있는 것이 정상이고, 비어 있으면 할당의 IP 를 쓴다.
+ *
+ * ⚠ 할당이 `0.0.0.0` 이면 조회를 시도하지 않는다. 그건 주소가 아니라 "전부"라는 뜻이고,
+ *   Player Counter 자신도 같은 이유로 거부한다(canRunQuery). 그 경우 덮어쓰기가 없으면
+ *   **셀 수 없음**으로 답한다 — 아무 데나 찔러 보고 실패로 적는 것보다 낫다.
  *
  * ⚠ 이 쿼리도 그 서버의 rx 를 올린다. 유휴 판정에서 접속자 수를 쓰는 게임이 rx 를 보지 않는
  *   이유다 — 새 호출처를 늘릴 때(위젯 폴링 등) 그 전제는 그대로 유지된다.
@@ -73,11 +82,13 @@ class PlayerCount
             return false;
         }
 
-        $result = $schema->process(
-            $server,
-            config('concierge.query_host', '172.17.0.1'),
-            $this->queryPort($server, $game),
-        );
+        $host = $this->queryHost($server);
+
+        if ($host === null) {
+            return false;
+        }
+
+        $result = $schema->process($server, $host, $this->queryPort($server, $game));
 
         return $result ?? false;
     }
@@ -118,6 +129,29 @@ class PlayerCount
     }
 
     /** @param array<string, mixed> $game */
+    /**
+     * 어디로 물을 것인가 (#82).
+     *
+     * 할당의 IP 가 답이다. 덮어쓰기가 설정돼 있으면 그것이 이긴다 — 패널이 자기 할당
+     * 주소로 되돌아 들어갈 수 없는 배포를 위한 탈출구다.
+     *
+     * @return ?string null = 물을 곳이 없다(할당이 0.0.0.0 인데 덮어쓰기도 없다)
+     */
+    private function queryHost(Server $server): ?string
+    {
+        $override = trim((string) config('concierge.query_host', ''));
+
+        if ($override !== '') {
+            return $override;
+        }
+
+        $ip = trim((string) $server->allocation?->ip);
+
+        // 🔴 0.0.0.0 은 주소가 아니라 "전부"다. 그리로 조회를 보내면 실패하거나 — 더 나쁘게 —
+        //    루프백의 엉뚱한 서비스에 닿는다. Player Counter 도 같은 이유로 거부한다.
+        return ($ip === '' || $ip === '0.0.0.0' || $ip === '::') ? null : $ip;
+    }
+
     private function queryPort(Server $server, array $game): int
     {
         if ($variable = $game['query_port_variable'] ?? null) {
