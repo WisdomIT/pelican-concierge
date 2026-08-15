@@ -43,6 +43,7 @@ class ConciergeSettings extends Model
         'effort',
         'max_tokens',
         'usage_limits',
+        'quota_timezone',
         'idle_enabled',
         'search_enabled',
         'search_max_uses',

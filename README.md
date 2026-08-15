@@ -188,6 +188,7 @@ else matters until this works), **Usage limits**, **Features**, **Environment**,
 | Effort | Connection | `medium` | Per entry. How hard the model thinks. Higher costs more |
 | Max tokens | Connection | `8192` | Per entry, per reply |
 | Usage limit | Limits | 50 messages / user / day | Metric (messages · tokens) × scope (per user · panel-wide) × period (hour · day · week · month). The block message names the limit and its reset time. 0 = unlimited |
+| Reset timezone | Limits | follow the panel | Which clock the limit rolls over on, and when the next reset falls. Server time, not each user's profile — an administrator has to be able to line usage up with server logs |
 | Web search | Features | off | Adds a per-search fee on top of tokens |
 | Idle watch | Features | off | Interval, and whether to stop the server or only ask |
 | Conversation deletion | Features | off | Users may remove conversations from their own history. Soft: administrators keep the record and usage totals |
