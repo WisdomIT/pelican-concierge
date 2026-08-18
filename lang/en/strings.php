@@ -70,6 +70,10 @@ return [
     // Importing eggs (#105)
     'tool_list_importable_eggs' => 'Searching for eggs to import',
     'tool_import_egg' => 'Importing an egg',
+    // Player-count recipes (#112)
+    'tool_list_game_queries' => 'Checking player-count recipes',
+    'tool_set_egg_game_query' => 'Linking a player-count recipe',
+    'tool_remove_egg_game_query' => 'Unlinking a player-count recipe',
     // Admin operations (#47)
     'tool_set_node_maintenance' => 'Changing maintenance mode',
     'tool_add_node_allocations' => 'Adding ports',
@@ -150,6 +154,22 @@ return [
     'card_node_address' => 'Address',
     'card_title_create_mount' => 'Create this mount?',
     // Importing eggs (#105) — this brings in someone else's install script, so the card names the source.
+    // Player-count recipes (#112) — every server on that egg changes with it.
+    'card_title_set_egg_game_query' => 'Start counting players for this egg?',
+    'card_confirm_set_egg_game_query' => 'Link',
+    'card_title_remove_egg_game_query' => 'Stop counting players?',
+    'card_confirm_remove_egg_game_query' => 'Unlink',
+    'card_query_protocol' => 'Protocol',
+    'card_query_port' => 'Query port',
+    'card_query_port_variable' => 'the value of the egg variable :variable',
+    'card_query_port_offset' => 'the allocation port +:offset',
+    'card_query_port_same' => 'the allocation port itself',
+    'card_query_source' => 'Based on',
+    'card_query_source_catalog' => 'the catalogue entry',
+    'card_query_source_given' => 'values given in this conversation',
+    'card_query_replaces' => 'Currently',
+    'card_note_set_egg_game_query' => 'Every server on this egg starts showing a player count. After linking, the recipe is tried against a real server and the answer is reported back.',
+    'card_note_remove_egg_game_query' => 'Servers on this egg stop showing a player count. The servers themselves are untouched.',
     'card_title_import_egg' => 'Import this egg?',
     'card_confirm_import_egg' => 'Import',
     'card_egg' => 'Egg',

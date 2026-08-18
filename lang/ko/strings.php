@@ -70,6 +70,10 @@ return [
     // egg 가져오기 (#105)
     'tool_list_importable_eggs' => '가져올 수 있는 egg 찾는 중',
     'tool_import_egg' => 'egg 가져오는 중',
+    // 접속자 수 규약 (#112)
+    'tool_list_game_queries' => '접속자 수 규약 확인하는 중',
+    'tool_set_egg_game_query' => '접속자 수 규약 잇는 중',
+    'tool_remove_egg_game_query' => '접속자 수 규약 푸는 중',
     // 관리 운영 변경 (#47)
     'tool_set_node_maintenance' => '노드 점검 모드 바꾸는 중',
     'tool_add_node_allocations' => '포트 추가하는 중',
@@ -150,6 +154,22 @@ return [
     'card_node_address' => '접속 주소',
     'card_title_create_mount' => '이 마운트를 만들까요?',
     // egg 가져오기 (#105) — 남이 쓴 설치 스크립트를 들이는 일이라 출처를 카드에 적는다.
+    // 접속자 수 규약 (#112) — 그 egg 로 만든 모든 서버의 위젯이 함께 바뀐다.
+    'card_title_set_egg_game_query' => '이 egg 의 접속자 수를 세도록 할까요?',
+    'card_confirm_set_egg_game_query' => '연결',
+    'card_title_remove_egg_game_query' => '접속자 수 세기를 끌까요?',
+    'card_confirm_remove_egg_game_query' => '연결 해제',
+    'card_query_protocol' => '조회 방식',
+    'card_query_port' => '조회 포트',
+    'card_query_port_variable' => 'egg 변수 :variable 의 값',
+    'card_query_port_offset' => '할당 포트 +:offset',
+    'card_query_port_same' => '할당 포트 그대로',
+    'card_query_source' => '근거',
+    'card_query_source_catalog' => '카탈로그에 적힌 값',
+    'card_query_source_given' => '대화에서 받은 값',
+    'card_query_replaces' => '지금 설정',
+    'card_note_set_egg_game_query' => '이 egg 로 만든 모든 서버의 접속자 수 표시가 함께 바뀝니다. 연결한 뒤 실제로 한 번 물어보고 응답이 왔는지 알려드립니다.',
+    'card_note_remove_egg_game_query' => '이 egg 로 만든 서버들은 접속자 수를 표시하지 않게 됩니다. 서버 자체는 영향을 받지 않습니다.',
     'card_title_import_egg' => '이 egg 를 가져올까요?',
     'card_confirm_import_egg' => '가져오기',
     'card_egg' => 'egg',

@@ -75,7 +75,7 @@ from the requester's own permissions, so it differs per person.
 | Diagnose | node health and capacity, wings reachability, ports, users and what they own, roles and what each grants, eggs and their variables, mounts, database and backup hosts, webhooks, API keys, panel health, activity log |
 | Operate | maintenance mode, add or reclaim ports, suspend a server |
 | People | create an account, grant or revoke roles, transfer a server, edit an account, send a password reset link, clear a stuck two-factor, create roles and set their permissions |
-| Build | register a node or a mount; search the official egg index and import a game this panel does not have yet |
+| Build | register a node or a mount; search the official egg index and import a game this panel does not have yet; wire up player counts for an egg (with Player Counter) |
 | Delete | servers, accounts, roles, nodes, mounts — each behind the strongest confirmation in the product |
 
 ## What the assistant can do depends on who is asking
@@ -262,7 +262,7 @@ still works, with exactly these differences:
 
 | Plugin | With it | Without it |
 |---|---|---|
-| [Player Counter](https://hub.pelican.dev/plugins/player-counter) | Player counts in status answers; player-based idle detection | Counts unavailable (status answers say why); idle detection falls back to network traffic |
+| [Player Counter](https://hub.pelican.dev/plugins/player-counter) | Player counts in status answers; player-based idle detection; the assistant can also see which eggs have no player-count recipe and link one, using the catalogue's own declaration | Counts unavailable (status answers say why); idle detection falls back to network traffic. The recipe tools are not offered at all |
 | [Minecraft Modrinth](https://hub.pelican.dev/plugins/minecraft-modrinth) | Mod and plugin search & install for Minecraft | Mod tools explain the plugin is missing and that an admin can install it — they do not claim the game is unsupported |
 | [Rust uMod](https://hub.pelican.dev/plugins/rust-umod) | Plugin search & install for Rust | Same as above |
 | [User Creatable Servers](https://hub.pelican.dev/plugins/user-creatable-servers) | Per-user quotas enforced on creation; ports drawn from its configured range; a delete-server link | **Creation requires admin authority** (the panel's `create server` permission) — ordinary users cannot create at all. Admin creations skip quota and the port pool (reserved ports included) and get 0 backup/database limits; the assistant's reply says so. No delete link |

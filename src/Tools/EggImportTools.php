@@ -5,6 +5,7 @@ namespace WisdomIT\Concierge\Tools;
 use App\Models\Egg;
 use App\Services\Eggs\Sharing\EggImporterService;
 use Illuminate\Support\Facades\Cache;
+use WisdomIT\Concierge\Services\PlayerCount;
 use Throwable;
 
 /**
@@ -185,12 +186,30 @@ final class EggImportTools
 
         return sprintf(
             '%s the egg "%s" (id %d)%s. It can be used for new servers right away, and appears under Eggs on the admin side. '
-            . 'If it should also be offered by the assistant, it needs a catalogue entry — create_catalog_game does that.',
+            . 'If it should also be offered by the assistant, it needs a catalogue entry — create_catalog_game does that.%s',
             $plan['replaces'] !== null ? 'Updated' : 'Imported',
             $egg->name,
             $egg->id,
             filled($egg->author) ? sprintf(' by %s', $egg->author) : '',
+            $this->playerCountNote(),
         );
+    }
+
+    /**
+     * 접속자 수 규약도 없다는 사실을 **여기서** 말한다 (#112).
+     *
+     * egg 를 막 들여온 순간은 관리자가 그 게임을 생각하고 있는 유일한 때다. 그때 말하지
+     * 않으면 영영 말할 기회가 없고, 접속자 수가 없다는 것은 나중에 빈 위젯으로만 드러난다 —
+     * 그건 "서버에 아무도 없다"와 구분되지 않는다. 카탈로그 안내와 같은 자리다.
+     *
+     * 🔴 **Player Counter 가 있을 때만.** 없는 플러그인의 기능을 권하는 것은 안내가 아니라
+     *    막다른 길이고(#48), 그 말을 읽은 관리자는 없는 화면을 찾아다니게 된다.
+     */
+    private function playerCountNote(): string
+    {
+        return PlayerCount::available()
+            ? ' It also has no player-count recipe yet, so servers on it will show nobody online — set_egg_game_query links one.'
+            : '';
     }
 
     /**
