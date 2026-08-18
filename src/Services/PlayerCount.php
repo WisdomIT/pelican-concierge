@@ -122,8 +122,9 @@ class PlayerCount
     }
 
     /** Player Counter 플러그인이 설치되어 있고 **켜져** 있는가.
-     *  ⚠ class_exists 로는 안 된다 — 꺼진 플러그인에도 true 다(#13). */
-    private static function available(): bool
+     *  ⚠ class_exists 로는 안 된다 — 꺼진 플러그인에도 true 다(#13).
+     *  공개다: 규약 도구(GameQueryTools)와 도구 노출 판정이 **같은 판정**을 봐야 한다(#112). */
+    public static function available(): bool
     {
         return OptionalPlugins::usable('player-counter');
     }

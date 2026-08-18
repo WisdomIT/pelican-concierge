@@ -3,10 +3,12 @@
 namespace WisdomIT\Concierge\Tools;
 
 use App\Models\Egg;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\Yaml\Yaml;
 use WisdomIT\Concierge\Catalog\AdvancedYaml;
 use WisdomIT\Concierge\Catalog\GameCatalog;
 use WisdomIT\Concierge\Models\ConciergeGame;
+use WisdomIT\Concierge\Services\PlayerCount;
 
 /**
  * 카탈로그를 읽고 고치는 도구 (#91).
@@ -51,15 +53,41 @@ final class CatalogTools
             ], fn ($v) => $v !== null && $v !== false))
             ->all();
 
-        return [
+        return array_filter([
             'count' => count($games),
             'games' => $games,
             'eggs_without_entry' => array_values(array_diff(
                 $eggs,
                 ConciergeGame::query()->pluck('egg')->all(),
             )),
+            // 항목이 없는 egg 옆에 **규약이 없는 egg** 도 함께 준다 (#112) — 둘 다
+            // "왜 이게 안 보이지"의 답이고, 한 번에 보여야 관리자가 한 번에 고친다.
+            'eggs_without_player_count' => $this->eggsWithoutPlayerCount($eggs),
             'note' => 'Use get_catalog_game for one entry in full, including its advanced block.',
-        ];
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * 접속자 수 규약이 없는 egg 들 (#112).
+     *
+     * 🔴 **Player Counter 가 없으면 null** — 그러면 위에서 키째 빠진다. 없는 플러그인의
+     *    설정거리를 목록에 얹으면 모델이 그것을 권하게 되고, 관리자는 없는 화면을 찾는다.
+     *
+     * @param  array<int, string>  $eggs
+     * @return ?array<int, string>
+     */
+    private function eggsWithoutPlayerCount(array $eggs): ?array
+    {
+        if (!PlayerCount::available()) {
+            return null;
+        }
+
+        $linked = Egg::query()
+            ->whereIn('id', DB::table('egg_game_query')->pluck('egg_id'))
+            ->pluck('name')
+            ->all();
+
+        return array_values(array_diff($eggs, $linked));
     }
 
     /**
@@ -153,7 +181,45 @@ final class CatalogTools
 
         GameCatalog::forget();
 
-        return ['saved' => $game->game_id, 'name' => $game->name, 'egg' => $game->egg];
+        return array_filter([
+            'saved' => $game->game_id,
+            'name' => $game->name,
+            'egg' => $game->egg,
+            // 방금 쓴 항목이 query 를 선언했는데 그 egg 에 규약이 없다면 지금 말한다 (#112) —
+            // 같은 사실을 두 곳에 따로 적게 두지 않는다.
+            'player_count' => $this->playerCountHint($game),
+        ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * 이 항목이 접속자 수를 선언했는데 egg 에 규약이 없으면 그 사실 (#112).
+     *
+     * 🔴 Player Counter 가 없으면 null — 없는 플러그인의 설정을 권하지 않는다.
+     */
+    private function playerCountHint(ConciergeGame $game): ?string
+    {
+        if (!PlayerCount::available()) {
+            return null;
+        }
+
+        $declared = ($game->advanced ?? [])['query'] ?? null;
+
+        if (!is_string($declared) || $declared === '') {
+            return null;
+        }
+
+        $eggId = Egg::query()->whereRaw('lower(name) = ?', [mb_strtolower((string) $game->egg)])->value('id');
+
+        if ($eggId === null || DB::table('egg_game_query')->where('egg_id', $eggId)->exists()) {
+            return null;
+        }
+
+        return sprintf(
+            'This entry declares the "%s" query, but the egg "%s" has no player-count recipe yet, so servers on it will '
+            . 'show nobody online. set_egg_game_query with just the egg picks these same values up.',
+            $declared,
+            $game->egg,
+        );
     }
 
     /** @return array<string, mixed> */

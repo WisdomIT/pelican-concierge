@@ -121,6 +121,14 @@ final class AgentToolbox
         return $this->adminRead ??= new AdminReadTools($this->user);
     }
 
+    /** 접속자 수 규약 (#112). */
+    private function gameQueries(): GameQueryTools
+    {
+        return $this->gameQueries ??= new GameQueryTools($this->catalog);
+    }
+
+    private ?GameQueryTools $gameQueries = null;
+
     /** egg 가져오기 (#105). */
     private function eggImport(): EggImportTools
     {
@@ -335,6 +343,49 @@ final class AgentToolbox
                 ]);
             })(),
 
+            'set_egg_game_query' => (function () use ($common, $input) {
+                // 검사는 카드 앞에서 끝난다 — egg 존재·프로토콜·포트 규칙까지.
+                $plan = $this->gameQueries()->plan($input);
+
+                return array_merge($common, [
+                    'lines' => array_values(array_filter([
+                        ['label' => trans('concierge::strings.card_egg'), 'value' => $plan['egg']],
+                        ['label' => trans('concierge::strings.card_query_protocol'), 'value' => $plan['protocol']],
+                        ['label' => trans('concierge::strings.card_query_port'), 'value' => trans(
+                            match (true) {
+                                filled($plan['port_variable']) => 'concierge::strings.card_query_port_variable',
+                                (int) $plan['port_offset'] !== 0 => 'concierge::strings.card_query_port_offset',
+                                default => 'concierge::strings.card_query_port_same',
+                            },
+                            ['variable' => $plan['port_variable'], 'offset' => $plan['port_offset']],
+                        )],
+                        // 🔴 카탈로그에서 왔는지 사람이 준 값인지 밝힌다 — 승인의 근거가 다르다.
+                        ['label' => trans('concierge::strings.card_query_source'), 'value' => trans(
+                            $plan['source'] === 'catalog'
+                                ? 'concierge::strings.card_query_source_catalog'
+                                : 'concierge::strings.card_query_source_given',
+                        )],
+                        // 이미 이어져 있으면 새로 만드는 게 아니라 바꾸는 것이다.
+                        $plan['replaces'] === null ? null : [
+                            'label' => trans('concierge::strings.card_query_replaces'),
+                            'value' => (string) $plan['replaces'],
+                        ],
+                    ])),
+                    'note' => trans('concierge::strings.card_note_set_egg_game_query'),
+                    'danger' => $plan['replaces'] !== null,
+                ]);
+            })(),
+
+            'remove_egg_game_query' => (function () use ($common, $input) {
+                $egg = trim((string) ($input['egg'] ?? ''));
+
+                return array_merge($common, [
+                    'lines' => [['label' => trans('concierge::strings.card_egg'), 'value' => $egg]],
+                    'note' => trans('concierge::strings.card_note_remove_egg_game_query'),
+                    'danger' => true,
+                ]);
+            })(),
+
             'import_egg' => (function () use ($common, $input) {
                 // 검사는 카드 앞에서 끝난다 — 주소 형태·스킴·확장자, 그리고 공식 목록 대조까지.
                 $plan = $this->eggImport()->plan($input);
@@ -505,7 +556,17 @@ final class AgentToolbox
         'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
         // egg 가져오기 (#105) — 화면 툴바의 Import 와 같은 `import egg` 권한
         'list_importable_eggs', 'import_egg',
+        // 접속자 수 규약 (#112) — Player Counter 가 있을 때만 노출된다
+        'list_game_queries', 'set_egg_game_query', 'remove_egg_game_query',
     ];
+
+    /**
+     * Player Counter 플러그인이 있어야 뜻이 있는 도구들 (#112).
+     *
+     * 🔴 없는 플러그인의 도구를 쥐여 주면 모델이 불러 보고 실패한다 — 왕복이 낭비되고
+     *    사용자는 없는 화면을 찾아다닌다. 모드 도구가 Modrinth·uMod 에 대해 하는 것과 같다.
+     */
+    private const PLAYER_COUNTER_TOOLS = ['list_game_queries', 'set_egg_game_query', 'remove_egg_game_query'];
 
     /**
      * 어드민 도구별로 요구하는 **리소스 권한** (#46).
@@ -566,6 +627,12 @@ final class AgentToolbox
         // 접두어 enum 에는 import 가 없다 — 문자열 형태를 쓴다.
         'list_importable_eggs' => 'import egg',
         'import_egg' => 'import egg',
+        // 접속자 수 규약 (#112). Player Counter 의 화면이 DefaultAdminPolicies 로
+        // `game_query` 를 쓰므로 **같은 권한**을 요구한다 — 화면과 도구가 갈리면 안 된다(#97).
+        // 접두어 enum 에 없는 모델이라 문자열 형태를 쓴다.
+        'list_game_queries' => 'viewList game_query',
+        'set_egg_game_query' => 'update game_query',
+        'remove_egg_game_query' => 'update game_query',
         // 사용자·역할 2차 (#63)
         'update_panel_user' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
         'send_password_reset' => [RolePermissionPrefixes::Update, RolePermissionModels::User],
@@ -662,6 +729,12 @@ final class AgentToolbox
 
     private function isRelevant(string $name): bool
     {
+        // 🔴 Player Counter 가 없으면 그 플러그인의 도구는 **아예 없는 것으로 한다** (#112).
+        //    권한보다 먼저 본다 — 권한이 있어도 조작할 대상이 없다.
+        if (in_array($name, self::PLAYER_COUNTER_TOOLS, true) && !PlayerCount::available()) {
+            return false;
+        }
+
         // 관리 도구는 서버 유무와 무관하고, 리소스 권한 하나하나로 갈린다 (#46).
         if (isset(self::ADMIN_TOOL_PERMISSIONS[$name])) {
             return $this->allowedByAdminPermission($name);
@@ -1370,6 +1443,44 @@ final class AgentToolbox
                     'required' => ['url'],
                 ],
             ],
+            // ── 접속자 수 규약 (#112). Player Counter 가 없으면 노출되지 않는다. ──
+            [
+                'name' => 'list_game_queries',
+                'description' => 'How each egg is asked for its player count, and — more usefully — which eggs have no such recipe at all. '
+                    . 'An egg without one shows no player count anywhere, and nothing else on the panel says so. '
+                    . 'Where our catalogue already declares the protocol and port for an egg, that is included: it is a verified '
+                    . 'value, so propose it rather than asking.',
+                'inputSchema' => ['type' => 'object', 'properties' => (object) [], 'required' => []],
+            ],
+            [
+                'name' => 'set_egg_game_query',
+                'description' => 'Give an egg a player-count recipe, so servers on it start reporting who is online. '
+                    . 'Call it with just the egg to use our catalogue\'s own declaration — that is the normal case. '
+                    . 'Supply protocol and port only when the catalogue has nothing, and then only with values the administrator gave you: '
+                    . '**never guess a port**. A wrong one fails silently and is indistinguishable from an empty server, which is worse '
+                    . 'than leaving it unlinked. After linking, the result says whether a real server actually answered. '
+                    . 'Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'egg' => ['type' => 'string', 'description' => 'Egg name as imported on this panel.'],
+                        'protocol' => ['type' => 'string', 'description' => 'Only when the catalogue has no entry: source, goldsrc, minecraft_java, minecraft_bedrock, cfx or palworld.'],
+                        'port_variable' => ['type' => 'string', 'description' => 'Egg variable holding the query port, when the game uses a separate one (for example QUERY_PORT).'],
+                        'port_offset' => ['type' => 'integer', 'description' => 'Or how far the query port sits above the allocation port. Give one of these, not both.'],
+                    ],
+                    'required' => ['egg'],
+                ],
+            ],
+            [
+                'name' => 'remove_egg_game_query',
+                'description' => 'Take a player-count recipe away from an egg. Servers on it stop reporting players. '
+                    . 'Confirmation card runs first.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => ['egg' => ['type' => 'string', 'description' => 'Egg name.']],
+                    'required' => ['egg'],
+                ],
+            ],
             [
                 'name' => 'list_mounts',
                 'description' => 'Mounts configured on this panel — host directories attached into servers, and which nodes and eggs use them.',
@@ -1736,6 +1847,8 @@ final class AgentToolbox
         'create_catalog_game', 'update_catalog_game', 'delete_catalog_game',
         // egg 가져오기 (#105) — 대상이 서버가 아니라 패널 전체다
         'import_egg',
+        // 접속자 수 규약 (#112) — 대상이 egg 다
+        'set_egg_game_query', 'remove_egg_game_query',
     ];
 
     private const CONFIRM_TOOLS = [
@@ -1744,6 +1857,8 @@ final class AgentToolbox
         // 🔴 egg 가져오기 (#105) — 남이 쓴 설치 스크립트를 이 패널에 들이는 일이다.
         //    카드가 출처를 밝히고, 공식 목록 밖 주소는 그렇다고 적는다.
         'import_egg',
+        // 접속자 수 규약 (#112) — 그 egg 로 만든 **모든 서버**의 위젯이 함께 바뀐다.
+        'set_egg_game_query', 'remove_egg_game_query',
         'start_server', 'stop_server', 'restart_server',
         'accept_minecraft_eula', 'replace_in_server_file',
         'create_server', 'install_mod',
@@ -2374,6 +2489,10 @@ final class AgentToolbox
                 // egg 가져오기 (#105)
                 'list_importable_eggs' => new ToolCallResult($name, $input, $this->eggImport()->listImportable($input)),
                 'import_egg' => new ToolCallResult($name, $input, $this->eggImport()->import($input)),
+                // 접속자 수 규약 (#112)
+                'list_game_queries' => new ToolCallResult($name, $input, $this->json($this->gameQueries()->list())),
+                'set_egg_game_query' => new ToolCallResult($name, $input, $this->json($this->gameQueries()->set($input))),
+                'remove_egg_game_query' => new ToolCallResult($name, $input, $this->json($this->gameQueries()->remove($input))),
                 default => ToolCallResult::error($name, $input, "Unknown tool: {$name}"),
             };
         } catch (ToolException $exception) {
